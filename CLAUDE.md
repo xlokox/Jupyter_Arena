@@ -4,14 +4,15 @@ Read `MASTER_BRIEF.md` and the latest `reports/PHASE_REPORT_*.md` before any wor
 
 ## Commands
 
-| Command                         | What it does                                                                              |
-| ------------------------------- | ----------------------------------------------------------------------------------------- |
-| `pnpm dev`                      | Dev server at http://localhost:3000                                                       |
-| `pnpm build`                    | Production build                                                                          |
-| `pnpm check`                    | lint + typecheck + unit tests (gate for every phase; `content:validate` joins in Phase 1) |
-| `pnpm test` / `pnpm test:watch` | Vitest unit tests (`src/**/*.test.{ts,tsx}`)                                              |
-| `pnpm e2e`                      | Playwright e2e (`e2e/`, starts dev server itself)                                         |
-| `pnpm lint` / `pnpm format`     | ESLint / Prettier                                                                         |
+| Command                         | What it does                                                                        |
+| ------------------------------- | ----------------------------------------------------------------------------------- |
+| `pnpm dev`                      | Dev server at http://localhost:3000                                                 |
+| `pnpm build`                    | Production build                                                                    |
+| `pnpm check`                    | lint + typecheck + unit tests + content:validate (gate for every phase, runs in CI) |
+| `pnpm content:validate`         | Zod + QA checks over `/content` (Section 6 rules)                                   |
+| `pnpm test` / `pnpm test:watch` | Vitest unit tests (`src/**/*.test.{ts,tsx}`)                                        |
+| `pnpm e2e`                      | Playwright e2e (`e2e/`, starts dev server itself)                                   |
+| `pnpm lint` / `pnpm format`     | ESLint / Prettier                                                                   |
 
 Package manager is **pnpm**, Node ≥ 20.
 
@@ -21,7 +22,7 @@ Package manager is **pnpm**, Node ≥ 20.
 - `src/components/` — UI components; colocated `*.test.tsx`.
 - `src/i18n/en.ts` — ALL user-visible strings. Components never hardcode copy. Use logical CSS properties (`ms-*`, `text-start`) for future RTL. Code blocks always LTR.
 - `e2e/` — Playwright specs.
-- `content/` — challenge JSON (Phase 1+), validated by Zod, seeded to Postgres (Phase 4).
+- `content/` — `sectors.json` + `challenges/{sector}/{id}.json`, validated by `src/lib/content/schema.ts` (Zod) and the QA checks in `src/lib/content/validate.ts`; seeded to Postgres in Phase 4. Authoring rules: brief Section 6 (traceback must match the code, exactly one correct option, wrong options get realistic failure logs, video links are YouTube search queries only, no TODO/lorem).
 - `reports/` — one `PHASE_REPORT_N.md` per phase.
 
 ## Hard rules (from brief Sections 2, 4, 12)
