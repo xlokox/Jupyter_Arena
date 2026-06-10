@@ -77,3 +77,24 @@ code {
     transform: translateX(4px);
   }
 }
+
+/* Transform-only (no opacity fade) so text contrast holds at every frame. */
+@keyframes toast-in {
+  from {
+    transform: translateY(12px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* The single celebratory level-up pulse (~600ms, Section 8). */
+@keyframes level-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+  50% {
+    box-shadow: 0 0 24px 4px color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+}

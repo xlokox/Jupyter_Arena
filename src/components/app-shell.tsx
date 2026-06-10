@@ -5,6 +5,7 @@ import { FlaskConical } from "lucide-react";
 import type { Challenge, Sector } from "@/lib/content/schema";
 import { Header } from "@/components/header";
 import { Sidebar } from "@/components/sidebar";
+import { XpToast } from "@/components/xp-toast";
 import { NotebookView } from "@/components/notebook/notebook-view";
 import { TutorialView } from "@/components/tutorial-view";
 import { filterChallenges, getAttempt, useWorkspaceStore } from "@/store/workspace";
@@ -13,9 +14,11 @@ import { en } from "@/i18n/en";
 interface AppShellProps {
   challenges: Challenge[];
   sectors: Sector[];
+  /** When set (e.g. the /daily route), this mission opens on mount. */
+  initialChallengeId?: string | null;
 }
 
-export function AppShell({ challenges }: AppShellProps) {
+export function AppShell({ challenges, initialChallengeId }: AppShellProps) {
   const activeChallengeId = useWorkspaceStore((s) => s.activeChallengeId);
   const view = useWorkspaceStore((s) => s.view);
   const sectorFilter = useWorkspaceStore((s) => s.sectorFilter);
@@ -26,6 +29,15 @@ export function AppShell({ challenges }: AppShellProps) {
   const openMission = useWorkspaceStore((s) => s.openMission);
 
   const active = challenges.find((c) => c.id === activeChallengeId) ?? null;
+
+  // Restore anonymous progress from localStorage (persist is SSR-safe via
+  // skipHydration), then honor a route-provided initial mission.
+  useEffect(() => {
+    useWorkspaceStore.persist.rehydrate();
+    if (initialChallengeId) {
+      useWorkspaceStore.getState().openMission(initialChallengeId);
+    }
+  }, [initialChallengeId]);
 
   const goToNext = useCallback(() => {
     const visible = filterChallenges(challenges, {
@@ -100,6 +112,7 @@ export function AppShell({ challenges }: AppShellProps) {
           )}
         </main>
       </div>
+      <XpToast />
     </div>
   );
 }
