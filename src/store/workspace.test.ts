@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { Challenge } from "@/lib/content/schema";
-import { EMPTY_ATTEMPT, filterChallenges, getAttempt, useWorkspaceStore } from "./workspace";
+import {
+  EMPTY_ATTEMPT,
+  filterChallenges,
+  getAttempt,
+  sanitizeAttempts,
+  useWorkspaceStore,
+} from "./workspace";
 
 const initialState = useWorkspaceStore.getState();
 
@@ -171,5 +177,83 @@ describe("filterChallenges", () => {
   it("combines filters", () => {
     const result = filterChallenges(catalog, { sector: "ml", difficulty: "very_hard", query: "" });
     expect(result).toEqual([]);
+  });
+});
+
+describe("gamification integration", () => {
+  const id = "ml-002-test-set-leakage";
+
+  it("a clean correct solve awards 20 XP and surfaces a reward", () => {
+    const store = useWorkspaceStore.getState();
+    store.selectOption(id, "a");
+    store.startRun(id);
+    store.completeRun(id, true);
+    const state = useWorkspaceStore.getState();
+    expect(state.stats.xp).toBe(20);
+    expect(state.stats.correctAttempts).toBe(1);
+    expect(state.stats.currentStreak).toBe(1);
+    expect(state.lastReward?.total).toBe(20);
+    expect(state.lastReward?.events.map((e) => e.reason)).toEqual([
+      "correct_fix",
+      "first_try_bonus",
+      "daily_first_solve",
+    ]);
+  });
+
+  it("a wrong run floors XP at 0 and records the attempt", () => {
+    const store = useWorkspaceStore.getState();
+    store.selectOption(id, "b");
+    store.startRun(id);
+    store.completeRun(id, false);
+    const state = useWorkspaceStore.getState();
+    expect(state.stats.xp).toBe(0);
+    expect(state.stats.totalAttempts).toBe(1);
+    expect(state.lastReward?.events).toEqual([{ reason: "wrong_fix", delta: 0 }]);
+  });
+
+  it("wrong-then-correct loses the first-try bonus", () => {
+    const store = useWorkspaceStore.getState();
+    store.selectOption(id, "b");
+    store.startRun(id);
+    store.completeRun(id, false);
+    store.selectOption(id, "a");
+    store.startRun(id);
+    store.completeRun(id, true);
+    const state = useWorkspaceStore.getState();
+    // 0 (floored wrong) + 10 correct + 5 daily, no first-try bonus
+    expect(state.stats.xp).toBe(15);
+    expect(state.stats.correctAttempts).toBe(1);
+    expect(state.stats.totalAttempts).toBe(2);
+  });
+
+  it("two hints forfeit the bonus through the store path too", () => {
+    const store = useWorkspaceStore.getState();
+    store.revealHint(id);
+    store.revealHint(id);
+    store.selectOption(id, "a");
+    store.startRun(id);
+    store.completeRun(id, true);
+    expect(useWorkspaceStore.getState().stats.xp).toBe(15);
+  });
+
+  it("dismissReward clears the toast payload", () => {
+    const store = useWorkspaceStore.getState();
+    store.selectOption(id, "a");
+    store.startRun(id);
+    store.completeRun(id, true);
+    useWorkspaceStore.getState().dismissReward();
+    expect(useWorkspaceStore.getState().lastReward).toBeNull();
+  });
+});
+
+describe("sanitizeAttempts", () => {
+  it("returns persisted mid-run attempts to idle and leaves the rest alone", () => {
+    const sanitized = sanitizeAttempts({
+      a: { ...EMPTY_ATTEMPT, selectedOption: "a", runState: "running" },
+      b: { ...EMPTY_ATTEMPT, solved: true, runState: "solved", lastRunOption: "a" },
+    });
+    expect(sanitized.a?.runState).toBe("idle");
+    expect(sanitized.a?.selectedOption).toBe("a");
+    expect(sanitized.b?.runState).toBe("solved");
   });
 });
