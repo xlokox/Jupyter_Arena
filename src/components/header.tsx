@@ -1,10 +1,16 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
-import { BriefcaseBusiness, CheckCircle2, Flame, Menu } from "lucide-react";
+import { useState } from "react";
+import { BriefcaseBusiness, CheckCircle2, Flame, LogIn, LogOut, Menu } from "lucide-react";
+import { publicSupabaseEnv } from "@/lib/supabase/env";
+import { useAuthStore } from "@/store/auth";
 import { displayStreak, levelForXp, rankForLevel, XP_PER_LEVEL, xpIntoLevel } from "@/lib/game/xp";
 import { useWorkspaceStore, type SectorFilter } from "@/store/workspace";
 import { en } from "@/i18n/en";
+
+const SignInDialog = dynamic(() => import("@/components/auth/sign-in-dialog"), { ssr: false });
 
 /**
  * Header — MASTER_BRIEF.md Section 8. Sector pills drive the store filter;
@@ -20,6 +26,10 @@ const SECTOR_FILTERS: Array<{ id: SectorFilter; label: string }> = [
 ];
 
 export function Header() {
+  const [signInOpen, setSignInOpen] = useState(false);
+  const authStatus = useAuthStore((s) => s.status);
+  const authEmail = useAuthStore((s) => s.email);
+  const supabaseConfigured = publicSupabaseEnv() !== null;
   const sectorFilter = useWorkspaceStore((s) => s.sectorFilter);
   const setSectorFilter = useWorkspaceStore((s) => s.setSectorFilter);
   const setSidebarOpen = useWorkspaceStore((s) => s.setSidebarOpen);
@@ -118,14 +128,41 @@ export function Header() {
           })}
         </nav>
 
-        <Link
-          href="/portfolio"
-          className="flex min-h-[44px] items-center gap-1.5 rounded-md border border-border bg-panel-2 px-3 text-sm text-muted transition-colors hover:border-accent-hover hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-        >
-          <BriefcaseBusiness className="size-4 text-accent" aria-hidden />
-          {en.header.portfolio}
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/portfolio"
+            className="flex min-h-[44px] items-center gap-1.5 rounded-md border border-border bg-panel-2 px-3 text-sm text-muted transition-colors hover:border-accent-hover hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            <BriefcaseBusiness className="size-4 text-accent" aria-hidden />
+            {en.header.portfolio}
+          </Link>
+
+          {supabaseConfigured && authStatus === "signedIn" && (
+            <button
+              type="button"
+              onClick={() => {
+                void import("@/lib/game/server-progress").then(({ signOut }) => signOut());
+              }}
+              title={authEmail ?? undefined}
+              className="flex min-h-[44px] items-center gap-1.5 rounded-md border border-border bg-panel-2 px-3 text-sm text-muted transition-colors hover:border-accent-hover hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              <LogOut className="size-4" aria-hidden />
+              {en.auth.signOut}
+            </button>
+          )}
+          {supabaseConfigured && authStatus === "signedOut" && (
+            <button
+              type="button"
+              onClick={() => setSignInOpen(true)}
+              className="flex min-h-[44px] items-center gap-1.5 rounded-md border border-accent/50 bg-accent/10 px-3 text-sm text-accent transition-colors hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              <LogIn className="size-4" aria-hidden />
+              {en.auth.signIn}
+            </button>
+          )}
+        </div>
       </div>
+      {signInOpen && <SignInDialog onClose={() => setSignInOpen(false)} />}
     </header>
   );
 }

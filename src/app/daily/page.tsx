@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { loadChallenges, loadSectors } from "@/lib/content/load";
+import { unstable_cache } from "next/cache";
+import { getChallenges, getSectors } from "@/lib/content/source";
 import { dailyChallengeId } from "@/lib/game/daily";
 import { utcDayOf } from "@/lib/game/xp";
 import { AppShell } from "@/components/app-shell";
@@ -14,9 +15,14 @@ export const metadata: Metadata = {
   description: en.app.tagline,
 };
 
-export default function DailyPage() {
-  const challenges = loadChallenges();
-  const sectors = loadSectors();
+const cachedChallenges = unstable_cache(getChallenges, ["daily-challenges"], {
+  revalidate: 3600,
+});
+const cachedSectors = unstable_cache(getSectors, ["daily-sectors"], { revalidate: 3600 });
+
+export default async function DailyPage() {
+  const challenges = await cachedChallenges();
+  const sectors = await cachedSectors();
   const todaysId = dailyChallengeId(
     challenges.map((c) => c.id),
     utcDayOf(new Date()),

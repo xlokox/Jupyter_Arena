@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
+import { AuthProvider } from "@/components/auth/auth-provider";
 import { en } from "@/i18n/en";
 import "./globals.css";
 
@@ -26,6 +27,7 @@ export default function RootLayout({
   return (
     <html lang="en" dir="ltr">
       <body className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
+        <AuthProvider />
         {children}
       </body>
     </html>

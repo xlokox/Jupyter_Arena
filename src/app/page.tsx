@@ -1,8 +1,11 @@
-import { loadChallenges, loadSectors } from "@/lib/content/load";
+import { getChallenges, getSectors } from "@/lib/content/source";
 import { AppShell } from "@/components/app-shell";
 
-export default function Home() {
-  const challenges = loadChallenges();
-  const sectors = loadSectors();
+// Published content is read via the anon-key client (RLS) when Supabase env
+// is present; ISR keeps it static-fast. fs fallback otherwise.
+export const revalidate = 3600;
+
+export default async function Home() {
+  const [challenges, sectors] = await Promise.all([getChallenges(), getSectors()]);
   return <AppShell challenges={challenges} sectors={sectors} />;
 }

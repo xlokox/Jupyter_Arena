@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Challenge } from "@/lib/content/schema";
 import { Markdown } from "@/components/markdown";
 import { ChallengeIcon } from "@/components/challenge-icon";
@@ -10,6 +10,8 @@ import { OutputCell } from "./output-cell";
 import { ControlCell } from "./control-cell";
 import { SolvePanel } from "./solve-panel";
 import { useWorkspaceStore, getAttempt, type OptionKey } from "@/store/workspace";
+import { useAuthStore } from "@/store/auth";
+import { submitAttemptServer } from "@/lib/game/server-progress";
 import { en } from "@/i18n/en";
 
 const RUN_SIMULATION_MS = 700;
@@ -25,7 +27,11 @@ export function NotebookView({ challenge, onNext }: NotebookViewProps) {
   const selectOption = useWorkspaceStore((s) => s.selectOption);
   const startRun = useWorkspaceStore((s) => s.startRun);
   const completeRun = useWorkspaceStore((s) => s.completeRun);
+  const abortRun = useWorkspaceStore((s) => s.abortRun);
+  const applyServerOutcome = useWorkspaceStore((s) => s.applyServerOutcome);
   const revealHint = useWorkspaceStore((s) => s.revealHint);
+  const isAuthed = useAuthStore((s) => s.status === "signedIn");
+  const [runError, setRunError] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -39,14 +45,29 @@ export function NotebookView({ challenge, onNext }: NotebookViewProps) {
     if (!selectedOption || solved || runState === "running") return;
     const option = challenge.options.find((o) => o.key === selectedOption);
     if (!option) return;
+    setRunError(null);
     startRun(challenge.id);
     const reduced =
       typeof window !== "undefined" &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    timerRef.current = setTimeout(
-      () => completeRun(challenge.id, option.isCorrect),
-      reduced ? RUN_SIMULATION_REDUCED_MS : RUN_SIMULATION_MS,
-    );
+    const delayMs = reduced ? RUN_SIMULATION_REDUCED_MS : RUN_SIMULATION_MS;
+
+    if (isAuthed) {
+      // Authed users: the server is the only XP authority. Keep the run
+      // simulation feel with a minimum delay alongside the RPC.
+      const minDelay = new Promise((resolve) => setTimeout(resolve, delayMs));
+      void Promise.all([
+        submitAttemptServer(challenge.id, selectedOption, attempt.hintsRevealed),
+        minDelay,
+      ])
+        .then(([result]) => applyServerOutcome(challenge.id, result))
+        .catch(() => {
+          abortRun(challenge.id);
+          setRunError(en.auth.runError);
+        });
+    } else {
+      timerRef.current = setTimeout(() => completeRun(challenge.id, option.isCorrect), delayMs);
+    }
   }
 
   function handleSelect(option: OptionKey) {
@@ -90,6 +111,15 @@ export function NotebookView({ challenge, onNext }: NotebookViewProps) {
       />
 
       <OutputCell challenge={challenge} attempt={attempt} />
+
+      {runError && (
+        <p
+          role="alert"
+          className="rounded-md border border-danger/50 bg-danger/10 px-3 py-2 text-sm text-danger"
+        >
+          {runError}
+        </p>
+      )}
 
       <ControlCell
         challenge={challenge}
