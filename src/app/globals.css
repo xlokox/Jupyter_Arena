@@ -1,0 +1,64 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens — MASTER_BRIEF.md Section 8. These variables are the single
+ * source of truth for color; components consume them via the Tailwind theme
+ * mapping below (bg-panel, text-muted, border-border, text-accent, ...).
+ */
+:root {
+  --bg: #0a0c10;
+  --panel: #11141a;
+  --panel-2: #161a22;
+  --code-bg: #0d1117;
+  --border: #232936;
+
+  --text: #e6e9ef;
+  --muted: #8b93a7;
+
+  --accent: #f59e0b;
+  --accent-hover: #fbbf24;
+  --success: #34d399;
+  --danger: #f87171;
+
+  /* Syntax palette (GitHub-dark family) */
+  --syntax-keyword: #ff7b72;
+  --syntax-string: #a5d6ff;
+  --syntax-comment: #8b949e;
+  --syntax-number: #79c0ff;
+  --syntax-type: #ffa657;
+  --syntax-function: #d2a8ff;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-panel-2: var(--panel-2);
+  --color-code-bg: var(--code-bg);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --color-syntax-keyword: var(--syntax-keyword);
+  --color-syntax-string: var(--syntax-string);
+  --color-syntax-comment: var(--syntax-comment);
+  --color-syntax-number: var(--syntax-number);
+  --color-syntax-type: var(--syntax-type);
+  --color-syntax-function: var(--syntax-function);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+}
+
+/* Code blocks remain LTR always, regardless of UI locale direction. */
+pre,
+code {
+  direction: ltr;
+}
