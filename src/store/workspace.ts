@@ -6,6 +6,7 @@ import {
   applyWrongAttempt,
   INITIAL_STATS,
   levelForXp,
+  utcDayOf,
   type GameStats,
   type XpEvent,
 } from "@/lib/game/xp";
@@ -76,8 +77,34 @@ interface WorkspaceStore {
   selectOption: (challengeId: string, option: OptionKey) => void;
   startRun: (challengeId: string) => void;
   completeRun: (challengeId: string, wasCorrect: boolean) => void;
+  /** Returns an in-flight run to idle (e.g. the server rejected/failed). */
+  abortRun: (challengeId: string) => void;
+  /** Authed path: the server decided; apply its outcome verbatim. */
+  applyServerOutcome: (challengeId: string, result: ServerOutcome) => void;
+  /** Sign-in hydration: replace local progress with the account's. */
+  hydrateFromServer: (stats: GameStats, solved: ServerSolvedEntry[]) => void;
+  /** Sign-out: clear in-memory account progress back to a fresh state. */
+  resetProgress: () => void;
   revealHint: (challengeId: string) => void;
   dismissReward: () => void;
+}
+
+/** Shape of the submit_attempt RPC response the store consumes. */
+export interface ServerOutcome {
+  is_correct: boolean;
+  xp_delta: number;
+  new_xp: number;
+  level: number;
+  streak: number;
+  already_solved: boolean;
+  events: XpEvent[];
+}
+
+export interface ServerSolvedEntry {
+  challengeId: string;
+  attempts: number;
+  hintsUsed: number;
+  solved: boolean;
 }
 
 export const getAttempt = (
@@ -195,6 +222,80 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
             },
           };
         }),
+
+      abortRun: (challengeId) =>
+        set((state) => {
+          const attempt = getAttempt(state.attempts, challengeId);
+          if (attempt.runState !== "running") return state;
+          return {
+            attempts: {
+              ...state.attempts,
+              [challengeId]: { ...attempt, runState: "idle" },
+            },
+          };
+        }),
+
+      applyServerOutcome: (challengeId, result) =>
+        set((state) => {
+          const attempt = getAttempt(state.attempts, challengeId);
+          if (attempt.runState !== "running" || !attempt.selectedOption) return state;
+
+          const dailyTicked = result.events.some((e) => e.reason === "daily_first_solve");
+          const counted = !(result.is_correct && result.already_solved);
+          rewardCounter += 1;
+          return {
+            attempts: {
+              ...state.attempts,
+              [challengeId]: {
+                ...attempt,
+                runState: result.is_correct ? "solved" : "failed",
+                solved: result.is_correct,
+                lastRunOption: attempt.selectedOption,
+                wrongAttempts: attempt.wrongAttempts + (result.is_correct ? 0 : 1),
+              },
+            },
+            stats: {
+              ...state.stats,
+              xp: result.new_xp,
+              currentStreak: result.streak,
+              longestStreak: Math.max(state.stats.longestStreak, result.streak),
+              lastActiveDay: dailyTicked ? utcDayOf(new Date()) : state.stats.lastActiveDay,
+              totalAttempts: state.stats.totalAttempts + (counted ? 1 : 0),
+              correctAttempts: state.stats.correctAttempts + (counted && result.is_correct ? 1 : 0),
+            },
+            lastReward:
+              result.events.length === 0
+                ? state.lastReward
+                : {
+                    id: rewardCounter,
+                    events: result.events,
+                    total: result.xp_delta,
+                    leveledUp: result.level > levelForXp(state.stats.xp),
+                    newLevel: result.level,
+                  },
+          };
+        }),
+
+      hydrateFromServer: (stats, solved) =>
+        set(() => ({
+          stats,
+          attempts: Object.fromEntries(
+            solved.map((entry) => [
+              entry.challengeId,
+              {
+                ...EMPTY_ATTEMPT,
+                solved: entry.solved,
+                runState: entry.solved ? ("solved" as const) : ("idle" as const),
+                wrongAttempts: Math.max(0, entry.attempts - (entry.solved ? 1 : 0)),
+                hintsRevealed: Math.min(entry.hintsUsed, MAX_HINTS),
+              },
+            ]),
+          ),
+          lastReward: null,
+        })),
+
+      resetProgress: () =>
+        set({ attempts: {}, stats: INITIAL_STATS, lastReward: null, activeChallengeId: null }),
 
       revealHint: (challengeId) =>
         set((state) => {

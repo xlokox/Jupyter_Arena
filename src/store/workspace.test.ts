@@ -257,3 +257,123 @@ describe("sanitizeAttempts", () => {
     expect(sanitized.b?.runState).toBe("solved");
   });
 });
+
+describe("server-backed outcomes (authed path)", () => {
+  const id = "fullstack-001-stale-closure";
+  const serverSolve = {
+    is_correct: true,
+    xp_delta: 20,
+    new_xp: 20,
+    level: 1,
+    streak: 1,
+    already_solved: false,
+    events: [
+      { reason: "correct_fix" as const, delta: 10 },
+      { reason: "first_try_bonus" as const, delta: 5 },
+      { reason: "daily_first_solve" as const, delta: 5 },
+    ],
+  };
+
+  it("applyServerOutcome adopts the server's stats verbatim and emits the reward", () => {
+    const store = useWorkspaceStore.getState();
+    store.selectOption(id, "a");
+    store.startRun(id);
+    store.applyServerOutcome(id, serverSolve);
+    const state = useWorkspaceStore.getState();
+    expect(getAttempt(state.attempts, id)).toMatchObject({ solved: true, runState: "solved" });
+    expect(state.stats.xp).toBe(20);
+    expect(state.stats.currentStreak).toBe(1);
+    expect(state.stats.correctAttempts).toBe(1);
+    expect(state.lastReward?.total).toBe(20);
+  });
+
+  it("a wrong server outcome records the failure without local math", () => {
+    const store = useWorkspaceStore.getState();
+    store.selectOption(id, "b");
+    store.startRun(id);
+    store.applyServerOutcome(id, {
+      ...serverSolve,
+      is_correct: false,
+      xp_delta: -5,
+      new_xp: 15,
+      events: [{ reason: "wrong_fix", delta: -5 }],
+    });
+    const state = useWorkspaceStore.getState();
+    expect(getAttempt(state.attempts, id)).toMatchObject({
+      solved: false,
+      runState: "failed",
+      wrongAttempts: 1,
+    });
+    expect(state.stats.xp).toBe(15);
+  });
+
+  it("an already-solved outcome emits no reward and counts no attempt", () => {
+    const store = useWorkspaceStore.getState();
+    store.selectOption(id, "a");
+    store.startRun(id);
+    store.applyServerOutcome(id, {
+      ...serverSolve,
+      xp_delta: 0,
+      already_solved: true,
+      events: [],
+    });
+    const state = useWorkspaceStore.getState();
+    expect(state.lastReward).toBeNull();
+    expect(state.stats.totalAttempts).toBe(0);
+  });
+
+  it("applyServerOutcome is ignored when no run is in flight", () => {
+    useWorkspaceStore.getState().applyServerOutcome(id, serverSolve);
+    expect(useWorkspaceStore.getState().stats.xp).toBe(0);
+  });
+
+  it("abortRun returns a running attempt to idle", () => {
+    const store = useWorkspaceStore.getState();
+    store.selectOption(id, "a");
+    store.startRun(id);
+    store.abortRun(id);
+    expect(getAttempt(useWorkspaceStore.getState().attempts, id).runState).toBe("idle");
+  });
+
+  it("hydrateFromServer replaces progress with the account's", () => {
+    useWorkspaceStore.getState().hydrateFromServer(
+      {
+        xp: 35,
+        currentStreak: 2,
+        longestStreak: 4,
+        lastActiveDay: "2026-06-10",
+        correctAttempts: 2,
+        totalAttempts: 3,
+      },
+      [
+        { challengeId: "ml-001-kmeans-scaling", attempts: 2, hintsUsed: 1, solved: true },
+        { challengeId: "db-002-sql-injection", attempts: 1, hintsUsed: 0, solved: false },
+      ],
+    );
+    const state = useWorkspaceStore.getState();
+    expect(state.stats.xp).toBe(35);
+    expect(getAttempt(state.attempts, "ml-001-kmeans-scaling")).toMatchObject({
+      solved: true,
+      runState: "solved",
+      wrongAttempts: 1,
+      hintsRevealed: 1,
+    });
+    expect(getAttempt(state.attempts, "db-002-sql-injection")).toMatchObject({
+      solved: false,
+      runState: "idle",
+      wrongAttempts: 1,
+    });
+  });
+
+  it("resetProgress returns to the initial anonymous state", () => {
+    const store = useWorkspaceStore.getState();
+    store.selectOption(id, "a");
+    store.startRun(id);
+    store.applyServerOutcome(id, serverSolve);
+    useWorkspaceStore.getState().resetProgress();
+    const state = useWorkspaceStore.getState();
+    expect(state.stats.xp).toBe(0);
+    expect(state.attempts).toEqual({});
+    expect(state.activeChallengeId).toBeNull();
+  });
+});
