@@ -14,9 +14,16 @@
     "test:watch": "vitest",
     "e2e": "playwright test",
     "content:validate": "tsx scripts/validate-content.ts",
-    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm content:validate"
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm content:validate",
+    "content:seed": "NODE_OPTIONS=--experimental-websocket tsx scripts/seed-content.ts",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "test:db": "NODE_OPTIONS=--experimental-websocket vitest run -c vitest.config.integration.ts"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.12.0",
+    "@supabase/supabase-js": "^2.108.1",
     "lucide-react": "^0.525.0",
     "next": "^15.3.4",
     "react": "^19.1.0",
@@ -40,6 +47,7 @@
     "eslint-config-next": "^15.3.4",
     "jsdom": "^26.1.0",
     "prettier": "^3.5.3",
+    "supabase": "^2.105.0",
     "tailwindcss": "^4.1.10",
     "tsx": "^4.22.4",
     "typescript": "^5.8.3",
