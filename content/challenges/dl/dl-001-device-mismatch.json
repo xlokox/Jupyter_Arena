@@ -1,0 +1,62 @@
+{
+  "id": "dl-001-device-mismatch",
+  "sector": "dl",
+  "difficulty": "hard",
+  "title": "03_pytorch_gpu_mismatch.ipynb",
+  "language": "python",
+  "icon": "cpu",
+  "conceptTags": ["pytorch", "cuda", "device-management", "training-loop"],
+  "descriptionMd": "## Mission: Get the Classifier Training on the GPU\n\nThe team just got GPU quota, and this small binary classifier is the pilot workload. The architectural goal: a standard PyTorch training loop — `DataLoader` for batching, model on the CUDA device, three epochs, loss printed per epoch.\n\nThe model was moved to the GPU and the job was relaunched… and it crashed on the very first batch with a `RuntimeError` about tensors living on two different devices. The model is on `cuda:0`, but something else in the loop never made the trip. Read the trace, find what stayed behind on the CPU, and fix the loop the way a production training script would.",
+  "initialCode": "import torch\nfrom torch import nn\nfrom torch.utils.data import DataLoader, TensorDataset\n\ndevice = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\n\nX = torch.randn(4096, 20)\ny = (X.sum(dim=1) > 0).long()\nloader = DataLoader(TensorDataset(X, y), batch_size=64, shuffle=True)\n\nmodel = nn.Sequential(nn.Linear(20, 64), nn.ReLU(), nn.Linear(64, 2)).to(device)\noptimizer = torch.optim.Adam(model.parameters(), lr=1e-3)\nloss_fn = nn.CrossEntropyLoss()\n\nfor epoch in range(3):\n    for inputs, targets in loader:\n        optimizer.zero_grad()\n        logits = model(inputs)\n        loss = loss_fn(logits, targets)\n        loss.backward()\n        optimizer.step()\n    print(f\"epoch {epoch}: loss {loss.item():.4f}\")",
+  "buggyLineStart": 16,
+  "buggyLineEnd": 19,
+  "traceback": "---------------------------------------------------------------------------\nRuntimeError                              Traceback (most recent call last)\nCell In[1], line 18\n     16 for inputs, targets in loader:\n     17     optimizer.zero_grad()\n---> 18     logits = model(inputs)\n     19     loss = loss_fn(logits, targets)\n\nFile ~/.venv/lib/python3.11/site-packages/torch/nn/modules/module.py:1518, in Module._wrapped_call_impl(self, *args, **kwargs)\n   1516     return self._compiled_call_impl(*args, **kwargs)\n   1517 else:\n-> 1518     return self._call_impl(*args, **kwargs)\n\nFile ~/.venv/lib/python3.11/site-packages/torch/nn/modules/linear.py:114, in Linear.forward(self, input)\n    113 def forward(self, input):\n--> 114     return F.linear(input, self.weight, self.bias)\n\nRuntimeError: Expected all tensors to be on the same device, but found at least two devices, cuda:0 and cpu! (when checking argument for argument mat1 in method wrapper_CUDA_addmm)",
+  "correctOutput": "epoch 0: loss 0.4231\nepoch 1: loss 0.2218\nepoch 2: loss 0.1394",
+  "options": [
+    {
+      "key": "a",
+      "label": "Move each batch's inputs and targets to the device inside the loop",
+      "patchCode": "import torch\nfrom torch import nn\nfrom torch.utils.data import DataLoader, TensorDataset\n\ndevice = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\n\nX = torch.randn(4096, 20)\ny = (X.sum(dim=1) > 0).long()\nloader = DataLoader(TensorDataset(X, y), batch_size=64, shuffle=True)\n\nmodel = nn.Sequential(nn.Linear(20, 64), nn.ReLU(), nn.Linear(64, 2)).to(device)\noptimizer = torch.optim.Adam(model.parameters(), lr=1e-3)\nloss_fn = nn.CrossEntropyLoss()\n\nfor epoch in range(3):\n    for inputs, targets in loader:\n        inputs, targets = inputs.to(device), targets.to(device)\n        optimizer.zero_grad()\n        logits = model(inputs)\n        loss = loss_fn(logits, targets)\n        loss.backward()\n        optimizer.step()\n    print(f\"epoch {epoch}: loss {loss.item():.4f}\")",
+      "isCorrect": true,
+      "resultLog": "epoch 0: loss 0.4231\nepoch 1: loss 0.2218\nepoch 2: loss 0.1394",
+      "rationale": "A `DataLoader` yields whatever device its dataset tensors live on — here, CPU. The canonical pattern is to transfer each batch at the top of the loop: both the inputs (consumed by the model's forward pass) and the targets (consumed by the loss). This keeps host memory as the staging area and moves only one batch at a time to the GPU, which is exactly how production loops handle datasets too large for device memory."
+    },
+    {
+      "key": "b",
+      "label": "Move the DataLoader itself to the GPU: loader = DataLoader(...).to(device)",
+      "patchCode": "import torch\nfrom torch import nn\nfrom torch.utils.data import DataLoader, TensorDataset\n\ndevice = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\n\nX = torch.randn(4096, 20)\ny = (X.sum(dim=1) > 0).long()\nloader = DataLoader(TensorDataset(X, y), batch_size=64, shuffle=True).to(device)\n\nmodel = nn.Sequential(nn.Linear(20, 64), nn.ReLU(), nn.Linear(64, 2)).to(device)\noptimizer = torch.optim.Adam(model.parameters(), lr=1e-3)\nloss_fn = nn.CrossEntropyLoss()\n\nfor epoch in range(3):\n    for inputs, targets in loader:\n        optimizer.zero_grad()\n        logits = model(inputs)\n        loss = loss_fn(logits, targets)\n        loss.backward()\n        optimizer.step()\n    print(f\"epoch {epoch}: loss {loss.item():.4f}\")",
+      "isCorrect": false,
+      "resultLog": "---------------------------------------------------------------------------\nAttributeError                            Traceback (most recent call last)\nCell In[1], line 9\n      8 y = (X.sum(dim=1) > 0).long()\n----> 9 loader = DataLoader(TensorDataset(X, y), batch_size=64, shuffle=True).to(device)\n\nAttributeError: 'DataLoader' object has no attribute 'to'",
+      "rationale": "`.to(device)` is a method on tensors and `nn.Module`s — things that own parameters or data buffers. A `DataLoader` is an iteration strategy, not a container of tensors; it has no device concept at all. Device placement happens on the tensors it yields, batch by batch, inside the loop."
+    },
+    {
+      "key": "c",
+      "label": "Move only the inputs to the device — the targets are just labels",
+      "patchCode": "import torch\nfrom torch import nn\nfrom torch.utils.data import DataLoader, TensorDataset\n\ndevice = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\n\nX = torch.randn(4096, 20)\ny = (X.sum(dim=1) > 0).long()\nloader = DataLoader(TensorDataset(X, y), batch_size=64, shuffle=True)\n\nmodel = nn.Sequential(nn.Linear(20, 64), nn.ReLU(), nn.Linear(64, 2)).to(device)\noptimizer = torch.optim.Adam(model.parameters(), lr=1e-3)\nloss_fn = nn.CrossEntropyLoss()\n\nfor epoch in range(3):\n    for inputs, targets in loader:\n        inputs = inputs.to(device)\n        optimizer.zero_grad()\n        logits = model(inputs)\n        loss = loss_fn(logits, targets)\n        loss.backward()\n        optimizer.step()\n    print(f\"epoch {epoch}: loss {loss.item():.4f}\")",
+      "isCorrect": false,
+      "resultLog": "---------------------------------------------------------------------------\nRuntimeError                              Traceback (most recent call last)\nCell In[1], line 20\n     19     logits = model(inputs)\n---> 20     loss = loss_fn(logits, targets)\n\nRuntimeError: Expected all tensors to be on the same device, but found at least two devices, cuda:0 and cpu! (when checking argument for argument target in method wrapper_CUDA_nll_loss_forward)",
+      "rationale": "The forward pass now succeeds, but the loss is also a device-resident computation: `CrossEntropyLoss` compares GPU logits against the targets, and those are still CPU tensors. Same exception class, new argument name in the message — `target` instead of `mat1`. Every tensor that participates in the graph must live on the same device."
+    }
+  ],
+  "hints": [
+    "The error names two devices: the model's parameters are on `cuda:0`, and something it was asked to multiply lives on `cpu`. Trace where each tensor in the loop is born.",
+    "Lines 16–19: the batches yielded by the `DataLoader` keep the device of the dataset they came from. Nothing in the loop transfers `inputs` or `targets` — and the loss needs both on the GPU."
+  ],
+  "explanationMd": "### Why the bug occurs\n`model.to(device)` moves the *parameters* to the GPU, but tensors carry their own device. The `TensorDataset` was built from CPU tensors, so the `DataLoader` yields CPU batches forever. The first matrix multiply, `F.linear(input, self.weight, self.bias)`, receives a CPU `input` and CUDA weights — and PyTorch refuses to silently copy across the PCIe bus, because implicit transfers would hide massive performance bugs. Hence the explicit `RuntimeError` naming both devices.\n\n### Why the fix is correct\nTransferring `inputs` *and* `targets` at the top of the loop is the canonical pattern: the dataset stays in host RAM (which scales far beyond GPU memory), and exactly one batch occupies the device at a time. Both tensors must move — the model consumes `inputs`, the loss consumes `targets`, and a graph spanning two devices is illegal. In real pipelines the same line often gains `non_blocking=True` with pinned memory to overlap the copy with compute, but the placement logic is identical.",
+  "recruiterReview": "This is the rite-of-passage CUDA bug, and you fixed it in the right place — per-batch transfer inside the loop, not by dragging the whole dataset onto the device or downgrading the job to CPU. I also like that the targets made the trip; half the candidates fix the forward pass and then hit the same wall inside the loss. The principle: a tensor's device is part of its identity, and every participant in one computation graph must agree. When you productionize this, look at `pin_memory=True` on the loader plus `non_blocking=True` on the copies for free throughput. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## PyTorch Device Management: Where Tensors Live\n\nEvery PyTorch tensor has a `device` attribute, fixed at creation: `cpu`, `cuda:0`, `cuda:1`, `mps`. Operations require all participating tensors to share one device — PyTorch never copies between devices implicitly, because a hidden host-to-GPU transfer inside a hot loop could silently destroy performance. Instead it throws the famous `Expected all tensors to be on the same device` error and tells you which argument betrayed you.\n\n### The standard training-loop choreography\n1. **Pick the device once:** `device = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")` keeps the script runnable on any machine.\n2. **Move the model once:** `model.to(device)` transfers parameters and buffers, in place, before the optimizer is created (the optimizer holds references to the parameters it received).\n3. **Move each batch every iteration:** `inputs, targets = inputs.to(device), targets.to(device)` at the top of the loop. The dataset itself stays in host RAM — that is a feature, not an oversight, since real datasets rarely fit in GPU memory.\n\nReading the error message precisely pays off: `argument mat1 in method wrapper_CUDA_addmm` means the *input to a linear layer* was on the wrong device; `argument target in method wrapper_CUDA_nll_loss_forward` means the *labels* were. The argument name routes you straight to the offending tensor.\n\n### Things that look like fixes but aren't\n- Calling `.to(device)` on a `DataLoader` — it isn't a tensor container and has no such method.\n- `tensor.to(device)` without assignment — `.to()` returns a *new* tensor; the original stays put. (`module.to(device)` is the one in-place exception.)\n- Moving the model back to CPU — the crash disappears along with the GPU you paid for.\n\n### Common variations of this bug\n- Targets left on CPU after the inputs were fixed (the loss-side crash).\n- A freshly created tensor inside the loop (`torch.zeros`, a mask, positional indices) defaulting to CPU.\n- Loading a checkpoint with `torch.load(...)` defaulting weights to a device the optimizer state disagrees with.\n- Metrics libraries accumulating GPU tensors against CPU buffers during evaluation.",
+    "videos": [
+      {
+        "title": "PyTorch CUDA basics — moving models and tensors",
+        "searchQuery": "pytorch to device cuda tutorial training loop"
+      },
+      {
+        "title": "Fixing 'expected all tensors on the same device'",
+        "searchQuery": "pytorch runtimeerror expected all tensors same device cuda cpu fix"
+      }
+    ]
+  },
+  "estMinutes": 8,
+  "version": 1
+}

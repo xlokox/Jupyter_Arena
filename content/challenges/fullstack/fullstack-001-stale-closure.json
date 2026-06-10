@@ -1,0 +1,62 @@
+{
+  "id": "fullstack-001-stale-closure",
+  "sector": "fullstack",
+  "difficulty": "medium",
+  "title": "02_react_click_tracker.jsx",
+  "language": "jsx",
+  "icon": "mouse-pointer-click",
+  "conceptTags": ["react-state", "closures", "async-updates"],
+  "descriptionMd": "## Mission: Click Analytics That Tell the Truth\n\nThe growth team relies on `/api/click-log` events to measure a new feature's adoption. The architectural goal is simple: a button that renders its own click count and reports every click to the analytics endpoint with the *current* total.\n\nQA flagged a discrepancy: the dashboard total is permanently one click behind what users see on screen. The integration test reproduces it on every run — the UI says 3, the API received 2. Somewhere between updating state and calling the logger, the component is reading a value from the past.",
+  "initialCode": "import { useState } from \"react\";\n\nasync function logClick(count) {\n  await fetch(\"/api/click-log\", {\n    method: \"POST\",\n    headers: { \"Content-Type\": \"application/json\" },\n    body: JSON.stringify({ count }),\n  });\n  console.log(\"logged count:\", count);\n}\n\nexport default function ClickTracker() {\n  const [clicks, setClicks] = useState(0);\n\n  function handleClick() {\n    setClicks(clicks + 1);\n    logClick(clicks);\n  }\n\n  return (\n    <button onClick={handleClick}>\n      Clicked {clicks} times\n    </button>\n  );\n}",
+  "buggyLineStart": 15,
+  "buggyLineEnd": 18,
+  "traceback": "FAIL  click-tracker.test.jsx > reports the latest click count to /api/click-log\n\nAssertionError: expected final POST body {\"count\":3} but received {\"count\":2}\n\n  console transcript:\n    render: \"Clicked 1 times\"   → POST /api/click-log {\"count\":0}\n    render: \"Clicked 2 times\"   → POST /api/click-log {\"count\":1}\n    render: \"Clicked 3 times\"   → POST /api/click-log {\"count\":2}",
+  "correctOutput": "PASS  click-tracker.test.jsx > reports the latest click count to /api/click-log\n\n  console transcript:\n    render: \"Clicked 1 times\"   → POST /api/click-log {\"count\":1}\n    render: \"Clicked 2 times\"   → POST /api/click-log {\"count\":2}\n    render: \"Clicked 3 times\"   → POST /api/click-log {\"count\":3}",
+  "options": [
+    {
+      "key": "a",
+      "label": "Compute the new count in a local variable and pass it to both the setter and the logger",
+      "patchCode": "import { useState } from \"react\";\n\nasync function logClick(count) {\n  await fetch(\"/api/click-log\", {\n    method: \"POST\",\n    headers: { \"Content-Type\": \"application/json\" },\n    body: JSON.stringify({ count }),\n  });\n  console.log(\"logged count:\", count);\n}\n\nexport default function ClickTracker() {\n  const [clicks, setClicks] = useState(0);\n\n  function handleClick() {\n    const next = clicks + 1;\n    setClicks(next);\n    logClick(next);\n  }\n\n  return (\n    <button onClick={handleClick}>\n      Clicked {clicks} times\n    </button>\n  );\n}",
+      "isCorrect": true,
+      "resultLog": "PASS  click-tracker.test.jsx > reports the latest click count to /api/click-log\n\n  console transcript:\n    render: \"Clicked 1 times\"   → POST /api/click-log {\"count\":1}\n    render: \"Clicked 2 times\"   → POST /api/click-log {\"count\":2}\n    render: \"Clicked 3 times\"   → POST /api/click-log {\"count\":3}",
+      "rationale": "`setClicks` schedules a re-render; it never mutates `clicks` inside the running handler — that variable is a snapshot from the render that created the closure. Computing `next` once gives the state setter and the API call the exact same, current value, so the UI and the analytics can never disagree."
+    },
+    {
+      "key": "b",
+      "label": "Switch to the functional updater form: setClicks(c => c + 1)",
+      "patchCode": "import { useState } from \"react\";\n\nasync function logClick(count) {\n  await fetch(\"/api/click-log\", {\n    method: \"POST\",\n    headers: { \"Content-Type\": \"application/json\" },\n    body: JSON.stringify({ count }),\n  });\n  console.log(\"logged count:\", count);\n}\n\nexport default function ClickTracker() {\n  const [clicks, setClicks] = useState(0);\n\n  function handleClick() {\n    setClicks((c) => c + 1);\n    logClick(clicks);\n  }\n\n  return (\n    <button onClick={handleClick}>\n      Clicked {clicks} times\n    </button>\n  );\n}",
+      "isCorrect": false,
+      "resultLog": "FAIL  click-tracker.test.jsx > reports the latest click count to /api/click-log\n\nAssertionError: expected final POST body {\"count\":3} but received {\"count\":2}\n\n  console transcript:\n    render: \"Clicked 1 times\"   → POST /api/click-log {\"count\":0}\n    render: \"Clicked 2 times\"   → POST /api/click-log {\"count\":1}\n    render: \"Clicked 3 times\"   → POST /api/click-log {\"count\":2}",
+      "rationale": "The functional updater protects against *lost updates* when several setState calls batch together, but it changes nothing about the line below it: `clicks` still belongs to the current render's closure, so `logClick(clicks)` keeps sending yesterday's number. The updater fixes a different bug than the one you have."
+    },
+    {
+      "key": "c",
+      "label": "Log from a useEffect that runs whenever clicks changes",
+      "patchCode": "import { useEffect, useState } from \"react\";\n\nasync function logClick(count) {\n  await fetch(\"/api/click-log\", {\n    method: \"POST\",\n    headers: { \"Content-Type\": \"application/json\" },\n    body: JSON.stringify({ count }),\n  });\n  console.log(\"logged count:\", count);\n}\n\nexport default function ClickTracker() {\n  const [clicks, setClicks] = useState(0);\n\n  useEffect(() => {\n    logClick(clicks);\n  }, [clicks]);\n\n  function handleClick() {\n    setClicks(clicks + 1);\n  }\n\n  return (\n    <button onClick={handleClick}>\n      Clicked {clicks} times\n    </button>\n  );\n}",
+      "isCorrect": false,
+      "resultLog": "FAIL  click-tracker.test.jsx > reports the latest click count to /api/click-log\n\nAssertionError: unexpected POST /api/click-log {\"count\":0} fired on mount, before any click\n\n  console transcript:\n    mount:  \"Clicked 0 times\"   → POST /api/click-log {\"count\":0}\n    render: \"Clicked 1 times\"   → POST /api/click-log {\"count\":1}",
+      "rationale": "The effect does see the fresh value — but effects model synchronization with state, not user actions. It fires once on mount, logging a phantom zero-click event, and it will fire again any time `clicks` changes for a reason that is not a user click. Side effects caused by an interaction belong in the event handler."
+    }
+  ],
+  "hints": [
+    "A state setter doesn't change the variable in the currently running function — `clicks` is a snapshot taken when this render's closure was created. What value does `logClick` actually receive?",
+    "Lines 15–18: `setClicks(clicks + 1)` schedules the re-render, then `logClick(clicks)` ships the pre-click value. Compute the new value exactly once and hand it to both consumers."
+  ],
+  "explanationMd": "### Why the bug occurs\nIn React, `clicks` is not a live reference — it is a constant captured by this render's closure. `setClicks(clicks + 1)` asks React to re-render with a new value; it does not (and cannot) rewrite the `clicks` binding inside the already-running `handleClick`. So the very next line, `logClick(clicks)`, sends the value from *before* the click. The UI catches up on the next render, the API never does — hence the permanent off-by-one.\n\n### Why the fix is correct\n`const next = clicks + 1` materializes the post-click value exactly once, in the handler, and feeds the same number to both the state setter and the network call. The UI and the analytics are now derived from a single source instead of two snapshots taken at different times. This also documents intent: anyone reading the handler sees that the render state and the logged event are meant to agree.",
+  "recruiterReview": "Good fix, and more importantly the right mental model: state setters schedule renders, they don't mutate the closure you're standing in. The local-variable pattern is exactly what I want to see — one computation, two consumers, zero drift. The functional-updater distractor trips up a lot of mid-level candidates, so knowing *which* bug it actually solves (batched lost updates) is a strong signal. Forward-looking note: if this logger ever moves to fire-and-forget, add error handling so a failed POST doesn't silently undercount. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## React State Updates Are Snapshots, Not Mutations\n\nThe single most common React bug is reading state immediately after setting it. It happens because `useState` looks like a variable but behaves like a *photograph*: every render captures its own values, and every function created during that render (handlers, effects, callbacks) sees only that photograph.\n\n### The mechanism\nWhen you call `setClicks(clicks + 1)`, React records \"next render should show clicks + 1\" and schedules that render. The function you are currently inside keeps executing with the old `clicks`, because JavaScript closures capture the values that existed when the function was created. There is no point during the current call where `clicks` becomes the new value — not after `await`, not after `setTimeout`, not ever. The new value exists only in the *next* render's closure.\n\n### The three correct tools\n1. **A local variable** — `const next = clicks + 1; setClicks(next); use(next);`. The right choice when one event needs the new value immediately (logging, navigation, API calls).\n2. **The functional updater** — `setClicks(c => c + 1)`. The right choice when multiple updates may batch in one tick and each must build on the previous one. It does *not* give the surrounding code access to the new value.\n3. **useEffect on the state** — runs after the commit with fresh values. The right choice for *synchronization* (\"whenever X changes, keep Y consistent\"), and the wrong choice for *user actions*, because it also fires on mount and on every other path that changes the state.\n\nChoosing between them is interview gold: each tool solves a different bug, and using the wrong one usually compiles, runs, and quietly lies.\n\n### Common variations of this bug\n- Logging or analytics calls reading state right after `setState` (this challenge).\n- Navigating with `router.push(\"/step/\" + step)` immediately after `setStep(step + 1)`.\n- Double-increment buttons \"fixed\" with two `setCount(count + 1)` calls that batch into one.\n- A `setTimeout` or `await` inside a handler reading state captured before the pause.\n- Form submit handlers serializing state that the last keystroke hasn't committed yet.",
+    "videos": [
+      {
+        "title": "React state as a snapshot — why your value is stale",
+        "searchQuery": "react state snapshot stale closure explained"
+      },
+      {
+        "title": "useState functional updates vs reading state after set",
+        "searchQuery": "react usestate functional update vs stale state setstate async"
+      }
+    ]
+  },
+  "estMinutes": 6,
+  "version": 1
+}

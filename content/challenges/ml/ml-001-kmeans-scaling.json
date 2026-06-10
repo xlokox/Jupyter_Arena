@@ -1,0 +1,62 @@
+{
+  "id": "ml-001-kmeans-scaling",
+  "sector": "ml",
+  "difficulty": "easy",
+  "title": "01_kmeans_customer_segmentation.ipynb",
+  "language": "python",
+  "icon": "users",
+  "conceptTags": ["feature-scaling", "kmeans", "unsupervised-learning"],
+  "descriptionMd": "## Mission: Customer Segmentation\n\nMarketing wants three customer segments built from `age` and `income` so campaigns can be tailored per group. The architectural goal is a small, reproducible clustering job: load the customer table, run KMeans, and write a `segment` label back onto every row.\n\nThe notebook runs to completion, but the runtime sanity check fails: every segment has almost exactly the same average age. The clusters are being carved by income alone, so the campaign team is getting income bands, not customer profiles. Find the defect and ship a fix that makes both features count.",
+  "initialCode": "import pandas as pd\nfrom sklearn.cluster import KMeans\n\ncustomers = pd.read_csv(\"customers.csv\")\n\n# Cluster customers into 3 segments on age and income\nX = customers[[\"age\", \"income\"]].to_numpy()\n\nkmeans = KMeans(n_clusters=3, n_init=10, random_state=42)\ncustomers[\"segment\"] = kmeans.fit_predict(X)\n\nprofile = customers.groupby(\"segment\")[[\"age\", \"income\"]].mean()\nprint(profile.round(1))\n\nspread = profile[\"age\"].max() - profile[\"age\"].min()\nprint(f\"age spread across segments: {spread:.1f} years\")\nassert spread > 5, \"Segments do not separate on age - check feature scaling\"",
+  "buggyLineStart": 7,
+  "buggyLineEnd": 10,
+  "traceback": "          age    income\nsegment\n0        40.1   24890.5\n1        39.6   98430.2\n2        41.3  187210.8\nage spread across segments: 1.7 years\n---------------------------------------------------------------------------\nAssertionError                            Traceback (most recent call last)\nCell In[1], line 17\n     15 spread = profile[\"age\"].max() - profile[\"age\"].min()\n     16 print(f\"age spread across segments: {spread:.1f} years\")\n---> 17 assert spread > 5, \"Segments do not separate on age - check feature scaling\"\n\nAssertionError: Segments do not separate on age - check feature scaling",
+  "correctOutput": "          age    income\nsegment\n0        27.4   38120.6\n1        46.9   71540.3\n2        63.2  142880.9\nage spread across segments: 35.8 years",
+  "options": [
+    {
+      "key": "a",
+      "label": "Standardize both features with StandardScaler before clustering",
+      "patchCode": "import pandas as pd\nfrom sklearn.cluster import KMeans\nfrom sklearn.preprocessing import StandardScaler\n\ncustomers = pd.read_csv(\"customers.csv\")\n\n# Cluster customers into 3 segments on age and income\nX = StandardScaler().fit_transform(customers[[\"age\", \"income\"]])\n\nkmeans = KMeans(n_clusters=3, n_init=10, random_state=42)\ncustomers[\"segment\"] = kmeans.fit_predict(X)\n\nprofile = customers.groupby(\"segment\")[[\"age\", \"income\"]].mean()\nprint(profile.round(1))\n\nspread = profile[\"age\"].max() - profile[\"age\"].min()\nprint(f\"age spread across segments: {spread:.1f} years\")\nassert spread > 5, \"Segments do not separate on age - check feature scaling\"",
+      "isCorrect": true,
+      "resultLog": "          age    income\nsegment\n0        27.4   38120.6\n1        46.9   71540.3\n2        63.2  142880.9\nage spread across segments: 35.8 years",
+      "rationale": "Euclidean distance treats one unit of any feature identically. Income spans ~180,000 units while age spans ~70, so unscaled income contributes essentially all of the distance and age is ignored. Standardizing puts both features on a unit-variance scale, letting age genuinely shape the clusters. Because clustering is unsupervised with no train/test split, fitting the scaler on the full table is sound here."
+    },
+    {
+      "key": "b",
+      "label": "Increase n_clusters from 3 to 6 so finer segments appear",
+      "patchCode": "import pandas as pd\nfrom sklearn.cluster import KMeans\n\ncustomers = pd.read_csv(\"customers.csv\")\n\n# Cluster customers into 3 segments on age and income\nX = customers[[\"age\", \"income\"]].to_numpy()\n\nkmeans = KMeans(n_clusters=6, n_init=10, random_state=42)\ncustomers[\"segment\"] = kmeans.fit_predict(X)\n\nprofile = customers.groupby(\"segment\")[[\"age\", \"income\"]].mean()\nprint(profile.round(1))\n\nspread = profile[\"age\"].max() - profile[\"age\"].min()\nprint(f\"age spread across segments: {spread:.1f} years\")\nassert spread > 5, \"Segments do not separate on age - check feature scaling\"",
+      "isCorrect": false,
+      "resultLog": "          age    income\nsegment\n0        40.3   21204.8\n1        39.9   54310.6\n2        40.7   88412.3\n3        40.2  121706.4\n4        41.0  158233.7\n5        39.5  193881.2\nage spread across segments: 1.5 years\n---------------------------------------------------------------------------\nAssertionError                            Traceback (most recent call last)\nCell In[1], line 17\n---> 17 assert spread > 5, \"Segments do not separate on age - check feature scaling\"\n\nAssertionError: Segments do not separate on age - check feature scaling",
+      "rationale": "More clusters just slices the income axis into thinner bands. `k` controls how many groups you get, not which features matter — the distance metric still runs on raw units, so the scale imbalance that silences age is completely untouched."
+    },
+    {
+      "key": "c",
+      "label": "Raise n_init to 50 and try a different random_state",
+      "patchCode": "import pandas as pd\nfrom sklearn.cluster import KMeans\n\ncustomers = pd.read_csv(\"customers.csv\")\n\n# Cluster customers into 3 segments on age and income\nX = customers[[\"age\", \"income\"]].to_numpy()\n\nkmeans = KMeans(n_clusters=3, n_init=50, random_state=7)\ncustomers[\"segment\"] = kmeans.fit_predict(X)\n\nprofile = customers.groupby(\"segment\")[[\"age\", \"income\"]].mean()\nprint(profile.round(1))\n\nspread = profile[\"age\"].max() - profile[\"age\"].min()\nprint(f\"age spread across segments: {spread:.1f} years\")\nassert spread > 5, \"Segments do not separate on age - check feature scaling\"",
+      "isCorrect": false,
+      "resultLog": "          age    income\nsegment\n0        40.0   24887.1\n1        39.7   98444.6\n2        41.2  187195.3\nage spread across segments: 1.5 years\n---------------------------------------------------------------------------\nAssertionError                            Traceback (most recent call last)\nCell In[1], line 17\n---> 17 assert spread > 5, \"Segments do not separate on age - check feature scaling\"\n\nAssertionError: Segments do not separate on age - check feature scaling",
+      "rationale": "Extra restarts only protect against unlucky centroid initialization — bad local minima of the same objective. That objective is still computed on raw units, so every restart converges to income-dominated clusters. Randomness was never the problem; the geometry of the feature space is."
+    }
+  ],
+  "hints": [
+    "KMeans groups points by plain Euclidean distance. Think about what happens to that distance when one feature is measured in tens and the other in hundreds of thousands.",
+    "Look at lines 7–10: the raw `age`/`income` matrix goes straight into `fit_predict`. scikit-learn ships a preprocessing transformer designed exactly for this situation."
+  ],
+  "explanationMd": "### Why the bug occurs\nKMeans assigns each point to its nearest centroid by Euclidean distance: `d² = (Δage)² + (Δincome)²`. With ages spanning ~70 units and incomes spanning ~180,000, even a 40-year age gap contributes 1,600 to `d²` while a modest 5,000-unit income gap contributes 25,000,000. Age is numerically invisible, so the algorithm degenerates into slicing the income axis — exactly what the segment table shows: income means far apart, age means identical.\n\n### Why the fix is correct\n`StandardScaler` transforms each feature to zero mean and unit variance, so a one-standard-deviation step in age counts exactly as much as one in income. The clusters can now form along both axes, producing genuinely different customer profiles. The diff is minimal — one import and one line — and because this is unsupervised clustering with no held-out evaluation set, fitting the scaler on the full table introduces no leakage.",
+  "recruiterReview": "Sharp catch — this is the most common silent failure in distance-based models, and it ships to production constantly because nothing throws. You fixed it at the right layer (preprocessing) instead of fiddling with `k` or restarts, and the diff is minimal. The principle to carry forward: any model built on distances — KMeans, KNN, RBF-kernel SVM, PCA — needs deliberate feature scaling. One improvement for next time: wrap the scaler and the model in a single sklearn `Pipeline` so the scaling always travels with the model artifact. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Feature Scaling for Distance-Based Models\n\nMany algorithms never look at your features individually — they only see distances between points. KMeans, K-Nearest-Neighbors, RBF-kernel SVMs, and PCA all belong to this family. For them, the *units* of your data silently become *weights*: a feature that spans a numerically larger range automatically matters more.\n\n### The mechanism\nEuclidean distance squares each per-feature difference and sums them. If `income` differences are routinely 1,000× larger than `age` differences, then income differences are 1,000,000× larger after squaring. The model is not biased toward income for any statistical reason — it is biased purely because of the unit it happens to be recorded in. Re-denominate income from dollars into thousands of dollars and the clusters change. A model whose output depends on the currency unit is not modeling anything real.\n\n### The standard fixes\n- **StandardScaler** — subtract the mean, divide by the standard deviation. Each feature gets mean 0 and variance 1. The default choice for clustering and most linear models.\n- **MinMaxScaler** — rescale into `[0, 1]`. Useful when you need bounded values (e.g. for neural network inputs), but sensitive to outliers because the min and max define the range.\n- **RobustScaler** — center on the median and scale by the interquartile range. Prefer it when heavy outliers would distort the mean and standard deviation.\n\nIn supervised settings, always fit the scaler on the training split only and reuse those statistics to transform validation, test, and production data — fitting on everything leaks test information into preprocessing. In pure unsupervised clustering with no held-out set, fitting on the full table is fine.\n\n### How to spot it\nProfile your clusters after fitting. If the cluster means differ strongly on exactly one feature and are flat on all others, and that feature has the largest numeric range, suspect scaling before anything else.\n\n### Common variations of this bug\n- KNN classification where one raw feature (e.g. salary) drowns out all others.\n- PCA \"discovering\" that the first principal component is just the largest-unit feature.\n- RBF-kernel SVMs whose gamma is effectively tuned for only one feature's scale.\n- Mixing units in one table (meters and kilometers, dollars and cents) and clustering on them raw.",
+    "videos": [
+      {
+        "title": "Why feature scaling matters for KMeans",
+        "searchQuery": "feature scaling kmeans clustering why standardscaler"
+      },
+      {
+        "title": "StandardScaler vs MinMaxScaler vs RobustScaler",
+        "searchQuery": "standardscaler vs minmaxscaler vs robustscaler sklearn when to use"
+      }
+    ]
+  },
+  "estMinutes": 4,
+  "version": 1
+}
