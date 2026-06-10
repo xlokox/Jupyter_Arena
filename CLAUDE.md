@@ -19,7 +19,9 @@ Package manager is **pnpm**, Node ≥ 20.
 ## Structure
 
 - `src/app/` — Next.js App Router (TS strict). `globals.css` holds the Section 8 design tokens (`--bg`, `--panel`, `--accent`, …) mapped to Tailwind utilities (`bg-panel`, `text-accent`, `border-border`, …). Use the tokens, never raw hex in components.
-- `src/components/` — UI components; colocated `*.test.tsx`.
+- `src/components/` — UI components; colocated `*.test.tsx`. `notebook/` holds the workspace cells (code/output/control/solve-panel); `app-shell.tsx` owns layout + keyboard shortcuts (1/2/3 select, Enter run, N next, Esc closes drawer). New content icons must be registered in `challenge-icon.tsx` (explicit map for tree-shaking).
+- `src/store/workspace.ts` — Zustand store: filters, navigation, per-challenge attempt lifecycle (select → startRun → completeRun). Keep it content-agnostic; pass `isCorrect` in from components.
+- `src/lib/tokenizer/` — line-based syntax tokenizer (python/jsx/js/sql). `src/lib/content/load.ts` — server-only fs loader; throws at build on invalid content.
 - `src/i18n/en.ts` — ALL user-visible strings. Components never hardcode copy. Use logical CSS properties (`ms-*`, `text-start`) for future RTL. Code blocks always LTR.
 - `e2e/` — Playwright specs.
 - `content/` — `sectors.json` + `challenges/{sector}/{id}.json`, validated by `src/lib/content/schema.ts` (Zod) and the QA checks in `src/lib/content/validate.ts`; seeded to Postgres in Phase 4. Authoring rules: brief Section 6 (traceback must match the code, exactly one correct option, wrong options get realistic failure logs, video links are YouTube search queries only, no TODO/lorem).
