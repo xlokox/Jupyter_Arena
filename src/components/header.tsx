@@ -1,10 +1,13 @@
-import { CheckCircle2, Flame } from "lucide-react";
+"use client";
+
+import { CheckCircle2, Flame, Menu } from "lucide-react";
+import { useWorkspaceStore, type SectorFilter } from "@/store/workspace";
 import { en } from "@/i18n/en";
 
 /**
- * Header shell — MASTER_BRIEF.md Section 8. Phase 0 renders the structure with
- * initial (anonymous, zero-progress) values; live stats wire in via the Zustand
- * store in Phase 2/3.
+ * Header — MASTER_BRIEF.md Section 8. Sector pills drive the store filter.
+ * Level/XP/streak render initial values until the Phase 3 gamification math
+ * lands; the solved counter is live from attempt state.
  */
 
 const INITIAL_STATS = {
@@ -13,30 +16,41 @@ const INITIAL_STATS = {
   xpIntoLevel: 0,
   xpPerLevel: 50,
   streak: 0,
-  completed: 0,
 };
 
-const SECTOR_FILTERS = [
+const SECTOR_FILTERS: Array<{ id: SectorFilter; label: string }> = [
   { id: "all", label: en.sectors.all },
   { id: "ml", label: en.sectors.ml },
   { id: "dl", label: en.sectors.dl },
   { id: "fullstack", label: en.sectors.fullstack },
   { id: "db", label: en.sectors.db },
-] as const;
+];
 
 export function Header() {
+  const sectorFilter = useWorkspaceStore((s) => s.sectorFilter);
+  const setSectorFilter = useWorkspaceStore((s) => s.setSectorFilter);
+  const setSidebarOpen = useWorkspaceStore((s) => s.setSidebarOpen);
+  const attempts = useWorkspaceStore((s) => s.attempts);
+  const completed = Object.values(attempts).filter((a) => a.solved).length;
+
   const xpPercent = (INITIAL_STATS.xpIntoLevel / INITIAL_STATS.xpPerLevel) * 100;
 
   return (
     <header className="border-b border-border bg-panel">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3">
-        {/* Logo */}
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            aria-label={en.header.openSidebar}
+            onClick={() => setSidebarOpen(true)}
+            className="-ms-2 flex size-11 items-center justify-center rounded-md text-muted hover:text-text focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:hidden"
+          >
+            <Menu className="size-5" aria-hidden />
+          </button>
           <Flame aria-hidden className="size-6 text-accent" />
           <span className="font-mono text-lg font-bold tracking-tight">{en.app.name}</span>
         </div>
 
-        {/* Stats cluster */}
         <div
           aria-label={en.header.statsAria}
           className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm"
@@ -45,20 +59,20 @@ export function Header() {
             <span className="rounded-md border border-border bg-panel-2 px-2 py-0.5 font-mono text-xs text-accent">
               {en.header.level} {INITIAL_STATS.level}
             </span>
-            <span className="text-muted">{INITIAL_STATS.rank}</span>
+            <span className="hidden text-muted sm:inline">{INITIAL_STATS.rank}</span>
           </div>
 
-          <div className="flex items-center gap-2" aria-label={en.header.xp}>
+          <div className="flex items-center gap-2">
             <div
               role="progressbar"
               aria-valuemin={0}
               aria-valuemax={INITIAL_STATS.xpPerLevel}
               aria-valuenow={INITIAL_STATS.xpIntoLevel}
               aria-label={en.header.xp}
-              className="h-2 w-28 overflow-hidden rounded-full border border-border bg-panel-2"
+              className="h-2 w-24 overflow-hidden rounded-full border border-border bg-panel-2"
             >
               <div
-                className="h-full rounded-full bg-accent transition-[width] duration-500"
+                className="h-full rounded-full bg-accent motion-safe:transition-[width] motion-safe:duration-500"
                 style={{ width: `${xpPercent}%` }}
               />
             </div>
@@ -77,23 +91,23 @@ export function Header() {
           <div className="flex items-center gap-1.5">
             <CheckCircle2 aria-hidden className="size-4 text-muted" />
             <span className="font-mono text-xs text-muted">
-              {INITIAL_STATS.completed} {en.header.completedLabel}
+              {completed} {en.header.completedLabel}
             </span>
           </div>
         </div>
 
-        {/* Sector filter pills */}
         <nav
           aria-label={en.header.sectorFilterAria}
           className="flex flex-wrap items-center gap-2 md:ms-auto"
         >
           {SECTOR_FILTERS.map((sector) => {
-            const isActive = sector.id === "all";
+            const isActive = sectorFilter === sector.id;
             return (
               <button
                 key={sector.id}
                 type="button"
                 aria-pressed={isActive}
+                onClick={() => setSectorFilter(sector.id)}
                 className={`min-h-[44px] rounded-full border px-3 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
                   isActive
                     ? "border-accent bg-accent/10 text-accent"

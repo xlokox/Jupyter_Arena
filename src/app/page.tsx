@@ -1,10 +1,8 @@
-import { Header } from "@/components/header";
+import { loadChallenges, loadSectors } from "@/lib/content/load";
+import { AppShell } from "@/components/app-shell";
 
 export default function Home() {
-  return (
-    <div className="flex min-h-screen flex-col">
-      <Header />
-      <main className="flex-1" />
-    </div>
-  );
+  const challenges = loadChallenges();
+  const sectors = loadSectors();
+  return <AppShell challenges={challenges} sectors={sectors} />;
 }
