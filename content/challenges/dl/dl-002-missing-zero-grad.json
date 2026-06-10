@@ -1,0 +1,62 @@
+{
+  "id": "dl-002-missing-zero-grad",
+  "sector": "dl",
+  "difficulty": "easy",
+  "title": "05_missing_zero_grad.ipynb",
+  "language": "python",
+  "icon": "rotate-ccw",
+  "conceptTags": ["pytorch", "gradients", "training-loop", "optimization"],
+  "descriptionMd": "## Mission: Stop the Regression Model From Exploding\n\nThis is the smallest possible PyTorch workload: a linear layer learning a known linear mapping with SGD. It should converge in under a hundred steps — the kind of sanity-check script teams run to validate a new training rig.\n\nInstead, the loss starts at a reasonable 9.78, climbs to the hundreds of thousands, and lands on `nan` by step 60. The final guard assertion fires: training diverged. Learning rate looks sane, data is well-conditioned, the model is one layer. Something in the loop itself is compounding step after step. Read the loop like the autograd engine would, and fix it.",
+  "initialCode": "import torch\nfrom torch import nn\n\ntorch.manual_seed(0)\nX = torch.randn(512, 10)\ntrue_w = torch.randn(10, 1)\ny = X @ true_w + 0.1 * torch.randn(512, 1)\n\nmodel = nn.Linear(10, 1)\noptimizer = torch.optim.SGD(model.parameters(), lr=0.05)\nloss_fn = nn.MSELoss()\n\nfor step in range(100):\n    loss = loss_fn(model(X), y)\n    loss.backward()\n    optimizer.step()\n    if step % 20 == 0:\n        print(f\"step {step:3d}: loss {loss.item():.4f}\")\n\nassert torch.isfinite(loss), \"training diverged - loss is not finite\"",
+  "buggyLineStart": 13,
+  "buggyLineEnd": 16,
+  "traceback": "step   0: loss 9.7842\nstep  20: loss 351.2867\nstep  40: loss 84112.5469\nstep  60: loss nan\nstep  80: loss nan\n---------------------------------------------------------------------------\nAssertionError                            Traceback (most recent call last)\nCell In[1], line 20\n     17     if step % 20 == 0:\n     18         print(f\"step {step:3d}: loss {loss.item():.4f}\")\n---> 20 assert torch.isfinite(loss), \"training diverged - loss is not finite\"\n\nAssertionError: training diverged - loss is not finite",
+  "correctOutput": "step   0: loss 9.7842\nstep  20: loss 1.2304\nstep  40: loss 0.1876\nstep  60: loss 0.0413\nstep  80: loss 0.0147",
+  "options": [
+    {
+      "key": "a",
+      "label": "Call optimizer.zero_grad() at the start of every step",
+      "patchCode": "import torch\nfrom torch import nn\n\ntorch.manual_seed(0)\nX = torch.randn(512, 10)\ntrue_w = torch.randn(10, 1)\ny = X @ true_w + 0.1 * torch.randn(512, 1)\n\nmodel = nn.Linear(10, 1)\noptimizer = torch.optim.SGD(model.parameters(), lr=0.05)\nloss_fn = nn.MSELoss()\n\nfor step in range(100):\n    optimizer.zero_grad()\n    loss = loss_fn(model(X), y)\n    loss.backward()\n    optimizer.step()\n    if step % 20 == 0:\n        print(f\"step {step:3d}: loss {loss.item():.4f}\")\n\nassert torch.isfinite(loss), \"training diverged - loss is not finite\"",
+      "isCorrect": true,
+      "resultLog": "step   0: loss 9.7842\nstep  20: loss 1.2304\nstep  40: loss 0.1876\nstep  60: loss 0.0413\nstep  80: loss 0.0147",
+      "rationale": "`loss.backward()` *accumulates* into each parameter's `.grad` — it never overwrites. Without zeroing, step N applies the sum of gradients from steps 1 through N, so the effective update grows linearly and the loss compounds into `nan`. Zeroing at the top of the loop makes each update use exactly one step's gradient, which is what SGD assumes."
+    },
+    {
+      "key": "b",
+      "label": "Lower the learning rate from 0.05 to 0.001 to calm the divergence",
+      "patchCode": "import torch\nfrom torch import nn\n\ntorch.manual_seed(0)\nX = torch.randn(512, 10)\ntrue_w = torch.randn(10, 1)\ny = X @ true_w + 0.1 * torch.randn(512, 1)\n\nmodel = nn.Linear(10, 1)\noptimizer = torch.optim.SGD(model.parameters(), lr=0.001)\nloss_fn = nn.MSELoss()\n\nfor step in range(100):\n    loss = loss_fn(model(X), y)\n    loss.backward()\n    optimizer.step()\n    if step % 20 == 0:\n        print(f\"step {step:3d}: loss {loss.item():.4f}\")\n\nassert torch.isfinite(loss), \"training diverged - loss is not finite\"",
+      "isCorrect": false,
+      "resultLog": "step   0: loss 9.7842\nstep  20: loss 2.1010\nstep  40: loss 7.8443\nstep  60: loss 152.0871\nstep  80: loss 4810.3327",
+      "rationale": "The assertion passes — the loss is still finite — but look at the curve: it dips, turns around, and climbs four orders of magnitude. The gradient sum still grows with every step; a smaller learning rate only delays the compounding past your 100-step window. You tuned a hyperparameter to mask a correctness bug, and the next person to train for 1,000 steps inherits the explosion."
+    },
+    {
+      "key": "c",
+      "label": "Re-create the optimizer inside the loop so it starts fresh each step",
+      "patchCode": "import torch\nfrom torch import nn\n\ntorch.manual_seed(0)\nX = torch.randn(512, 10)\ntrue_w = torch.randn(10, 1)\ny = X @ true_w + 0.1 * torch.randn(512, 1)\n\nmodel = nn.Linear(10, 1)\nloss_fn = nn.MSELoss()\n\nfor step in range(100):\n    optimizer = torch.optim.SGD(model.parameters(), lr=0.05)\n    loss = loss_fn(model(X), y)\n    loss.backward()\n    optimizer.step()\n    if step % 20 == 0:\n        print(f\"step {step:3d}: loss {loss.item():.4f}\")\n\nassert torch.isfinite(loss), \"training diverged - loss is not finite\"",
+      "isCorrect": false,
+      "resultLog": "step   0: loss 9.7842\nstep  20: loss 351.2867\nstep  40: loss 84112.5469\nstep  60: loss nan\nstep  80: loss nan\n---------------------------------------------------------------------------\nAssertionError                            Traceback (most recent call last)\nCell In[1], line 20\n---> 20 assert torch.isfinite(loss), \"training diverged - loss is not finite\"\n\nAssertionError: training diverged - loss is not finite",
+      "rationale": "Identical explosion, because gradients don't live in the optimizer — they live on the parameter tensors themselves, in `.grad`. A new optimizer object holds references to the same parameters with the same accumulated gradients. (For optimizers with state like Adam's momentum, recreating them each step would *also* destroy that state — two bugs in one line.)"
+    }
+  ],
+  "hints": [
+    "In PyTorch, `backward()` doesn't write gradients — it adds them. What does each parameter's `.grad` contain by step 40?",
+    "Lines 13–16: the loop calls `backward()` and `step()` but nothing ever clears `.grad` between iterations. There is a one-line optimizer method for exactly this."
+  ],
+  "explanationMd": "### Why the bug occurs\nAutograd's contract is that `loss.backward()` **accumulates** gradients into `.grad` rather than replacing them — a deliberate design that enables gradient accumulation across micro-batches and multi-loss models. The cost of that flexibility is a responsibility: *you* clear the buffers between steps. This loop never does, so step N applies `grad₁ + grad₂ + … + gradₙ`. The update magnitude grows roughly linearly, each oversized step makes the loss (and the next gradient) bigger, and the feedback loop rockets through 84,000 into floating-point overflow and `nan` within 60 steps.\n\n### Why the fix is correct\n`optimizer.zero_grad()` at the top of each iteration resets every registered parameter's gradient buffer, so each `step()` consumes exactly one fresh gradient — the assumption SGD's update rule is built on. Placing it at the loop start (rather than after `step()`) is the conventional, hard-to-get-wrong position. The standard rhythm worth memorizing: **zero → forward → backward → step**.",
+  "recruiterReview": "Clean diagnosis of the classic accumulation explosion — the giveaway you read correctly was the loss *growing between print intervals* on a one-layer model, which no sane learning rate does on its own. You also dodged both traps: lowering the LR hides the bug inside your step budget, and recreating the optimizer shows a misunderstanding of where gradients actually live. Worth knowing for production loops: `optimizer.zero_grad(set_to_none=True)` is the modern default and saves a memset. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## The Training Loop Rhythm: Zero, Forward, Backward, Step\n\nEvery PyTorch training iteration is the same four-beat bar:\n\n1. `optimizer.zero_grad()` — clear last step's gradients\n2. `loss = loss_fn(model(x), y)` — forward pass\n3. `loss.backward()` — compute gradients into each parameter's `.grad`\n4. `optimizer.step()` — update parameters using `.grad`\n\nThe beat people drop is the first one, because nothing reminds you: the API neither requires nor warns. The crucial fact is that **`backward()` accumulates**: it executes `param.grad += new_grad`, not `param.grad = new_grad`. Skip the zeroing and every step applies the running *sum* of all gradients so far — an effective learning rate that grows with the step counter. The loss curve has a recognizable signature: fine for a few steps, then a turn upward, then numbers with too many digits, then `nan`.\n\n### Why accumulate at all?\nBecause sometimes the sum is exactly what you want. **Gradient accumulation** simulates a large batch on a small GPU: run 4 micro-batches, `backward()` each (dividing the loss by 4), and call `step()` + `zero_grad()` once per group. Multi-task models with several losses also rely on `backward()` adding contributions into the same buffers. PyTorch chose to make the flexible thing automatic and the common thing manual — so the common case is your job.\n\n### Where gradients actually live\nNot in the optimizer. Each parameter tensor owns its `.grad` attribute; the optimizer merely holds references to the parameters and reads `.grad` during `step()`. That is why recreating the optimizer clears nothing, and why `model.zero_grad()` and `optimizer.zero_grad()` both work (they reach the same tensors). Prefer `zero_grad(set_to_none=True)` — the modern default — which frees the buffers instead of filling them with zeros.\n\n### Common variations of this bug\n- Zeroing outside the inner loop (once per epoch instead of once per step) — slower-motion version of the same explosion.\n- Intentional gradient accumulation that forgets to divide the loss by the accumulation count, quadrupling the effective LR.\n- Evaluation code calling `backward()` for a metric and polluting `.grad` before the next training step.\n- Two optimizers over overlapping parameter sets, each zeroing only its own view of the schedule.",
+    "videos": [
+      {
+        "title": "Why optimizer.zero_grad() exists in PyTorch",
+        "searchQuery": "pytorch optimizer zero_grad why gradients accumulate explained"
+      },
+      {
+        "title": "PyTorch training loop step by step",
+        "searchQuery": "pytorch training loop tutorial zero_grad backward step"
+      }
+    ]
+  },
+  "estMinutes": 4,
+  "version": 1
+}

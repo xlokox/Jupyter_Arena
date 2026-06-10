@@ -1,0 +1,62 @@
+{
+  "id": "fullstack-002-index-keys",
+  "sector": "fullstack",
+  "difficulty": "easy",
+  "title": "06_task_index_keys.jsx",
+  "language": "jsx",
+  "icon": "list-todo",
+  "conceptTags": ["react-keys", "list-rendering", "reconciliation"],
+  "descriptionMd": "## Mission: Make the Pinned Task Keep Its Checkmark\n\nThe task list supports two interactions: check a task off, and pin a task to the top of the list. Each row renders an uncontrolled checkbox, the task text, and a Pin button. The architectural goal is unremarkable list UI — which is exactly why the bug report is so confusing.\n\nQA's failing scenario: check the third task, pin it to the top — and the checkmark *stays at the third row*, now decorating a completely different task. No errors in the console, no failed network calls. The list data moves correctly; the checkbox state doesn't travel with it. Something about how React matches rows between renders is misaligned with how the rows actually move.",
+  "initialCode": "import { useState } from \"react\";\n\nconst initialTasks = [\n  { id: \"a1\", text: \"Ship the release\" },\n  { id: \"b2\", text: \"Fix the flaky test\" },\n  { id: \"c3\", text: \"Review the RFC\" },\n];\n\nexport default function TaskList() {\n  const [tasks, setTasks] = useState(initialTasks);\n\n  function moveToTop(index) {\n    setTasks((prev) => [prev[index], ...prev.filter((_, i) => i !== index)]);\n  }\n\n  return (\n    <ul>\n      {tasks.map((task, index) => (\n        <li key={index}>\n          <input type=\"checkbox\" aria-label={`done: ${task.text}`} />\n          <span>{task.text}</span>\n          <button onClick={() => moveToTop(index)}>Pin</button>\n        </li>\n      ))}\n    </ul>\n  );\n}",
+  "buggyLineStart": 19,
+  "buggyLineEnd": 19,
+  "traceback": "FAIL  task-list.test.jsx > pinning a checked task keeps its checkbox state\n\n  steps:\n    1. check \"done: Review the RFC\"\n    2. click \"Pin\" on \"Review the RFC\"\n\nAssertionError: expected checkbox \"done: Review the RFC\" to be checked\n\n  actual DOM after the move:\n    row 1: [ ] Review the RFC\n    row 2: [ ] Ship the release\n    row 3: [x] Fix the flaky test   ← checkmark stranded at list position 3",
+  "correctOutput": "PASS  task-list.test.jsx > pinning a checked task keeps its checkbox state\n\n  actual DOM after the move:\n    row 1: [x] Review the RFC\n    row 2: [ ] Ship the release\n    row 3: [ ] Fix the flaky test",
+  "options": [
+    {
+      "key": "a",
+      "label": "Key each row by the task's stable id",
+      "patchCode": "import { useState } from \"react\";\n\nconst initialTasks = [\n  { id: \"a1\", text: \"Ship the release\" },\n  { id: \"b2\", text: \"Fix the flaky test\" },\n  { id: \"c3\", text: \"Review the RFC\" },\n];\n\nexport default function TaskList() {\n  const [tasks, setTasks] = useState(initialTasks);\n\n  function moveToTop(index) {\n    setTasks((prev) => [prev[index], ...prev.filter((_, i) => i !== index)]);\n  }\n\n  return (\n    <ul>\n      {tasks.map((task, index) => (\n        <li key={task.id}>\n          <input type=\"checkbox\" aria-label={`done: ${task.text}`} />\n          <span>{task.text}</span>\n          <button onClick={() => moveToTop(index)}>Pin</button>\n        </li>\n      ))}\n    </ul>\n  );\n}",
+      "isCorrect": true,
+      "resultLog": "PASS  task-list.test.jsx > pinning a checked task keeps its checkbox state\n\n  actual DOM after the move:\n    row 1: [x] Review the RFC\n    row 2: [ ] Ship the release\n    row 3: [ ] Fix the flaky test",
+      "rationale": "Keys are React's identity system for siblings: a key says \"this is the *same* row as last render, wherever it moved.\" With `task.id`, the pinned row's existing DOM node — checkbox state included — is relocated to the top. With the array index, identity belongs to the *position*, so reordering reassigns each item's data to whatever DOM node happens to sit at that slot."
+    },
+    {
+      "key": "b",
+      "label": "Make the key more unique by combining the text and the index",
+      "patchCode": "import { useState } from \"react\";\n\nconst initialTasks = [\n  { id: \"a1\", text: \"Ship the release\" },\n  { id: \"b2\", text: \"Fix the flaky test\" },\n  { id: \"c3\", text: \"Review the RFC\" },\n];\n\nexport default function TaskList() {\n  const [tasks, setTasks] = useState(initialTasks);\n\n  function moveToTop(index) {\n    setTasks((prev) => [prev[index], ...prev.filter((_, i) => i !== index)]);\n  }\n\n  return (\n    <ul>\n      {tasks.map((task, index) => (\n        <li key={`${task.text}-${index}`}>\n          <input type=\"checkbox\" aria-label={`done: ${task.text}`} />\n          <span>{task.text}</span>\n          <button onClick={() => moveToTop(index)}>Pin</button>\n        </li>\n      ))}\n    </ul>\n  );\n}",
+      "isCorrect": false,
+      "resultLog": "FAIL  task-list.test.jsx > pinning a checked task keeps its checkbox state\n\nAssertionError: expected checkbox \"done: Review the RFC\" to be checked\n\n  actual DOM after the move:\n    row 1: [ ] Review the RFC   ← row remounted, checkbox reset\n    row 2: [ ] Ship the release\n    row 3: [ ] Fix the flaky test",
+      "rationale": "Embedding the index keeps the key *position-dependent*: when \"Review the RFC\" moves from index 2 to index 0, its key changes from \"Review the RFC-2\" to \"Review the RFC-0\". A changed key tells React this is a *different* element, so it unmounts the old row and mounts a fresh one — wiping the uncontrolled checkbox. Keys need to be stable across renders, not just unique within one."
+    },
+    {
+      "key": "c",
+      "label": "Generate a guaranteed-unique key with Math.random()",
+      "patchCode": "import { useState } from \"react\";\n\nconst initialTasks = [\n  { id: \"a1\", text: \"Ship the release\" },\n  { id: \"b2\", text: \"Fix the flaky test\" },\n  { id: \"c3\", text: \"Review the RFC\" },\n];\n\nexport default function TaskList() {\n  const [tasks, setTasks] = useState(initialTasks);\n\n  function moveToTop(index) {\n    setTasks((prev) => [prev[index], ...prev.filter((_, i) => i !== index)]);\n  }\n\n  return (\n    <ul>\n      {tasks.map((task, index) => (\n        <li key={Math.random()}>\n          <input type=\"checkbox\" aria-label={`done: ${task.text}`} />\n          <span>{task.text}</span>\n          <button onClick={() => moveToTop(index)}>Pin</button>\n        </li>\n      ))}\n    </ul>\n  );\n}",
+      "isCorrect": false,
+      "resultLog": "FAIL  task-list.test.jsx > pinning a checked task keeps its checkbox state\n\nAssertionError: expected checkbox \"done: Review the RFC\" to be checked\n\n  actual DOM after the move:\n    row 1: [ ] Review the RFC\n    row 2: [ ] Ship the release\n    row 3: [ ] Fix the flaky test   ← every checkbox in the list reset",
+      "rationale": "Random keys are new on every render, so React unmounts and remounts the *entire list* whenever anything changes — all checkbox state gone, focus lost, and every row's DOM rebuilt for any unrelated state update. This is the maximally wrong key: unique, yes, but with zero stability, which is the property keys actually exist to provide."
+    }
+  ],
+  "hints": [
+    "React matches this render's rows to last render's rows by `key`. After the reorder, which row does React believe is \"the same one\" as the old row 3?",
+    "Line 19: `key={index}` ties row identity to list *position*. The data already carries a field that identifies the task itself, no matter where it sits."
+  ],
+  "explanationMd": "### Why the bug occurs\nDuring reconciliation React pairs old and new children by key. With `key={index}`, the keys are 0, 1, 2 before *and* after the reorder — so React concludes nothing moved; only the text props changed. It keeps each `<li>`'s DOM node in place and rewrites the labels. The checkbox is *uncontrolled*: its checked state lives in the DOM node, not in React, so the checkmark stays welded to position 3 while the task names rotate around it.\n\n### Why the fix is correct\n`key={task.id}` moves identity from the position to the data. After the reorder React sees key \"c3\" now first, and relocates that row's existing DOM node — checkbox state, focus, scroll position and all — to the top. Index keys are only safe for lists that never reorder, insert, delete, or filter; the moment items move, every piece of position-anchored state (uncontrolled inputs, animations, component state) silently attaches to the wrong item.",
+  "recruiterReview": "Textbook reconciliation bug, correctly resolved at the data layer. What I look for here is whether a candidate understands *why* the symptom is silent — no error, because from React's point of view nothing went wrong; the model of identity was simply wrong. Your rejection of the `text + index` option matters too: keys must be stable across renders, and bolting the index on defeats the purpose. Habit to adopt: every `.map()` in JSX gets a stable domain id as key at the moment you write it, and reach for a controlled checkbox when state must survive heavier restructuring. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## React Keys: Identity, Not Decoration\n\nWhen React re-renders a list it must answer one question per child: *is this the same item as before, or a new one?* The `key` prop is that answer. Get it right and DOM nodes (with their state) follow their data around; get it wrong and state sticks to positions while data moves underneath it.\n\n### What actually goes wrong with index keys\nIndexes are positions, and positions don't move — by definition. Reorder the array and the keys 0, 1, 2 describe the same sequence as before, so React diffs \"item at 0 changed its text\" instead of \"item moved from 2 to 0\". Three categories of state then misbehave:\n- **Uncontrolled inputs** — checkbox checks, text drafts — live in DOM nodes and stay at their old positions.\n- **Component state** — `useState` inside a row component belongs to the key, so it gets handed to a different item.\n- **CSS transitions and focus** — animate or highlight the wrong row after the move.\n\nThe failure is silent. Nothing throws; the UI just lies.\n\n### Choosing keys well\n1. **Best:** a stable id from your data — database id, slug, UUID minted *when the item was created*.\n2. **Acceptable:** index keys for lists that are append-only render-static — never reordered, filtered, or deleted from the middle.\n3. **Never:** values that change when the item moves (text+index combos) or on every render (`Math.random()`, a new `Date`). The first remounts moved rows; the second remounts the whole list every render.\n\nA useful mental test: if this item moved three places down, would its key be unchanged? If not, the key is a position in disguise.\n\n### Keys and uncontrolled inputs interact worst\nAn uncontrolled `<input>` stores its own state in the DOM. Remount it (key changed) and the state evaporates; leave it in place while data moves (index keys) and the state decorates the wrong item. If row state matters across reordering, stable keys are mandatory — and promoting the input to controlled (`checked={task.done}` + `onChange`) moves the truth into your data model where reordering can't touch it.\n\n### Common variations of this bug\n- Filtered lists where index keys shift every item's identity when one item is removed.\n- Chat or feed UIs prepending new entries, causing every existing row to remount with index keys.\n- Form arrays (dynamic address/phone fields) losing half-typed input when a row above is deleted.\n- Drag-and-drop lists where the dragged card's expanded/selected state lands on its old slot.",
+    "videos": [
+      {
+        "title": "React keys and reconciliation explained",
+        "searchQuery": "react key prop reconciliation why not index explained"
+      },
+      {
+        "title": "Index as key anti-pattern demos",
+        "searchQuery": "react index as key anti pattern reorder list state bug demo"
+      }
+    ]
+  },
+  "estMinutes": 4,
+  "version": 1
+}

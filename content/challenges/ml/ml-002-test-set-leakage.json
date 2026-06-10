@@ -1,0 +1,62 @@
+{
+  "id": "ml-002-test-set-leakage",
+  "sector": "ml",
+  "difficulty": "easy",
+  "title": "08_scaler_fit_on_test.ipynb",
+  "language": "python",
+  "icon": "scale",
+  "conceptTags": ["data-leakage", "preprocessing", "train-test-split"],
+  "descriptionMd": "## Mission: Restore the Churn Model's Accuracy\n\nThis churn classifier has a simple, standard architecture: stratified train/test split, standardize the features, fit a logistic regression, report test accuracy. The CI gate asserts the model stays near its 0.84 baseline.\n\nAfter a refactor of the preprocessing block, the gate is red: accuracy fell to 0.712 with no change to the data or the model. The diff touched two lines — how the scaler is applied to the train and test matrices. One of those lines breaks the contract between training-time and test-time preprocessing. Find it and restore the contract.",
+  "initialCode": "import pandas as pd\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.metrics import accuracy_score\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.preprocessing import StandardScaler\n\ndf = pd.read_csv(\"churn.csv\")\nX = df.drop(columns=[\"churned\"])\ny = df[\"churned\"]\nX_train, X_test, y_train, y_test = train_test_split(\n    X, y, test_size=0.2, random_state=42, stratify=y\n)\n\nscaler = StandardScaler()\nX_train_s = scaler.fit_transform(X_train)\nX_test_s = scaler.fit_transform(X_test)\n\nmodel = LogisticRegression(max_iter=1000).fit(X_train_s, y_train)\nacc = accuracy_score(y_test, model.predict(X_test_s))\nprint(f\"test accuracy: {acc:.3f}\")\nassert acc > 0.80, f\"accuracy regression: {acc:.3f} (baseline 0.84)\"",
+  "buggyLineStart": 16,
+  "buggyLineEnd": 16,
+  "traceback": "test accuracy: 0.712\n---------------------------------------------------------------------------\nAssertionError                            Traceback (most recent call last)\nCell In[1], line 21\n     19 acc = accuracy_score(y_test, model.predict(X_test_s))\n     20 print(f\"test accuracy: {acc:.3f}\")\n---> 21 assert acc > 0.80, f\"accuracy regression: {acc:.3f} (baseline 0.84)\"\n\nAssertionError: accuracy regression: 0.712 (baseline 0.84)",
+  "correctOutput": "test accuracy: 0.841",
+  "options": [
+    {
+      "key": "a",
+      "label": "Transform the test set with the statistics already fitted on the training set",
+      "patchCode": "import pandas as pd\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.metrics import accuracy_score\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.preprocessing import StandardScaler\n\ndf = pd.read_csv(\"churn.csv\")\nX = df.drop(columns=[\"churned\"])\ny = df[\"churned\"]\nX_train, X_test, y_train, y_test = train_test_split(\n    X, y, test_size=0.2, random_state=42, stratify=y\n)\n\nscaler = StandardScaler()\nX_train_s = scaler.fit_transform(X_train)\nX_test_s = scaler.transform(X_test)\n\nmodel = LogisticRegression(max_iter=1000).fit(X_train_s, y_train)\nacc = accuracy_score(y_test, model.predict(X_test_s))\nprint(f\"test accuracy: {acc:.3f}\")\nassert acc > 0.80, f\"accuracy regression: {acc:.3f} (baseline 0.84)\"",
+      "isCorrect": true,
+      "resultLog": "test accuracy: 0.841",
+      "rationale": "The scaler is part of the model: the coefficients were learned against features standardized with the *training* mean and standard deviation, so test rows must pass through those exact statistics. `transform` reuses them; `fit_transform` re-estimates them from 240 test rows, feeding the model inputs on a subtly different scale than it was trained on — and at serving time there is no test set to refit on at all."
+    },
+    {
+      "key": "b",
+      "label": "Fit the scaler on the full dataset before splitting, then split the scaled matrix",
+      "patchCode": "import pandas as pd\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.metrics import accuracy_score\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.preprocessing import StandardScaler\n\ndf = pd.read_csv(\"churn.csv\")\nX = df.drop(columns=[\"churned\"])\ny = df[\"churned\"]\n\nscaler = StandardScaler()\nX_s = scaler.fit_transform(X)\n\nX_train_s, X_test_s, y_train, y_test = train_test_split(\n    X_s, y, test_size=0.2, random_state=42, stratify=y\n)\n\nmodel = LogisticRegression(max_iter=1000).fit(X_train_s, y_train)\nacc = accuracy_score(y_test, model.predict(X_test_s))\nprint(f\"test accuracy: {acc:.3f}\")\nassert acc > 0.80, f\"accuracy regression: {acc:.3f} (baseline 0.84)\"",
+      "isCorrect": false,
+      "resultLog": "test accuracy: 0.848",
+      "rationale": "The gate turns green — and that is exactly what makes this dangerous. The scaler's mean and standard deviation were computed over rows that later became the test set, so information about the test distribution leaked into preprocessing. Your offline number is now optimistically biased, and the production model (which can only ever fit on training data) will not match it. A passing check on a broken methodology is worse than a failing one."
+    },
+    {
+      "key": "c",
+      "label": "Drop the scaler entirely — logistic regression can handle raw features",
+      "patchCode": "import pandas as pd\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.metrics import accuracy_score\nfrom sklearn.model_selection import train_test_split\n\ndf = pd.read_csv(\"churn.csv\")\nX = df.drop(columns=[\"churned\"])\ny = df[\"churned\"]\nX_train, X_test, y_train, y_test = train_test_split(\n    X, y, test_size=0.2, random_state=42, stratify=y\n)\n\nmodel = LogisticRegression(max_iter=1000).fit(X_train, y_train)\nacc = accuracy_score(y_test, model.predict(X_test))\nprint(f\"test accuracy: {acc:.3f}\")\nassert acc > 0.80, f\"accuracy regression: {acc:.3f} (baseline 0.84)\"",
+      "isCorrect": false,
+      "resultLog": "ConvergenceWarning: lbfgs failed to converge (status=1):\nSTOP: TOTAL NO. OF ITERATIONS REACHED LIMIT.\n\nIncrease the number of iterations (max_iter) or scale the data as shown in:\n    https://scikit-learn.org/stable/modules/preprocessing.html\ntest accuracy: 0.793\n---------------------------------------------------------------------------\nAssertionError                            Traceback (most recent call last)\nCell In[1], line 16\n---> 16 assert acc > 0.80, f\"accuracy regression: {acc:.3f} (baseline 0.84)\"\n\nAssertionError: accuracy regression: 0.793 (baseline 0.84)",
+      "rationale": "Removing preprocessing trades one bug for two: the lbfgs solver struggles on wildly different feature scales (sklearn's own warning tells you to scale), and the regularization penalty now punishes coefficients unevenly based on units rather than signal. The baseline of 0.84 was earned *with* standardization — the task was to apply it consistently, not to abandon it."
+    }
+  ],
+  "hints": [
+    "A fitted scaler stores the mean and standard deviation it learned. Ask: which statistics should standardize the test set — its own, or the ones the model was trained against?",
+    "Line 16: `fit_transform` on `X_test` re-estimates the scaling statistics from the 20% test split. The method that reuses the training statistics is one word shorter."
+  ],
+  "explanationMd": "### Why the bug occurs\n`StandardScaler.fit_transform` does two things: estimate the mean/std, then standardize with them. Calling it on `X_test` re-estimates those statistics from the small test split. The model's coefficients, however, were learned against features standardized with the *training* statistics — so at evaluation time each feature arrives shifted and stretched relative to what the coefficients expect. With 240 test rows and skewed features, the re-estimated statistics differ enough to cost 13 points of accuracy. Nothing crashes, which is what makes this family of bugs dangerous.\n\n### Why the fix is correct\n`scaler.transform(X_test)` applies the already-fitted training statistics, restoring the invariant that test data flows through exactly the preprocessing the model was trained with. This is also the only version that works in production, where requests arrive one row at a time and there is nothing to `fit` on. The general rule: *fit on train, transform everywhere else* — and the cleanest way to enforce it is a sklearn `Pipeline`, which makes calling `fit` on test data structurally impossible.",
+  "recruiterReview": "Right call, and for the right reason — you identified that the fitted statistics are part of the model contract, not a per-dataset convenience. I'm also glad you didn't take the bait on option B: recognizing that a *higher* accuracy can signal leakage is the kind of skepticism that separates people who run experiments from people who validate them. To make this bulletproof, fold the scaler and the estimator into one `Pipeline` and pass it to `cross_val_score` — then the right thing is the only thing the API allows. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Fit on Train, Transform Everywhere Else\n\nEvery preprocessing step that *learns* something from data — a scaler's mean and standard deviation, an encoder's category list, an imputer's fill values, TF-IDF vocabulary — is part of your model. The moment you let those statistics be estimated from data the model is later judged on, the judgment is rigged. This family of mistakes is called **data leakage**, and it is the most common reason offline metrics fail to survive contact with production.\n\n### The contract\nThink of the fitted preprocessor as frozen knowledge, exactly like model weights:\n- `fit` / `fit_transform` — **training data only**. This is where the statistics are learned.\n- `transform` — validation data, test data, and every production request. The frozen statistics are applied, never re-estimated.\n\nThe asymmetry is the entire point. The test set's job is to impersonate the future; the future does not let you peek at its mean and standard deviation in advance.\n\n### The two ways this bug ships\n1. **Refit on test** (this challenge): test features are standardized with the wrong statistics, the model sees distorted inputs, metrics drop. Visible, if you have a baseline to compare against.\n2. **Fit before split**: statistics absorb test rows, metrics *improve* dishonestly. Invisible — the number goes up and everyone is happy until the production model underperforms the report.\n\n### Make the mistake impossible\nA sklearn `Pipeline` binds preprocessing and estimator into one object: `make_pipeline(StandardScaler(), LogisticRegression())`. Calling `.fit(X_train, y_train)` fits both stages on train only; `.predict(X_test)` transforms with frozen statistics automatically. Pipelines also slot directly into `cross_val_score` and `GridSearchCV`, which re-fit the preprocessing inside every fold — the only honest way to cross-validate a preprocessed model.\n\n### Common variations of this bug\n- Imputing missing values with the full dataset's median before splitting.\n- Fitting TF-IDF or a tokenizer vocabulary on train+test text.\n- Target encoding categories using statistics that include test-set labels.\n- Oversampling (e.g. SMOTE) before the split, creating synthetic twins of test rows in training data.\n- Computing normalization statistics for a neural network over the whole dataset instead of the training partition.",
+    "videos": [
+      {
+        "title": "Data leakage in machine learning explained",
+        "searchQuery": "data leakage machine learning train test split explained"
+      },
+      {
+        "title": "sklearn Pipelines to prevent preprocessing leakage",
+        "searchQuery": "sklearn pipeline standardscaler prevent data leakage tutorial"
+      }
+    ]
+  },
+  "estMinutes": 5,
+  "version": 1
+}

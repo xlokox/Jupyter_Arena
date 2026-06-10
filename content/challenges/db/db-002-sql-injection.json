@@ -1,0 +1,62 @@
+{
+  "id": "db-002-sql-injection",
+  "sector": "db",
+  "difficulty": "easy",
+  "title": "07_login_sql_injection.py",
+  "language": "python",
+  "icon": "shield-alert",
+  "conceptTags": ["sql-injection", "parameterized-queries", "security"],
+  "descriptionMd": "## Mission: Close the Login Lookup Hole\n\nThe user-lookup helper backs the login flow: given an email address, return the matching user row. It works fine for every legitimate address — and that is exactly the problem, because it also \"works\" for things that are not addresses at all.\n\nThe security review added a standard probe to the test suite: the classic `x' OR '1'='1` payload, which must return no user. Tonight's run is red — the probe came back with a row, and not just any row: the first user in the table, an admin. The query string is being assembled in a way that lets user input rewrite the WHERE clause. Find the construction flaw and fix it with the mechanism the database driver provides for exactly this.",
+  "initialCode": "import sqlite3\n\ndef find_user(conn, email):\n    cur = conn.cursor()\n    query = f\"SELECT id, name FROM users WHERE email = '{email}'\"\n    cur.execute(query)\n    return cur.fetchone()\n\nconn = sqlite3.connect(\"app.db\")\nprint(find_user(conn, \"dana@example.com\"))\n\nprobe = find_user(conn, \"x' OR '1'='1\")\nassert probe is None, f\"injection probe returned a row: {probe!r}\"",
+  "buggyLineStart": 5,
+  "buggyLineEnd": 6,
+  "traceback": "('u_1042', 'Dana Levi')\nTraceback (most recent call last):\n  File \"user_lookup.py\", line 13, in <module>\n    assert probe is None, f\"injection probe returned a row: {probe!r}\"\nAssertionError: injection probe returned a row: ('u_0001', 'Admin Root')",
+  "correctOutput": "('u_1042', 'Dana Levi')",
+  "options": [
+    {
+      "key": "a",
+      "label": "Use a parameterized query with a placeholder and pass the email separately",
+      "patchCode": "import sqlite3\n\ndef find_user(conn, email):\n    cur = conn.cursor()\n    cur.execute(\"SELECT id, name FROM users WHERE email = ?\", (email,))\n    return cur.fetchone()\n\nconn = sqlite3.connect(\"app.db\")\nprint(find_user(conn, \"dana@example.com\"))\n\nprobe = find_user(conn, \"x' OR '1'='1\")\nassert probe is None, f\"injection probe returned a row: {probe!r}\"",
+      "isCorrect": true,
+      "resultLog": "('u_1042', 'Dana Levi')",
+      "rationale": "Placeholders send the SQL text and the values down two separate channels: the database compiles the statement first, then binds the input purely as data. The probe string is now compared *literally* against the email column — quotes, OR and all — so it can never become syntax. This is the only fix that holds by construction rather than by filtering, and it works identically across drivers and databases."
+    },
+    {
+      "key": "b",
+      "label": "Escape the input by doubling any single quotes before formatting it in",
+      "patchCode": "import sqlite3\n\ndef find_user(conn, email):\n    cur = conn.cursor()\n    safe_email = email.replace(\"'\", \"''\")\n    query = f\"SELECT id, name FROM users WHERE email = '{safe_email}'\"\n    cur.execute(query)\n    return cur.fetchone()\n\nconn = sqlite3.connect(\"app.db\")\nprint(find_user(conn, \"dana@example.com\"))\n\nprobe = find_user(conn, \"x' OR '1'='1\")\nassert probe is None, f\"injection probe returned a row: {probe!r}\"",
+      "isCorrect": false,
+      "resultLog": "('u_1042', 'Dana Levi')",
+      "rationale": "The probe passes, the assert is silent — and the hole is still there. Hand-rolled escaping defends one payload shape in one driver: it does nothing for numeric columns (no quotes to escape), `LIKE` wildcards, or drivers where a backslash also escapes quotes, and the next person to build a query in this file will copy the pattern without the `replace`. You hardened a string; parameterization removes the string-assembly attack surface entirely."
+    },
+    {
+      "key": "c",
+      "label": "Reject suspicious input with an email allowlist regex before querying",
+      "patchCode": "import re\nimport sqlite3\n\ndef find_user(conn, email):\n    if not re.fullmatch(r\"[A-Za-z0-9@._-]+\", email):\n        raise ValueError(f\"invalid email: {email!r}\")\n    cur = conn.cursor()\n    query = f\"SELECT id, name FROM users WHERE email = '{email}'\"\n    cur.execute(query)\n    return cur.fetchone()\n\nconn = sqlite3.connect(\"app.db\")\nprint(find_user(conn, \"dana@example.com\"))\n\nprobe = find_user(conn, \"x' OR '1'='1\")\nassert probe is None, f\"injection probe returned a row: {probe!r}\"",
+      "isCorrect": false,
+      "resultLog": "('u_1042', 'Dana Levi')\nTraceback (most recent call last):\n  File \"user_lookup.py\", line 15, in <module>\n    probe = find_user(conn, \"x' OR '1'='1\")\n  File \"user_lookup.py\", line 6, in find_user\n    raise ValueError(f\"invalid email: {email!r}\")\nValueError: invalid email: \"x' OR '1'='1\"",
+      "rationale": "The probe is blocked — by crashing, which the test expected to be a clean no-match — and the query underneath is still built by string interpolation. Worse, the allowlist already rejects *legitimate* addresses: plus-tagging (`dana+ci@example.com`) is valid email and fails this regex. Input validation is a fine defense-in-depth layer, but it cannot be the fix while the SQL is still assembled from user text."
+    }
+  ],
+  "hints": [
+    "The payload never \"hacks\" anything — it just gets pasted into the SQL text, where its quote characters end the string early and the rest becomes live syntax. Where does pasting happen?",
+    "Lines 5–6: the f-string builds the WHERE clause out of user input. The DB-API gives `execute()` a second argument that binds values without ever splicing them into the SQL string — sqlite3 spells the placeholder `?`."
+  ],
+  "explanationMd": "### Why the bug occurs\nThe f-string treats SQL as text and the email as a string to be glued in. The probe `x' OR '1'='1` contains a quote that *closes* the email literal early, leaving `OR '1'='1'` as live SQL: the WHERE clause becomes `email = 'x' OR '1'='1'`, which is true for every row, so `fetchone()` returns the first user — the admin. Any place where untrusted input is concatenated into a query is one quote away from the attacker writing your SQL for you; the same construction also enables `UNION SELECT` data exfiltration and stacked `DROP`/`UPDATE` statements on drivers that allow them.\n\n### Why the fix is correct\nParameterized queries split the channels: `execute(\"... WHERE email = ?\", (email,))` ships the statement and the value separately, and the engine binds the value *after* parsing the SQL. Input can no longer change the statement's structure — only its data — which eliminates the vulnerability by construction instead of by trying to predict every malicious shape. It is also the standard across the entire Python DB-API: `?` in sqlite3, `%s` in psycopg2, named parameters in others — same principle, same guarantee.",
+  "recruiterReview": "This is the security bug I still find in real codebases every year, and you fixed it the only acceptable way. What stands out is the reasoning on the distractors: recognizing that quote-doubling *passes the test while remaining wrong* shows you evaluate fixes against the threat model, not against the assertion. Same for spotting that the regex rejects plus-tagged addresses — security fixes that break legitimate users get reverted, and then the hole comes back. House rule worth adopting: user input never appears inside an SQL string, ever; if you see an f-string building a query, that's a review blocker regardless of current exploitability. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## SQL Injection and Parameterized Queries\n\nSQL injection has sat at or near the top of every OWASP list for two decades, not because it is sophisticated but because the broken pattern looks so natural: you have a query string, you have a value, you put the value in the string. The flaw is structural. To the database, your query arrives as *one* undifferentiated text — it cannot tell which characters you wrote and which the user supplied. If the user's part contains syntax, it executes as syntax.\n\n### The anatomy of the classic payload\nWith `email = '{input}'` and input `x' OR '1'='1`, the assembled clause reads `email = 'x' OR '1'='1'`. The first quote in the payload terminates your string literal; everything after it is parsed as SQL. `OR '1'='1'` makes the predicate universally true. Variants follow the same recipe: `'; DROP TABLE users; --` ends the statement and starts a new one, `' UNION SELECT password FROM users --` grafts a second result set onto yours, and `--` comments out whatever trailing SQL would have broken the trick.\n\n### Why parameterization actually works\n`cur.execute(\"SELECT id, name FROM users WHERE email = ?\", (email,))` sends two things: the statement (with placeholders) and the values. The engine parses and plans the statement *before* the values are bound, so the structure is frozen — bound values are data forever, no matter what characters they contain. This is qualitatively different from escaping, which keeps the single-channel design and tries to neutralize dangerous characters after the fact. Every Python driver supports it (`?` for sqlite3, `%s` for psycopg2 — note: not Python %-formatting, the driver handles it), and every ORM uses it underneath.\n\n### What about validation and escaping?\nKeep input validation — it improves error messages and narrows the attack surface — but treat it as defense in depth, never the fix. Allowlists are either too strict (rejecting `dana+ci@example.com`) or too loose (an apostrophe is *legal* in email local parts and in human names — ask anyone named O'Brien). Driver-provided escaping functions are a last resort for the rare cases placeholders cannot express, such as dynamic identifiers — and table or column names chosen by users should map through a hardcoded dictionary instead.\n\n### Common variations of this bug\n- `%` or `.format()` string building instead of f-strings — identical hole, different syntax.\n- Numeric fields concatenated without quotes: `WHERE id = \" + user_id` needs no quote character to exploit.\n- `LIKE` patterns where user input smuggles `%`/`_` wildcards even in parameterized queries (escape the wildcards separately).\n- Dynamic `ORDER BY {column}` — placeholders can't bind identifiers; use an allowlist mapping.\n- Second-order injection: a value stored safely today gets concatenated into a query by a different code path tomorrow.",
+    "videos": [
+      {
+        "title": "SQL injection explained from first principles",
+        "searchQuery": "sql injection explained or 1=1 demo parameterized"
+      },
+      {
+        "title": "Parameterized queries in Python (sqlite3, psycopg2)",
+        "searchQuery": "python parameterized query sqlite3 psycopg2 placeholders tutorial"
+      }
+    ]
+  },
+  "estMinutes": 4,
+  "version": 1
+}
