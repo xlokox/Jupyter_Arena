@@ -14,16 +14,16 @@
 
 ## The 8 challenges
 
-| ID | Difficulty | Bug → fix |
-|---|---|---|
-| `ml-001-kmeans-scaling` *(spec seed)* | easy | Raw age/income into KMeans → StandardScaler |
-| `ml-002-test-set-leakage` | easy | `fit_transform` on X_test → `transform` only |
-| `dl-001-device-mismatch` *(spec seed)* | hard | CPU batches into CUDA model → `.to(device)` in loop |
-| `dl-002-missing-zero-grad` | easy | Gradient accumulation explosion → `optimizer.zero_grad()` |
-| `fullstack-001-stale-closure` *(spec seed)* | medium | Stale `clicks` sent to API → local `next` variable |
-| `fullstack-002-index-keys` | easy | `key={index}` on reorderable list → stable `task.id` |
-| `db-001-pool-leak` *(spec seed)* | very_hard | Early return skips `putconn` + holds FOR UPDATE lock → `try/finally` + rollback |
-| `db-002-sql-injection` | easy | f-string SQL → parameterized query |
+| ID                                          | Difficulty | Bug → fix                                                                       |
+| ------------------------------------------- | ---------- | ------------------------------------------------------------------------------- |
+| `ml-001-kmeans-scaling` _(spec seed)_       | easy       | Raw age/income into KMeans → StandardScaler                                     |
+| `ml-002-test-set-leakage`                   | easy       | `fit_transform` on X_test → `transform` only                                    |
+| `dl-001-device-mismatch` _(spec seed)_      | hard       | CPU batches into CUDA model → `.to(device)` in loop                             |
+| `dl-002-missing-zero-grad`                  | easy       | Gradient accumulation explosion → `optimizer.zero_grad()`                       |
+| `fullstack-001-stale-closure` _(spec seed)_ | medium     | Stale `clicks` sent to API → local `next` variable                              |
+| `fullstack-002-index-keys`                  | easy       | `key={index}` on reorderable list → stable `task.id`                            |
+| `db-001-pool-leak` _(spec seed)_            | very_hard  | Early return skips `putconn` + holds FOR UPDATE lock → `try/finally` + rollback |
+| `db-002-sql-injection`                      | easy       | f-string SQL → parameterized query                                              |
 
 Every challenge has: 3 options with full `patchCode` and realistic per-option failure/success logs (wrong answers run too), 2-stage hints, mechanism+principle explanation, senior-voice recruiter review, 400–700-word tutorial ending with a "common variations" list, and 2 YouTube **search-query** video cards.
 
@@ -42,7 +42,7 @@ Every challenge has: 3 options with full `patchCode` and realistic per-option fa
 
 ## Known gaps / weak spots
 
-- Authored outputs (loss curves, accuracy numbers, cluster tables) are *plausible* rather than machine-reproduced; per the brief, headless execution lands with the Pyodide flag in v1.5 and manual verification is recorded in commit messages until then.
+- Authored outputs (loss curves, accuracy numbers, cluster tables) are _plausible_ rather than machine-reproduced; per the brief, headless execution lands with the Pyodide flag in v1.5 and manual verification is recorded in commit messages until then.
 - The CI workflow has not yet run on GitHub (no remote configured); it is untested config until first push.
 - `estMinutes` values are editorial estimates.
 
