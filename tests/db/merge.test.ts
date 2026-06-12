@@ -1,5 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { createTestUser, DB_002, getStats, ML_001, ML_002, submit, type TestUser } from "./helpers";
+import {
+  createTestUser,
+  DB_002,
+  getBadges,
+  getDailyGoal,
+  getFreezeTokens,
+  getStats,
+  ML_001,
+  ML_002,
+  publishedSectorIds,
+  submit,
+  utcDay,
+  type TestUser,
+} from "./helpers";
 
 /** merge_local_progress: recompute server-side, one-time, clamped, skip-solved. */
 
@@ -79,5 +92,22 @@ describe("merge_local_progress", () => {
     // Wrongs clamp at 100 → XP can only be floored to 0 before the +10 solve;
     // hints clamp at 2 → no first-try bonus. +10 +5 daily = 15.
     expect(result.new_xp).toBe(15);
+  });
+
+  it("re-derives badges from the merged aggregate; goals and tokens stay clean", async () => {
+    const user = await createTestUser();
+    const ml = await publishedSectorIds("ml");
+    const result = await merge(
+      user,
+      ml.map((id) => ({ challenge_id: id, solved: true, wrong_attempts: 0, hints_used: 0 })),
+    );
+    expect(result.imported).toBe(ml.length);
+
+    const badges = await getBadges(user.userId);
+    expect(badges).toEqual(expect.arrayContaining(["first_blood", "sector_sweep_ml"]));
+
+    // Conservatism: offline daily-goal history and freeze tokens are NOT imported.
+    expect(await getDailyGoal(user.userId, utcDay(0))).toBeNull();
+    expect(await getFreezeTokens(user.userId)).toBe(0);
   });
 });

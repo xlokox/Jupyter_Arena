@@ -93,14 +93,19 @@ describe("achievement tables (5.6b)", () => {
   // Seed B real rows via admin (bypasses RLS) so the read policies are tested
   // independently of submit_attempt v3.
   beforeAll(async () => {
+    // B already earned first_blood + a daily goal by solving in the top-level
+    // setup; upsert-ignore so seeding the fixtures is order-independent.
     const today = new Date().toISOString().slice(0, 10);
     const badge = await admin
       .from("user_badges")
-      .insert({ user_id: b.userId, badge_id: "first_blood" });
+      .upsert({ user_id: b.userId, badge_id: "first_blood" }, { onConflict: "user_id,badge_id", ignoreDuplicates: true });
     expect(badge.error).toBeNull();
     const goal = await admin
       .from("user_daily_goals")
-      .insert({ user_id: b.userId, goal_date: today, progress_solves: 1 });
+      .upsert(
+        { user_id: b.userId, goal_date: today, progress_solves: 1 },
+        { onConflict: "user_id,goal_date", ignoreDuplicates: true },
+      );
     expect(goal.error).toBeNull();
   });
 

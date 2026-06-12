@@ -92,6 +92,11 @@ export interface SubmitResult {
   streak: number;
   already_solved: boolean;
   events: Array<{ reason: string; delta: number }>;
+  // 5.6b additive fields
+  streak_freeze_tokens: number;
+  streak_freeze_spent: boolean;
+  daily_goal: { progress: number; target: number; completed: boolean } | null;
+  newly_awarded: string[];
 }
 
 export async function submit(
@@ -114,6 +119,146 @@ export async function dailyChallengeIdServer(): Promise<string | null> {
   const { data, error } = await admin.rpc("daily_challenge_id");
   if (error) throw new Error(error.message);
   return data as string | null;
+}
+
+export async function getBadges(userId: string): Promise<string[]> {
+  const { data, error } = await admin
+    .from("user_badges")
+    .select("badge_id")
+    .eq("user_id", userId);
+  if (error) throw new Error(error.message);
+  return (data as Array<{ badge_id: string }>).map((r) => r.badge_id).sort();
+}
+
+export async function getDailyGoal(
+  userId: string,
+  date: string,
+): Promise<{ progress_solves: number; target_solves: number; completed_at: string | null } | null> {
+  const { data, error } = await admin
+    .from("user_daily_goals")
+    .select("progress_solves, target_solves, completed_at")
+    .eq("user_id", userId)
+    .eq("goal_date", date)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data as {
+    progress_solves: number;
+    target_solves: number;
+    completed_at: string | null;
+  } | null;
+}
+
+export async function getFreezeTokens(userId: string): Promise<number> {
+  const { data, error } = await admin
+    .from("user_stats")
+    .select("streak_freeze_tokens")
+    .eq("user_id", userId)
+    .single();
+  if (error) throw new Error(error.message);
+  return (data as { streak_freeze_tokens: number }).streak_freeze_tokens;
+}
+
+/** All published challenge ids in a sector (for Sector Sweep tests). */
+export async function publishedSectorIds(sector: string): Promise<string[]> {
+  const { data, error } = await admin
+    .from("challenges")
+    .select("id")
+    .eq("is_published", true)
+    .eq("sector_id", sector)
+    .order("id");
+  if (error) throw new Error(error.message);
+  return (data as Array<{ id: string }>).map((r) => r.id);
+}
+
+/** The correct option key for a challenge (seed content varies it). */
+export async function correctOptionKey(challengeId: string): Promise<string> {
+  const { data, error } = await admin
+    .from("challenge_options")
+    .select("option_key")
+    .eq("challenge_id", challengeId)
+    .eq("is_correct", true)
+    .single();
+  if (error) throw new Error(error.message);
+  return (data as { option_key: string }).option_key;
+}
+
+/** N easy published challenge ids with their correct option keys (no gating). */
+export async function easyChallenges(
+  n: number,
+  language?: string,
+): Promise<Array<{ id: string; option: string }>> {
+  let query = admin
+    .from("challenges")
+    .select("id")
+    .eq("is_published", true)
+    .eq("difficulty", "easy");
+  if (language === "javascript") query = query.in("language", ["jsx", "javascript"]);
+  else if (language) query = query.eq("language", language);
+  const { data, error } = await query.order("id").limit(n);
+  if (error) throw new Error(error.message);
+  const ids = (data as Array<{ id: string }>).map((r) => r.id);
+  return Promise.all(ids.map(async (id) => ({ id, option: await correctOptionKey(id) })));
+}
+
+/** A published challenge of a given difficulty with its correct option key. */
+export async function challengeOfDifficulty(
+  difficulty: string,
+): Promise<{ id: string; option: string }> {
+  const { data, error } = await admin
+    .from("challenges")
+    .select("id")
+    .eq("is_published", true)
+    .eq("difficulty", difficulty)
+    .order("id")
+    .limit(1)
+    .single();
+  if (error) throw new Error(error.message);
+  const id = (data as { id: string }).id;
+  return { id, option: await correctOptionKey(id) };
+}
+
+/** Mark challenges solved directly (admin bypass) to set up badge thresholds. */
+export async function seedSolved(userId: string, challengeIds: string[]): Promise<void> {
+  if (challengeIds.length === 0) return;
+  const now = new Date().toISOString();
+  const rows = challengeIds.map((id) => ({
+    user_id: userId,
+    challenge_id: id,
+    solved_at: now,
+    attempts: 1,
+    hints_used: 0,
+  }));
+  const { error } = await admin
+    .from("user_challenge_progress")
+    .upsert(rows, { onConflict: "user_id,challenge_id" });
+  if (error) throw new Error(error.message);
+}
+
+/** Seed N completed daily-goal rows on distinct past days (for Daily Devoted). */
+export async function seedCompletedDailyGoals(userId: string, count: number): Promise<void> {
+  const rows = Array.from({ length: count }, (_, i) => ({
+    user_id: userId,
+    goal_date: utcDay(i + 1),
+    target_solves: 3,
+    progress_solves: 3,
+    completed_at: new Date().toISOString(),
+  }));
+  const { error } = await admin
+    .from("user_daily_goals")
+    .upsert(rows, { onConflict: "user_id,goal_date" });
+  if (error) throw new Error(error.message);
+}
+
+/** Seed first_try_bonus xp_events directly (the SQL flawless-count source). */
+export async function seedFlawlessEvents(userId: string, count: number): Promise<void> {
+  const rows = Array.from({ length: count }, () => ({
+    user_id: userId,
+    challenge_id: null,
+    delta: 5,
+    reason: "first_try_bonus",
+  }));
+  const { error } = await admin.from("xp_events").insert(rows);
+  if (error) throw new Error(error.message);
 }
 
 /**
