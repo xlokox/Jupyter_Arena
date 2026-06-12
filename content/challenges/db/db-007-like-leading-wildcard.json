@@ -1,0 +1,62 @@
+{
+  "id": "db-007-like-leading-wildcard",
+  "sector": "db",
+  "difficulty": "medium",
+  "title": "db_007_like_leading_wildcard.sql",
+  "language": "sql",
+  "icon": "filter",
+  "conceptTags": ["sql", "like-operator", "indexing", "full-text-search", "performance"],
+  "descriptionMd": "## Mission: Fix the Wildcard That Kills the Index\n\nThe product search feature uses a `LIKE '%term%'` query. Users report it is very slow — 8+ seconds on a table with 5 million products. `EXPLAIN ANALYZE` shows a sequential scan even though there is an index on `products.name`.\n\nA leading wildcard (`%term`) prevents the B-tree index from being used: the index is sorted by the first character of the value, but a leading `%` means \"match anything before `term`\" — the match could start anywhere in the string, so no prefix ordering is possible and the index is useless.\n\nRewrite the search to use PostgreSQL's full-text search (`tsvector` / `tsquery`) or the `pg_trgm` trigram extension, which supports substring search with an index.",
+  "initialCode": "-- Slow: leading wildcard defeats the B-tree index on products.name\nSELECT id, name, price\nFROM products\nWHERE name LIKE '%laptop%';",
+  "buggyLineStart": 2,
+  "buggyLineEnd": 4,
+  "traceback": "EXPLAIN ANALYZE:\n  Seq Scan on products  (cost=0.00..125000.00 rows=500 width=40)\n                        (actual time=0.015..8241.771 rows=500 loops=1)\n  Filter: ((name)::text ~~ '%laptop%'::text)\n  Rows Removed by Filter: 4999500\n\nIndex on products.name NOT used — leading wildcard '%laptop%' prevents\nB-tree traversal. All 5,000,000 rows scanned.",
+  "correctOutput": "-- Using pg_trgm GIN index:\nSELECT id, name, price\nFROM products\nWHERE name ILIKE '%laptop%';\n\nEXPLAIN ANALYZE:\n  Bitmap Index Scan on products_name_trgm_idx\n    (actual time=1.842..1.842 rows=500 loops=1)\n  Execution Time: 3ms (was 8241ms)",
+  "options": [
+    {
+      "key": "a",
+      "label": "Create a GIN trigram index with pg_trgm — enables fast LIKE/ILIKE substring search",
+      "patchCode": "-- Enable the trigram extension (run once, requires superuser):\nCREATE EXTENSION IF NOT EXISTS pg_trgm;\n\n-- Create a GIN index on the name column for trigram search:\nCREATE INDEX products_name_trgm_idx ON products USING GIN(name gin_trgm_ops);\n\n-- Now the LIKE query uses the index:\nSELECT id, name, price\nFROM products\nWHERE name ILIKE '%laptop%';",
+      "isCorrect": true,
+      "resultLog": "EXPLAIN ANALYZE (after GIN trigram index):\n  Bitmap Index Scan on products_name_trgm_idx\n    (cost=0.00..56.00 rows=500 width=40)\n    (actual time=1.842..1.842 rows=500 loops=1)\n  Bitmap Heap Scan on products\n    (actual time=2.014..2.891 rows=500 loops=1)\n  Execution Time: 3.1ms (was 8241ms)",
+      "rationale": "`pg_trgm` breaks strings into trigrams (3-character substrings) and stores them in a GIN index. A search for `'laptop'` queries the set of trigrams `{lap, apt, pto, top}` — the index returns only rows containing all four trigrams, which the planner then filters with the full `LIKE` predicate. This supports arbitrary-position substring matching (`%term%`) with index-backed performance. `ILIKE` (case-insensitive) is also supported. GIN trigram indexes work with both `LIKE '%pattern%'` and regular expression (`~`) queries."
+    },
+    {
+      "key": "b",
+      "label": "Remove the leading wildcard — search only for names that start with the term",
+      "patchCode": "SELECT id, name, price\nFROM products\nWHERE name LIKE 'laptop%';",
+      "isCorrect": false,
+      "resultLog": "EXPLAIN ANALYZE:\n  Index Scan using products_name_idx on products\n    (actual time=0.041..0.850 rows=12 loops=1)\n  Execution Time: 0.9ms ✓\n\nBut: only returns products whose name STARTS WITH 'laptop'.\n  'MacBook Pro Laptop' → NOT matched (laptop appears in the middle)\n  'laptop bag' → matched\n\nThe search behavior has changed — this is not a drop-in fix.",
+      "rationale": "Removing the leading wildcard (`'laptop%'` instead of `'%laptop%'`) allows the B-tree index to be used: the index is sorted by prefix, so `LIKE 'laptop%'` is equivalent to a range scan from `'laptop'` to `'laptoz'`. The query becomes very fast. But it changes the semantics: `'MacBook Pro Laptop Stand'` no longer matches because the word `laptop` doesn't appear at the start of the string. Whether this is acceptable depends on the product — a user searching for `laptop` probably expects to find products with `laptop` anywhere in the name."
+    },
+    {
+      "key": "c",
+      "label": "Use full-text search with to_tsvector and to_tsquery instead of LIKE",
+      "patchCode": "-- Create a GIN full-text index:\nCREATE INDEX products_name_fts_idx ON products USING GIN(to_tsvector('english', name));\n\nSELECT id, name, price\nFROM products\nWHERE to_tsvector('english', name) @@ to_tsquery('english', 'laptop');",
+      "isCorrect": false,
+      "resultLog": "EXPLAIN ANALYZE:\n  Bitmap Index Scan on products_name_fts_idx\n    (actual time=0.931..0.931 rows=487 loops=1)\n  Execution Time: 1.8ms ✓\n\nBut: full-text search tokenizes and stems — 'laptops' matches 'laptop' ✓\n  'laptop-grade' may not match depending on parser config\n  Partial matches not supported: 'lap' does NOT match 'laptop'\n  Phrase matching has different syntax: 'laptop stand' → 'laptop <-> stand'\n\nFull-text search has different semantics from LIKE — acceptable for\nword-based search, but not a drop-in replacement for substring matching.",
+      "rationale": "Full-text search (`tsvector` / `tsquery`) provides fast indexed search and adds stemming (matching `laptops` when you search `laptop`) — better than `LIKE` for natural-language word search. But it tokenizes by word boundaries and stems lexemes, making it unsuitable for substring matching: `'lap'` does not match `'laptop'` with full-text search. It also has different query syntax. `pg_trgm` is the better fit for a LIKE-style substring search with index support — it preserves the exact substring matching semantics while adding index efficiency."
+    }
+  ],
+  "hints": [
+    "B-tree indexes are sorted by prefix. `LIKE 'laptop%'` (trailing wildcard) can use an index because it is a prefix range query. `LIKE '%laptop%'` (leading wildcard) cannot — the match can start anywhere, so no sorted prefix is useful. What PostgreSQL extension provides a different index type that supports arbitrary-substring matching?",
+    "Lines 2–4: the leading `%` in `LIKE '%laptop%'` defeats the B-tree index. Enable the `pg_trgm` extension and create `CREATE INDEX products_name_trgm_idx ON products USING GIN(name gin_trgm_ops)`. The planner will automatically use this index for `LIKE '%..%'` and `ILIKE '%..%'` queries."
+  ],
+  "explanationMd": "### Why the bug occurs\nB-tree indexes are sorted trees of column values. They support prefix-based lookups: `WHERE name LIKE 'laptop%'` is equivalent to `WHERE name >= 'laptop' AND name < 'laptoz'` — a range scan in a sorted structure. A leading wildcard (`LIKE '%laptop%'`) means the match position is unknown — the word `laptop` could start at character 1, 10, or 100. There is no ordering property the B-tree can exploit; the database must evaluate the predicate against every row.\n\n### Why the fix is correct\n`pg_trgm` (trigram similarity) breaks each string into overlapping 3-character substrings. `'laptop'` → `{'lap', 'apt', 'pto', 'top'}`. A GIN index stores which rows contain each trigram. A `LIKE '%laptop%'` query is transformed into an intersection of trigram lookups — the planner finds rows containing all four trigrams, then applies the full predicate to filter the candidates. For long search terms, this is extremely selective and very fast.",
+  "recruiterReview": "Correct fix and the trigram explanation is exactly right. The prefix-only distractor changes the product behavior — a real candidate would flag this as a behavior change requiring product owner sign-off, not a silent fix. The full-text search distractor is good because FTS is often the first suggestion for 'make search faster', and recognizing that it has different semantics (word boundary tokenization vs substring) shows you read the problem rather than pattern-matching on 'slow search → add full-text index'. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## SQL LIKE, Leading Wildcards, and pg_trgm\n\nThe `LIKE` operator matches string patterns using two wildcards: `%` (any sequence of characters) and `_` (exactly one character). Where the wildcard appears determines whether an index can be used.\n\n### Trailing wildcard: index-friendly\n`WHERE name LIKE 'laptop%'` is a *prefix search*. The B-tree index is sorted, so this is a range scan from `'laptop'` to `'laptoz'`. The index is used: `Index Scan`.\n\n### Leading wildcard: index-defeating\n`WHERE name LIKE '%laptop%'` is a *substring search*. The match can start at any position — there is no prefix ordering the B-tree can exploit. The database performs a `Seq Scan` regardless of whether an index exists.\n\n### Trailing wildcard only with ILIKE\nFor case-insensitive prefix search, create a functional index:\n```sql\nCREATE INDEX ON products(lower(name));\nWHERE lower(name) LIKE 'laptop%';\n```\n\n### pg_trgm: substring search with a GIN index\nThe `pg_trgm` extension adds trigram-based similarity and substring indexing:\n```sql\nCREATE EXTENSION IF NOT EXISTS pg_trgm;\nCREATE INDEX products_name_trgm_idx ON products USING GIN(name gin_trgm_ops);\n\n-- Both are now index-accelerated:\nWHERE name LIKE '%laptop%'    -- case-sensitive\nWHERE name ILIKE '%laptop%'   -- case-insensitive\nWHERE name ~ 'lapt[o0]p'      -- regex\n```\n\nTrigram GIN indexes work well for patterns longer than ~3 characters. Very short patterns (`LIKE '%ab%'`) still require many trigram matches and may fall back to sequential scan.\n\n### Full-text search (tsvector / tsquery): when to use instead\nFor natural-language search (prose, descriptions, comments), full-text search is often better:\n- Supports stemming (`laptops` → `laptop`)\n- Supports ranking by relevance (`ts_rank`)\n- Supports phrase search (`'laptop stand'` as adjacent words)\n\nBut full-text tokenizes by word boundaries — partial words don't match. `pg_trgm` is for exact substring matching; full-text is for word-boundary search.\n\n### Choosing the right approach\n| Use case | Solution |\n|---|---|\n| Prefix search (starts with) | B-tree index + `LIKE 'term%'` |\n| Substring search (contains) | `pg_trgm` GIN index + `LIKE '%term%'` |\n| Word-boundary search with stemming | `tsvector` GIN index + `tsquery` |\n| Fuzzy/similarity search | `pg_trgm` + `<->` similarity operator |",
+    "videos": [
+      {
+        "title": "PostgreSQL LIKE leading wildcard performance — pg_trgm trigram index",
+        "searchQuery": "postgresql LIKE leading wildcard slow performance pg_trgm trigram GIN index fix"
+      },
+      {
+        "title": "pg_trgm PostgreSQL — trigram similarity and substring search",
+        "searchQuery": "postgresql pg_trgm trigram extension GIN index LIKE ILIKE substring search"
+      }
+    ]
+  },
+  "estMinutes": 6,
+  "version": 1
+}

@@ -1,0 +1,62 @@
+{
+  "id": "db-008-implicit-type-cast",
+  "sector": "db",
+  "difficulty": "medium",
+  "title": "db_008_implicit_type_cast.sql",
+  "language": "sql",
+  "icon": "repeat",
+  "conceptTags": ["sql", "type-casting", "indexing", "implicit-conversion", "query-optimization"],
+  "descriptionMd": "## Mission: Stop the Implicit Cast That Ignores the Index\n\nThe API receives a `customer_id` as a string from the request URL. The query is `WHERE customer_id = $1` where `$1` is the string `'42'`. The `customers` table has an integer `id` column and a B-tree index on it.\n\n`EXPLAIN ANALYZE` shows a sequential scan — the index is ignored. The cause: the database must compare an `integer` column to a `varchar` parameter. Rather than cast the parameter to integer (which would enable the index), PostgreSQL casts the column values to varchar for each row — making the index on the `integer` column unusable.\n\nFix the query so the comparison happens with matching types, allowing the planner to use the index.",
+  "initialCode": "-- $1 is passed as a string '42' from the application layer\n-- customers.id is INTEGER with a B-tree index\nSELECT id, name, email\nFROM customers\nWHERE id = $1;",
+  "buggyLineStart": 3,
+  "buggyLineEnd": 5,
+  "traceback": "EXPLAIN ANALYZE (with $1 = '42' as VARCHAR):\n  Seq Scan on customers  (cost=0.00..25000.00 rows=1 width=60)\n  Filter: ((id)::text = '42'::text)\n  Rows Removed by Filter: 999999\n  Execution Time: 843.2ms\n\nPostgreSQL cast the INTEGER column to TEXT for every row to compare with\nthe VARCHAR parameter. The B-tree index on INTEGER id is not used.",
+  "correctOutput": "EXPLAIN ANALYZE (with $1::INTEGER = 42):\n  Index Scan using customers_pkey on customers\n    (cost=0.42..8.44 rows=1 width=60)\n    (actual time=0.018..0.020 rows=1 loops=1)\n  Execution Time: 0.04ms (was 843ms)",
+  "options": [
+    {
+      "key": "a",
+      "label": "Cast the parameter to INTEGER in the query so types match: WHERE id = $1::INTEGER",
+      "patchCode": "-- Cast the VARCHAR parameter to INTEGER to match the column type\nSELECT id, name, email\nFROM customers\nWHERE id = $1::INTEGER;",
+      "isCorrect": true,
+      "resultLog": "EXPLAIN ANALYZE (with $1::INTEGER = 42):\n  Index Scan using customers_pkey on customers\n    (cost=0.42..8.44 rows=1 width=60)\n    (actual time=0.018..0.020 rows=1 loops=1)\n  Execution Time: 0.04ms (was 843ms)",
+      "rationale": "Casting the parameter `$1::INTEGER` converts the string `'42'` to integer `42` once at query parse time, before any row evaluation. The comparison is now `INTEGER = INTEGER` — matching the column type and the index's key type. The query planner can use the B-tree index on `customers.id`, traversing it in O(log N) steps. The cost of the cast is one conversion per query invocation instead of one conversion per row."
+    },
+    {
+      "key": "b",
+      "label": "Create a functional index on the column cast to text: CREATE INDEX ON customers((id::TEXT))",
+      "patchCode": "-- Create a functional index on id cast to text\nCREATE INDEX customers_id_text_idx ON customers((id::TEXT));\n\nSELECT id, name, email\nFROM customers\nWHERE id = $1;",
+      "isCorrect": false,
+      "resultLog": "EXPLAIN ANALYZE (with $1 = '42' as VARCHAR):\n  Index Scan using customers_id_text_idx on customers\n    (cost=0.42..8.44 rows=1 width=60)\n    (actual time=0.021..0.023 rows=1 loops=1)\n  Execution Time: 0.05ms ✓\n\nBut: this creates an extra index on a derived value, doubling index storage\nfor the id column. It also doesn't fix the root cause — the application is\npassing the wrong type. The correct fix is to cast the parameter, not build\nan index around a type mismatch.",
+      "rationale": "A functional index on `(id::TEXT)` creates an index whose keys are the integer IDs converted to strings. The query `WHERE id = '42'` can now use this index because both sides of the comparison are TEXT. The query runs fast. But this approach creates an additional index that duplicates the primary key index in a different type, consuming extra storage and adding write overhead. More importantly, it enshrines the type mismatch in the schema rather than fixing it at the source. The correct fix is to pass the correct type from the application."
+    },
+    {
+      "key": "c",
+      "label": "Change the comparison to CAST(id AS TEXT) = $1 explicitly",
+      "patchCode": "SELECT id, name, email\nFROM customers\nWHERE CAST(id AS TEXT) = $1;",
+      "isCorrect": false,
+      "resultLog": "EXPLAIN ANALYZE (with $1 = '42' as VARCHAR):\n  Seq Scan on customers  (cost=0.00..27500.00 rows=1 width=60)\n  Filter: ((id)::text = '42'::text)\n  Rows Removed by Filter: 999999\n  Execution Time: 857.4ms — unchanged.\n\nCasting the column in the WHERE clause prevents index use:\nthe index stores INTEGER values, not TEXT. The planner cannot use\nan index on id to answer a query on CAST(id AS TEXT).",
+      "rationale": "Explicitly casting the column `CAST(id AS TEXT)` makes the comparison `TEXT = TEXT`, which the planner can type-check without implicit coercion. But it casts the column value for every row — the same O(N) work as the implicit version — and the B-tree index on the original integer column cannot be used. An index stores values of the original column type; a predicate on a derived expression (the cast) cannot use the original index. Casting the *parameter* (once, O(1)) instead of the *column* (per row, O(N)) is the correct approach."
+    }
+  ],
+  "hints": [
+    "The B-tree index on `customers.id` stores integer values. The query is comparing `id` (integer) to `$1` (varchar). The database resolves this by casting the column to varchar for each row — bypassing the index entirely. If instead the parameter were cast to integer before the comparison, which side would the planner need to transform: the column (once, at comparison time, per row) or the parameter (once, at query parse time)?",
+    "Line 5: `WHERE id = $1` compares an integer column to a varchar parameter. Add `::INTEGER` to cast the parameter: `WHERE id = $1::INTEGER`. The cast runs once per query, converts `'42'` to `42`, and the integer-to-integer comparison can use the B-tree index."
+  ],
+  "explanationMd": "### Why the bug occurs\nWhen comparing values of different types, the database applies a type coercion rule. PostgreSQL's coercion hierarchy for `INTEGER vs VARCHAR` resolves by casting the integer to text — because text is the more general type. This means for every row, `id` (an integer) is converted to a text string and compared to `'42'`. The B-tree index stores integer values, not text strings, so it cannot be used for a text comparison. The query performs a sequential scan, casting each row's `id` to text and comparing.\n\n### Why the fix is correct\n`$1::INTEGER` is a *parameter cast* — it runs once when the query is prepared, converting the string `'42'` to integer `42`. The comparison becomes `INTEGER = INTEGER`. The planner now sees an equality predicate on the indexed column with a matching type, enabling the B-tree index. The cast cost is O(1) per query invocation instead of O(N) per row.",
+  "recruiterReview": "Correct fix and you identified the direction of the implicit cast correctly — the column gets cast to text, not the parameter to integer, which is the counterintuitive part. The functional-index distractor represents a real pattern (indexing derived expressions) applied in the wrong direction — it works but codifies the bug rather than fixing it. The explicit-column-cast distractor looks plausible because it makes the comparison uniform, but it reproduces the exact same per-row cast problem. The key insight — cast the parameter (O(1)) not the column (O(N)) — is what this challenge tests. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Implicit Type Casts and Index Suppression\n\nA query that applies a function or cast to an indexed column in the `WHERE` clause defeats the index. This is one of the most subtle query performance bugs because the query is *logically correct* — it returns the right rows — but the planner cannot use the index.\n\n### The rule: don't transform the indexed column\nAn index stores the values of a column as they are. A predicate on a *derived* form of the column cannot use that index:\n```sql\n-- INDEX on id (INTEGER)\nWHERE CAST(id AS TEXT) = '42'       -- cant use index: transforms id\nWHERE id::TEXT = '42'               -- same — transforms id\nWHERE id + 0 = 42                   -- cant use index: transforms id\nWHERE LOWER(email) = 'alice@b.com'  -- cant use index: transforms email\n\n-- DO use the index — transform the parameter, not the column:\nWHERE id = '42'::INTEGER            -- casts parameter: index usable\nWHERE id = CAST('42' AS INTEGER)    -- same\nWHERE email = LOWER('ALICE@B.COM')  -- casts literal: index usable\n```\n\n### How to detect implicit casts\nRun `EXPLAIN ANALYZE` and look for:\n- `Filter: ((column)::type = ...)` — the column is being cast per row\n- `Seq Scan` where you expect `Index Scan`\n- High \"Rows Removed by Filter\" with very few rows returned\n\n### Functional indexes as a last resort\nIf you must query on a derived expression and cannot change the query, create a functional index that matches:\n```sql\nCREATE INDEX email_lower_idx ON users(LOWER(email));\nWHERE LOWER(email) = 'alice@b.com';  -- now uses functional index\n```\nThe index stores `LOWER(email)` values; the predicate applies `LOWER()` consistently. Both sides match. Use this when you can't change the application (e.g., a third-party ORM generates the query).\n\n### Type safety in application code\nThe root cause is passing the wrong type from the application. Best practice:\n- Parse path/query parameters to their actual types before building queries\n- Use parameterized queries with typed bindings (`$1::INTEGER` in SQL, or type annotations in ORM)\n- Validate input at the API boundary — reject `'abc'` for an integer parameter with a clear error, not an implicit cast\n\n### Common variations\n- `WHERE DATE_TRUNC('day', created_at) = '2024-01-01'` — casts the column; use `WHERE created_at >= '2024-01-01' AND created_at < '2024-01-02'` instead\n- `WHERE YEAR(created_at) = 2024` — MySQL: casts the column; use range instead\n- `WHERE TO_CHAR(amount, '9999') = '  100'` — casts the column; compare numeric directly",
+    "videos": [
+      {
+        "title": "SQL implicit type cast index suppression — why your index is ignored",
+        "searchQuery": "SQL implicit type cast index suppression seq scan WHERE column cast"
+      },
+      {
+        "title": "PostgreSQL query optimization — EXPLAIN ANALYZE reading tips",
+        "searchQuery": "postgresql EXPLAIN ANALYZE query optimization seq scan index scan reading"
+      }
+    ]
+  },
+  "estMinutes": 6,
+  "version": 1
+}

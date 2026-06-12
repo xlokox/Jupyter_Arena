@@ -1,0 +1,62 @@
+{
+  "id": "db-009-wrong-join-type",
+  "sector": "db",
+  "difficulty": "medium",
+  "title": "db_009_wrong_join_type.sql",
+  "language": "sql",
+  "icon": "git-branch",
+  "conceptTags": ["sql", "join-types", "inner-join", "left-join", "null-handling"],
+  "descriptionMd": "## Mission: Include Customers Who Have No Orders\n\nThe sales report should list every customer and their total order value, including customers who have never placed an order (showing 0 for their total). The current query uses an `INNER JOIN` between `customers` and `orders`. Customers with no orders have no matching row in `orders`, so the `INNER JOIN` excludes them entirely — they do not appear in the report at all.\n\nOf 1,200 customers, 340 have never ordered. The report shows 860 customers instead of 1,200. The business wants all 1,200 customers listed, with 0 for those who have not ordered.\n\nChange the join type so all customers are included, with NULL (coerced to 0) for missing order data.",
+  "initialCode": "SELECT\n  c.id,\n  c.name,\n  SUM(o.amount) AS total_ordered\nFROM customers c\nINNER JOIN orders o ON o.customer_id = c.id\nGROUP BY c.id, c.name\nORDER BY total_ordered DESC;",
+  "buggyLineStart": 6,
+  "buggyLineEnd": 6,
+  "traceback": "Expected rows: 1200 (all customers)\nActual rows:    860 (only customers with at least one order)\n\nCustomers with zero orders have no matching row in the orders table.\nINNER JOIN requires a match on both sides — no match = row excluded.\n340 customers with zero orders silently missing from the report.",
+  "correctOutput": "id  | name         | total_ordered\n----|--------------|---------------\n1   | Alice Smith  | 4200.00\n2   | Bob Jones    | 1850.00\n...\n847 | Carol White  | 0.00\n...\n(1200 rows — all customers included, 0 for those with no orders)",
+  "options": [
+    {
+      "key": "a",
+      "label": "Change INNER JOIN to LEFT JOIN and wrap SUM in COALESCE to show 0 instead of NULL",
+      "patchCode": "SELECT\n  c.id,\n  c.name,\n  COALESCE(SUM(o.amount), 0) AS total_ordered\nFROM customers c\nLEFT JOIN orders o ON o.customer_id = c.id\nGROUP BY c.id, c.name\nORDER BY total_ordered DESC;",
+      "isCorrect": true,
+      "resultLog": "id  | name         | total_ordered\n----|--------------|---------------\n1   | Alice Smith  | 4200.00\n2   | Bob Jones    | 1850.00\n...\n847 | Carol White  | 0.00\n...\n(1200 rows — all customers included, 0 for those with no orders)",
+      "rationale": "`LEFT JOIN` returns all rows from the left table (`customers`) regardless of whether a matching row exists in the right table (`orders`). For customers with no orders, all `orders` columns are NULL. `SUM(NULL)` returns NULL, and `COALESCE(NULL, 0)` converts it to 0. The result includes all 1,200 customers with accurate totals for those who ordered and 0 for those who did not."
+    },
+    {
+      "key": "b",
+      "label": "Add a UNION ALL to append a row for each customer with no orders",
+      "patchCode": "SELECT\n  c.id,\n  c.name,\n  SUM(o.amount) AS total_ordered\nFROM customers c\nINNER JOIN orders o ON o.customer_id = c.id\nGROUP BY c.id, c.name\n\nUNION ALL\n\nSELECT\n  c.id,\n  c.name,\n  0 AS total_ordered\nFROM customers c\nWHERE c.id NOT IN (SELECT DISTINCT customer_id FROM orders);",
+      "isCorrect": false,
+      "resultLog": "Rows: 1200 ✓ All customers appear.\n\nBut: this executes two full table scans and a NOT IN subquery —\napproximately 3x more work than a LEFT JOIN.\nAlso: the UNION ALL approach requires maintaining two separate query\nbranches in sync — fragile when the SELECT list changes.",
+      "rationale": "`UNION ALL` with a second branch for customerswith no orders produces the correct row count. But it executes two queries and a correlated subquery (`NOT IN (SELECT ...)`), which is significantly more expensive than a `LEFT JOIN`. The `NOT IN` subquery also has a subtle null trap: if any `customer_id` in `orders` is NULL, `NOT IN` with a NULL in the set returns UNKNOWN for every row, not FALSE, which can silently exclude all rows from the second branch. `LEFT JOIN` is the direct, idiomatic, and efficient solution."
+    },
+    {
+      "key": "c",
+      "label": "Use a subquery to count orders per customer and LEFT JOIN that to customers",
+      "patchCode": "SELECT\n  c.id,\n  c.name,\n  COALESCE(o.total_ordered, 0) AS total_ordered\nFROM customers c\nLEFT JOIN (\n  SELECT customer_id, SUM(amount) AS total_ordered\n  FROM orders\n  GROUP BY customer_id\n) o ON o.customer_id = c.id\nORDER BY total_ordered DESC;",
+      "isCorrect": false,
+      "resultLog": "Rows: 1200 ✓  All customers included.\nTotals: correct ✓\n\nBut: the subquery aggregates the entire orders table before joining,\nthen the outer query joins and filters. For large tables the query planner\ncannot push down predicates into the subquery (e.g. WHERE c.region = 'EU'),\nresulting in more work than a flat LEFT JOIN + GROUP BY.",
+      "rationale": "A pre-aggregating subquery with `LEFT JOIN` produces the correct result. The query is logically equivalent to the `LEFT JOIN` + `GROUP BY` approach. However, the subquery materializes the full aggregation before the join, preventing the planner from pushing predicate filters into the subquery — a problem when the outer query has additional WHERE clauses. The flat `LEFT JOIN ... GROUP BY` form lets the planner choose the most efficient join strategy. The subquery form is not wrong, but the direct approach is idiomatic and more optimizer-friendly."
+    }
+  ],
+  "hints": [
+    "`INNER JOIN` includes only rows with a match on both sides. For rows on the left side with no match on the right, `INNER JOIN` excludes them entirely. Which join type keeps all rows from the left table and fills the right side with NULL when there is no match?",
+    "Line 6: change `INNER JOIN` to `LEFT JOIN`. Also wrap `SUM(o.amount)` in `COALESCE(..., 0)` so customers with no orders show `0` instead of NULL."
+  ],
+  "explanationMd": "### Why the bug occurs\n`INNER JOIN` returns only rows that have a matching row in both tables. A customer with no orders has zero rows in the `orders` table where `orders.customer_id = customer.id`. With `INNER JOIN`, that customer has no matching pair and is excluded from the result entirely. Of 1,200 customers, 340 have no orders and are silently dropped.\n\n### Why the fix is correct\n`LEFT JOIN` (also called `LEFT OUTER JOIN`) returns all rows from the left table (`customers`) regardless of whether a match exists in the right table. For customers with no matching order, all columns from `orders` are filled with NULL. `SUM(NULL)` returns NULL; `COALESCE(NULL, 0)` converts it to 0. The result includes all 1,200 customers.",
+  "recruiterReview": "Correct fix. The UNION ALL distractor demonstrates a real anti-pattern: reaching for set operations to solve a problem that a join type handles directly, and introducing a `NOT IN` subquery that has a null-trap gotcha many developers don't know about. The pre-aggregating subquery is technically correct but optimizer-unfriendly — recognizing that it prevents predicate pushdown shows you understand how the query planner works. Left vs inner join is one of those fundamentals that separates engineers who produce correct SQL from those who produce SQL that happens to pass the happy-path test. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## SQL Join Types: INNER, LEFT, RIGHT, FULL OUTER\n\nJoin types control which rows appear in the result when one side has no matching row on the other. Choosing the wrong join type is one of the most common SQL correctness bugs.\n\n### INNER JOIN\nReturns only rows with a match on BOTH sides.\n```\nCustomers: Alice (has orders), Bob (no orders)\nOrders: 3 orders for Alice\nINNER JOIN result: Alice — 3 rows\nBob is excluded — no matching orders.\n```\nUse when: you only want rows with data on both sides.\n\n### LEFT JOIN (LEFT OUTER JOIN)\nReturns ALL rows from the left table. Right side is NULL when there is no match.\n```\nLEFT JOIN result:\n  Alice — 3 rows (with order data)\n  Bob   — 1 row (order columns = NULL)\n```\nUse when: the left table is the \"driving\" table and you want all its rows regardless.\n\n### RIGHT JOIN\nReturns ALL rows from the right table. Left side is NULL when there is no match.\nRarely used — a RIGHT JOIN can always be rewritten as a LEFT JOIN by swapping the table order. LEFT JOIN is more conventional.\n\n### FULL OUTER JOIN\nReturns ALL rows from both tables. NULL on the side that has no match.\n```\nFULL OUTER JOIN result:\n  Alice — matched rows\n  Bob   — left side data + NULL right\n  (rows in orders with no customer) — NULL left + right side data\n```\nUse when: you need to find unmatched rows on either side.\n\n### COALESCE for NULL handling\nWhen a LEFT JOIN produces NULLs, aggregate functions treat NULL as \"not present\":\n- `SUM(NULL)` → NULL (not 0)\n- `COUNT(NULL)` → 0 (NULL not counted)\n- `AVG(NULL)` → NULL (not 0)\n\nUse `COALESCE(expression, default)` to substitute a default for NULL:\n```sql\nCOALESCE(SUM(o.amount), 0)   -- NULL → 0\nCOALESCE(MAX(o.created_at), 'never')  -- NULL → 'never'\n```\n\n### NOT IN vs NOT EXISTS for exclusion queries\nWhen finding rows on the left with no match on the right, avoid `NOT IN` with subqueries:\n```sql\n-- Dangerous: if any customer_id in orders is NULL,\n-- NOT IN returns UNKNOWN for all rows, possibly returning 0 results\nWHERE c.id NOT IN (SELECT customer_id FROM orders)\n\n-- Safe: NOT EXISTS handles NULLs correctly\nWHERE NOT EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = c.id)\n\n-- Most efficient: LEFT JOIN anti-join pattern\nFROM customers c\nLEFT JOIN orders o ON o.customer_id = c.id\nWHERE o.id IS NULL  -- no matching order\n```",
+    "videos": [
+      {
+        "title": "SQL JOIN types explained — INNER LEFT RIGHT FULL OUTER with examples",
+        "searchQuery": "SQL JOIN types INNER LEFT RIGHT FULL OUTER explained examples visual"
+      },
+      {
+        "title": "SQL LEFT JOIN vs INNER JOIN — when to use which join type",
+        "searchQuery": "SQL LEFT JOIN vs INNER JOIN difference when to use null handling"
+      }
+    ]
+  },
+  "estMinutes": 5,
+  "version": 1
+}

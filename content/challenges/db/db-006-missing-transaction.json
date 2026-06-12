@@ -1,0 +1,62 @@
+{
+  "id": "db-006-missing-transaction",
+  "sector": "db",
+  "difficulty": "hard",
+  "title": "db_006_missing_transaction.sql",
+  "language": "sql",
+  "icon": "shield-alert",
+  "conceptTags": ["sql", "transactions", "atomicity", "acid", "data-integrity"],
+  "descriptionMd": "## Mission: Wrap the Transfer in a Transaction\n\nThe bank transfer operation deducts funds from the sender's account and adds them to the recipient's account. Two separate `UPDATE` statements run sequentially. If a crash, network error, or constraint violation occurs between the two statements, the first update persists but the second does not — the sender loses money that never arrives in the recipient's account.\n\nThis is a violation of atomicity: the two-statement operation must succeed entirely or fail entirely, with no partial state visible to other queries. In SQL, a `BEGIN` / `COMMIT` block wraps multiple statements into a single atomic transaction. If anything fails, `ROLLBACK` (explicit or automatic) returns the database to the state before `BEGIN`.\n\nWrap the two `UPDATE` statements in a transaction.",
+  "initialCode": "-- Transfer $100 from account 1 to account 2\nUPDATE accounts SET balance = balance - 100 WHERE id = 1;\nUPDATE accounts SET balance = balance + 100 WHERE id = 2;",
+  "buggyLineStart": 2,
+  "buggyLineEnd": 3,
+  "traceback": "Scenario: crash between the two UPDATE statements.\n\n  t=0ms  UPDATE accounts SET balance = balance - 100 WHERE id = 1;  → committed\n  t=5ms  [database crash / network timeout / constraint violation]\n  t=?    UPDATE accounts SET balance = balance + 100 WHERE id = 2;  → never runs\n\nResult: account 1 balance reduced by $100. Account 2 balance unchanged.\n$100 lost — not in account 1, not in account 2.",
+  "correctOutput": "BEGIN;\nUPDATE accounts SET balance = balance - 100 WHERE id = 1;\nUPDATE accounts SET balance = balance + 100 WHERE id = 2;\nCOMMIT;\n\nIf either UPDATE fails: automatic ROLLBACK — neither change persists.\nBoth accounts return to their pre-transfer balance.",
+  "options": [
+    {
+      "key": "a",
+      "label": "Wrap both UPDATE statements in BEGIN / COMMIT to make them atomic",
+      "patchCode": "BEGIN;\nUPDATE accounts SET balance = balance - 100 WHERE id = 1;\nUPDATE accounts SET balance = balance + 100 WHERE id = 2;\nCOMMIT;",
+      "isCorrect": true,
+      "resultLog": "BEGIN;\nUPDATE accounts SET balance = balance - 100 WHERE id = 1;\nUPDATE accounts SET balance = balance + 100 WHERE id = 2;\nCOMMIT;\n\nIf either UPDATE fails: automatic ROLLBACK — neither change persists.\nBoth accounts return to their pre-transfer balance.",
+      "rationale": "`BEGIN` opens a transaction. All statements between `BEGIN` and `COMMIT` are part of a single atomic unit: they either all commit together or all roll back together. If the database crashes after the first `UPDATE` but before `COMMIT`, the transaction is automatically rolled back when the database restarts — the first `UPDATE`'s changes are discarded. No partial state is ever visible to other concurrent queries or persisted to disk."
+    },
+    {
+      "key": "b",
+      "label": "Add a CHECK constraint to ensure balance never goes negative, relying on the constraint to prevent partial state",
+      "patchCode": "-- Ensure no account can go negative\nALTER TABLE accounts ADD CONSTRAINT balance_non_negative CHECK (balance >= 0);\n\n-- Original two statements (unchanged)\nUPDATE accounts SET balance = balance - 100 WHERE id = 1;\nUPDATE accounts SET balance = balance + 100 WHERE id = 2;",
+      "isCorrect": false,
+      "resultLog": "The CHECK constraint prevents overdraft — if account 1 has less than $100,\nthe first UPDATE fails and balance stays intact. ✓\n\nBut the partial-state problem is NOT solved:\n  If account 1 has $500 and the first UPDATE succeeds:\n  t=0ms  balance(1) = $400  — committed\n  t=5ms  [crash]\n  balance(2) unchanged — $100 lost.\n\n  The constraint only prevents a negative balance; it does not make the two\n  statements atomic.",
+      "rationale": "A `CHECK (balance >= 0)` constraint prevents overdrafts — a valuable data integrity rule — but it does not make the two `UPDATE` statements atomic. If account 1 has sufficient funds, the first `UPDATE` commits successfully. A crash between the two statements still leaves account 1 reduced and account 2 unchanged. Constraints are row-level validations, not transaction scope. Atomicity requires a `BEGIN` / `COMMIT` block."
+    },
+    {
+      "key": "c",
+      "label": "Combine both UPDATEs into a single statement using a CASE expression",
+      "patchCode": "UPDATE accounts\nSET balance = CASE\n  WHEN id = 1 THEN balance - 100\n  WHEN id = 2 THEN balance + 100\n  ELSE balance\nEND\nWHERE id IN (1, 2);",
+      "isCorrect": false,
+      "resultLog": "Single statement — atomic by definition in SQL. ✓ (for this specific case)\n\nBut: this only works when both accounts are in the same table.\nFor accounts in different tables, different databases, or involving application\nlogic between the two steps, this pattern does not generalize.\nAlso: the CASE evaluates `ELSE balance` for all other rows in the WHERE clause,\nwhich can cause unexpected lock contention on unrelated rows if the WHERE is broad.",
+      "rationale": "A single SQL statement is atomic — either it fully succeeds or it fails with no partial effect. Combining both updates into one `UPDATE ... SET ... CASE WHEN` is technically atomic for this specific schema and avoids the need for an explicit transaction. However, it is not a general solution: it only works when both accounts are in the same table, it locks both rows with a single statement which can increase contention, it doesn't generalize when application logic must execute between the two writes (e.g., fraud check), and it becomes unreadable for more than two parties. The `BEGIN / COMMIT` pattern scales to any number of statements and tables."
+    }
+  ],
+  "hints": [
+    "Two separate SQL statements without a transaction boundary are independent operations. A crash between them leaves the first committed and the second never executed. What SQL keyword starts a block that makes all enclosed statements succeed-or-fail together?",
+    "Lines 2–3: add `BEGIN;` before the first UPDATE and `COMMIT;` after the second. If anything fails between `BEGIN` and `COMMIT`, the database automatically rolls back — both UPDATEs or neither."
+  ],
+  "explanationMd": "### Why the bug occurs\nEvery SQL statement that is not inside an explicit transaction is implicitly wrapped in its own single-statement transaction and auto-committed. Two consecutive `UPDATE` statements are two separate transactions: each commits immediately. A crash, error, or timeout between them leaves the database in an inconsistent state — the first update is durable, the second never happened.\n\n### Why the fix is correct\n`BEGIN` opens a transaction. The database defers committing any changes to disk until `COMMIT` is reached. All writes made between `BEGIN` and `COMMIT` are visible only within the current connection until `COMMIT` — other connections see the pre-transaction state. If the transaction fails for any reason before `COMMIT`, the database rolls back all changes automatically, restoring both accounts to their pre-transfer balances. This is the A in ACID: *Atomicity*.",
+  "recruiterReview": "Correct fix and a good explanation of atomicity. The CHECK constraint distractor is a very common response from developers who think \"add more constraints\" — it solves overdrafts but completely misses the crash-between-statements scenario. The CASE/single-statement distractor is interesting: it's technically atomic but not general, and recognizing its limits (different tables, application logic between writes, contention) shows you understand why transactions exist as a general mechanism rather than a per-case workaround. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## ACID Transactions: Atomicity in SQL\n\nACID is the set of properties that guarantee valid database state even in the face of errors, crashes, and concurrent access:\n- **A**tomicity — all statements in a transaction succeed or all are rolled back\n- **C**onsistency — constraints are satisfied after every committed transaction\n- **I**solation — concurrent transactions do not see each other's uncommitted changes\n- **D**urability — committed changes survive crashes\n\nTransactions are the primary tool for enforcing *Atomicity*.\n\n### Transaction syntax\n```sql\nBEGIN;\n  -- one or more statements\n  UPDATE accounts SET balance = balance - 100 WHERE id = 1;\n  UPDATE accounts SET balance = balance + 100 WHERE id = 2;\nCOMMIT;\n```\n\nIf an error occurs or the connection is lost before `COMMIT`, the database automatically rolls back all changes to the pre-`BEGIN` state. You can also roll back explicitly:\n```sql\nROLLBACK;  -- undo everything since BEGIN\n```\n\n### Savepoints\nFor long transactions where you want partial rollback capability:\n```sql\nBEGIN;\n  UPDATE a ...;\n  SAVEPOINT sp1;\n  UPDATE b ...;\n  ROLLBACK TO sp1;  -- undo the second update, keep the first\n  -- (or COMMIT to keep everything up to sp1)\nCOMMIT;\n```\n\n### Application-level transactions\nORMs and database drivers provide transaction APIs:\n```python\n# SQLAlchemy\nwith session.begin():\n    session.execute(update_sender)\n    session.execute(update_recipient)\n# auto-commits on success, auto-rollbacks on exception\n```\n\n```js\n// node-postgres\nawait client.query('BEGIN');\ntry {\n  await client.query('UPDATE accounts ...');\n  await client.query('UPDATE accounts ...');\n  await client.query('COMMIT');\n} catch (e) {\n  await client.query('ROLLBACK');\n  throw e;\n}\n```\n\n### Isolation levels\nPostgreSQL default is `READ COMMITTED`: each statement sees only rows committed before that statement started. For scenarios where you need to prevent phantom reads or non-repeatable reads:\n```sql\nBEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE;\n```\n\nHigher isolation levels reduce concurrency but provide stronger guarantees. For most OLTP workloads, `READ COMMITTED` with explicit transactions is the right balance.\n\n### Common mistakes\n- Running DDL (ALTER TABLE) inside a transaction and expecting full rollback — DDL is auto-committed in MySQL; PostgreSQL allows DDL in transactions\n- Long-running transactions holding locks on frequently-updated rows\n- Not handling transaction errors in application code — catching the exception but not rolling back the transaction\n- Starting a transaction but never committing — connection pool exhaustion",
+    "videos": [
+      {
+        "title": "SQL transactions explained — BEGIN COMMIT ROLLBACK ACID",
+        "searchQuery": "SQL transactions BEGIN COMMIT ROLLBACK ACID atomicity explained"
+      },
+      {
+        "title": "Database ACID properties — atomicity consistency isolation durability",
+        "searchQuery": "database ACID properties explained atomicity consistency isolation durability"
+      }
+    ]
+  },
+  "estMinutes": 6,
+  "version": 1
+}

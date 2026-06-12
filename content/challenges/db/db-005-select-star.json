@@ -1,0 +1,62 @@
+{
+  "id": "db-005-select-star",
+  "sector": "db",
+  "difficulty": "easy",
+  "title": "db_005_select_star.sql",
+  "language": "sql",
+  "icon": "table",
+  "conceptTags": ["sql", "query-optimization", "column-selection", "bandwidth", "index-only-scan"],
+  "descriptionMd": "## Mission: Select Only the Columns You Need\n\nThe user profile API fetches a single user by ID. The `users` table has 20 columns including large `TEXT` fields for `bio`, `preferences_json`, and `avatar_blob` (base64 encoded). The API only uses `id`, `name`, and `email`.\n\nThe query uses `SELECT *`, which fetches all 20 columns including the large text fields. The average row is 18KB. For 1000 concurrent requests, that is 18MB of data fetched from the database and transferred to the application per second — most of it discarded immediately.\n\nChange the query to select only the three columns the API actually uses.",
+  "initialCode": "SELECT *\nFROM users\nWHERE id = $1;",
+  "buggyLineStart": 1,
+  "buggyLineEnd": 3,
+  "traceback": "PROFILE:\n  Query fetches 20 columns, avg row size 18KB.\n  API uses 3 columns (id, name, email), avg size 80 bytes.\n  Waste: 99.6% of fetched data is discarded.\n\n  At 1000 req/s:\n    SELECT * → 18MB/s from DB to app server\n    SELECT id, name, email → 80KB/s from DB to app server\n\n  Also: SELECT * prevents Index Only Scan — the planner must fetch the heap\n  row even when a covering index exists for (id, name, email).",
+  "correctOutput": "SELECT id, name, email\nFROM users\nWHERE id = $1;\n\n-- 3 columns, avg row 80 bytes.\n-- Planner can use Index Only Scan on (id, name, email) covering index.",
+  "options": [
+    {
+      "key": "a",
+      "label": "Explicitly list the required columns: SELECT id, name, email",
+      "patchCode": "SELECT id, name, email\nFROM users\nWHERE id = $1;",
+      "isCorrect": true,
+      "resultLog": "SELECT id, name, email\nFROM users\nWHERE id = $1;\n\n-- 3 columns, avg row 80 bytes.\n-- If a covering index exists on (id, name, email), planner uses Index Only Scan:\n-- no heap fetch required. Bandwidth: 80 bytes vs 18,000 bytes per row.",
+      "rationale": "Listing explicit columns eliminates fetching the 17 unused columns. The database does not compute, serialize, or transmit the large `TEXT` and `JSONB` fields. For the query planner, explicit column lists also enable *Index Only Scan*: if all requested columns are present in an index, the planner satisfies the query entirely from the index without touching the heap. `SELECT *` always requires a heap fetch even when a covering index exists, because any future `ALTER TABLE ADD COLUMN` could add new columns that `*` must include."
+    },
+    {
+      "key": "b",
+      "label": "Add a LIMIT 1 clause to stop scanning after the first matching row",
+      "patchCode": "SELECT *\nFROM users\nWHERE id = $1\nLIMIT 1;",
+      "isCorrect": false,
+      "resultLog": "LIMIT 1 returns at most one row — same as before since id is a primary key.\n\nThe bandwidth problem is unchanged:\n  Still fetches all 20 columns, avg 18KB per row.\n  LIMIT 1 has no effect when the primary key query already returns 1 row.",
+      "rationale": "`LIMIT 1` stops the query after returning one row, which is useful for non-unique lookups. But `WHERE id = $1` on a primary key already returns at most one row — `LIMIT 1` has no effect here. The bandwidth problem persists: the single returned row still contains all 20 columns, 18KB of data. The fix must change which columns are fetched, not how many rows are returned."
+    },
+    {
+      "key": "c",
+      "label": "Create a VIEW that exposes only the public columns and query that instead",
+      "patchCode": "CREATE VIEW user_public AS\n  SELECT id, name, email FROM users;\n\nSELECT * FROM user_public WHERE id = $1;",
+      "isCorrect": false,
+      "resultLog": "View is created — the SELECT now fetches only 3 columns. ✓\n\nBut: the view is a persistent schema object that other queries may depend on.\nAdding a view for every query pattern pollutes the schema.\nThe correct fix is to write explicit column names in the query itself,\nnot to route every query through a view.",
+      "rationale": "A view that projects to 3 columns does solve the bandwidth problem for this particular query. But creating a view to work around `SELECT *` adds a schema object that persists, may confuse future developers (why does this view exist?), and requires privilege management. The correct fix is to write `SELECT id, name, email` in the query. Views are appropriate when multiple queries need the same derived columns or when you want to restrict access to a subset of columns — not as a workaround for explicit column selection."
+    }
+  ],
+  "hints": [
+    "The `users` table has 20 columns but the API uses 3. `SELECT *` fetches all 20 — including large `TEXT` fields — and sends them across the wire to the application, which immediately discards 17 of them. How would you tell the database to send only the 3 columns you need?",
+    "Line 1: replace `SELECT *` with `SELECT id, name, email`. The database will only fetch, serialize, and transmit those three columns. This also enables Index Only Scans if a covering index on those columns exists."
+  ],
+  "explanationMd": "### Why the bug occurs\n`SELECT *` is convenient for exploratory queries but harmful in production code. It fetches every column in the table, including large computed, binary, or JSON columns that the application does not use. The data must be read from disk (or buffer pool), serialized, transmitted over the network, deserialized, and then discarded — pure waste at every step.\n\n### Why the fix is correct\nListing only `id, name, email` tells the database engine exactly which columns to read and return. The result rows are 80 bytes instead of 18KB — a 225x reduction in transferred data. Additionally, if an index covers all requested columns, the planner can use an *Index Only Scan*: it reads the answer directly from the index without touching the heap (the actual table rows). `SELECT *` always forces a heap fetch because `*` expands to include all current and future columns, and indexes don't cover every column.",
+  "recruiterReview": "Correct fix. `SELECT *` in production application code is a common anti-pattern that most developers learn about only after they profile a slow endpoint. The view distractor is good because it represents valid thinking ('I'll project to 3 columns') taken in the wrong direction — views are schema objects with persistence and governance overhead, not substitutes for proper column lists. The LIMIT 1 distractor addresses a different problem (row count) and is a sign of not distinguishing between 'rows returned' and 'columns returned'. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Explicit Column Selection: Why SELECT * is an Anti-Pattern in Production\n\nIn interactive SQL sessions, `SELECT *` is convenient — you see everything quickly. In production application queries, it is an anti-pattern with multiple costs:\n\n### Bandwidth and serialization cost\nEvery column in the result is:\n1. Read from disk or buffer pool\n2. Evaluated (for generated columns)\n3. Serialized to the wire protocol\n4. Transmitted over the network\n5. Deserialized by the client library\n6. Mapped into application memory\n\nFor columns your code discards immediately, all six steps are pure waste. Large `TEXT`, `JSONB`, `BYTEA`, or array columns can be hundreds of kilobytes. At high request rates, unused column bandwidth is a measurable fraction of database and network load.\n\n### Index Only Scan eligibility\nPostgreSQL's query planner can answer a query entirely from an index (without fetching the table row) when:\n- All columns in the `SELECT` list are present in the index\n- All columns in the `WHERE` and `ORDER BY` clauses are also in the index\n\nThis is called an *Index Only Scan*. `SELECT *` always forces a heap fetch because the planner cannot guarantee a future `ALTER TABLE ADD COLUMN` won't add a column that `*` must include. Explicit column lists allow the planner to use covering indexes.\n\n### Schema evolution\n`SELECT *` exposes your query to schema changes: adding a column, reordering columns, or changing a column's type can silently change what the query returns. Explicit column names provide stable, contract-like behavior: the query returns the same shape regardless of what other columns are added later.\n\n### When SELECT * is acceptable\n- Quick exploratory queries in psql / a notebook\n- The result is immediately passed through as-is (e.g., `INSERT INTO ... SELECT * FROM ...` where schemas match)\n- ORM generated queries where the framework manages column lists\n\n### Covering indexes\nFor high-frequency queries, create a covering index that includes all columns the query needs:\n```sql\nCREATE INDEX users_profile_idx ON users(id) INCLUDE (name, email);\n```\nThe `INCLUDE` clause adds non-key columns to the index leaf pages. Combined with explicit column selection, this enables Index Only Scan for `SELECT id, name, email FROM users WHERE id = $1`.",
+    "videos": [
+      {
+        "title": "SQL SELECT * vs explicit columns — performance and best practices",
+        "searchQuery": "SQL SELECT star vs explicit columns performance index only scan production"
+      },
+      {
+        "title": "PostgreSQL covering indexes and index-only scans explained",
+        "searchQuery": "postgresql covering index INCLUDE index only scan explained tutorial"
+      }
+    ]
+  },
+  "estMinutes": 3,
+  "version": 1
+}
