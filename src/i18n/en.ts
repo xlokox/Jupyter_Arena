@@ -265,6 +265,8 @@ export const en = {
     signupPageIntro:
       "Sync your XP and streak across devices, unlock a public portfolio, and appear on the leaderboard.",
     signupBenefits: "Sync XP across devices · Public portfolio · Leaderboard",
+    placementComingSoon:
+      "Heads up: the placement quiz that matches you to a starting sector isn't live yet. New to coding? Start with Python Fundamentals — it's open to everyone, no level required.",
     backToApp: "Back to arena",
     dialogTitle: "Sign in to Jupyter Arena",
     dialogIntro:
