@@ -1,0 +1,62 @@
+{
+  "id": "fullstack-011-ssr-hydration",
+  "sector": "fullstack",
+  "difficulty": "hard",
+  "title": "11_ssr_hydration_mismatch.jsx",
+  "language": "jsx",
+  "icon": "split",
+  "conceptTags": ["nextjs", "ssr", "hydration", "server-side-rendering", "date"],
+  "descriptionMd": "## Mission: Silence the Hydration Mismatch\n\nThe page header displays a greeting with the current timestamp. During SSR, Next.js renders the component on the server and sends the HTML to the browser. The browser then \"hydrates\" by attaching React's event system to that pre-rendered HTML — but only if the client-rendered output exactly matches the server-rendered HTML.\n\n`Date.now()` returns the number of milliseconds since the Unix epoch. On the server it returns the time of the server render. On the client it returns the time of hydration — always slightly later. React compares the two outputs and, finding them different, logs a hydration mismatch warning and replaces the entire tree, losing the SSR performance benefit.\n\nMove the timestamp out of the initial render so the server and client produce identical HTML during hydration, and only update the timestamp client-side after hydration is complete.",
+  "initialCode": "import { useState } from \"react\";\n\nexport default function PageHeader() {\n  const [timestamp] = useState(Date.now());\n\n  return (\n    <header>\n      <h1>Jupyter Arena</h1>\n      <p className=\"subtitle\">Session started: {new Date(timestamp).toLocaleTimeString()}</p>\n    </header>\n  );\n}",
+  "buggyLineStart": 4,
+  "buggyLineEnd": 4,
+  "traceback": "Warning: Prop `children` did not match. Server: \"10:42:17 AM\" Client: \"10:42:19 AM\"\n  at p\n  at header\n  at PageHeader\n\nError: There was an error while hydrating. Because the error happened outside\nof a Suspense boundary, the entire root will switch to client rendering.",
+  "correctOutput": "No hydration warnings. Server and client render identical HTML.\nAfter hydration, timestamp is set via useEffect and updates client-side only.",
+  "options": [
+    {
+      "key": "a",
+      "label": "Initialize state to null and set the timestamp in a useEffect that runs only on the client",
+      "patchCode": "import { useEffect, useState } from \"react\";\n\nexport default function PageHeader() {\n  const [timestamp, setTimestamp] = useState(null);\n\n  useEffect(() => {\n    setTimestamp(Date.now());\n  }, []);\n\n  return (\n    <header>\n      <h1>Jupyter Arena</h1>\n      {timestamp && (\n        <p className=\"subtitle\">Session started: {new Date(timestamp).toLocaleTimeString()}</p>\n      )}\n    </header>\n  );\n}",
+      "isCorrect": true,
+      "resultLog": "No hydration warnings. Server and client render identical HTML.\nAfter hydration, timestamp is set via useEffect and updates client-side only.",
+      "rationale": "Server-side rendering executes only the render function — `useEffect` does not run on the server. By initializing `timestamp` to `null` and setting it in a `useEffect`, both server and client render the same initial HTML (no timestamp shown). After hydration, React runs the effect, sets the timestamp, and re-renders with the current time — client-only, no mismatch. The conditional render ensures the `<p>` is absent on the server and absent on the client until the effect fires, keeping the two trees identical during hydration."
+    },
+    {
+      "key": "b",
+      "label": "Replace useState with useRef so the timestamp value does not trigger re-renders",
+      "patchCode": "import { useRef } from \"react\";\n\nexport default function PageHeader() {\n  const timestampRef = useRef(Date.now());\n\n  return (\n    <header>\n      <h1>Jupyter Arena</h1>\n      <p className=\"subtitle\">Session started: {new Date(timestampRef.current).toLocaleTimeString()}</p>\n    </header>\n  );\n}",
+      "isCorrect": false,
+      "resultLog": "Warning: Prop `children` did not match. Server: \"10:42:17 AM\" Client: \"10:42:19 AM\"\n  at p\n  at PageHeader\n\nuseRef initializes its value during render — both on the server and on the client.\nThe mismatch still occurs because server and client render at different times.",
+      "rationale": "`useRef` initializes its value during the render function, just like `useState`. On the server, `Date.now()` returns the server render time. On the client, `Date.now()` returns the hydration time — always later. The mismatch persists. `useRef` avoids re-renders on mutation, but it does not defer execution to after hydration — only `useEffect` does."
+    },
+    {
+      "key": "c",
+      "label": "Wrap the component in 'use client' to disable server-side rendering for this component",
+      "patchCode": "\"use client\";\n\nimport { useState } from \"react\";\n\nexport default function PageHeader() {\n  const [timestamp] = useState(Date.now());\n\n  return (\n    <header>\n      <h1>Jupyter Arena</h1>\n      <p className=\"subtitle\">Session started: {new Date(timestamp).toLocaleTimeString()}</p>\n    </header>\n  );\n}",
+      "isCorrect": false,
+      "resultLog": "No hydration warning — the component is now client-only.\n\nBut the page header is excluded from SSR entirely: the initial HTML sent to the\nbrowser has no header content. Users on slow connections see a blank header until\nJavaScript loads and executes. The SSR benefit for this above-the-fold component\nis gone.",
+      "rationale": "'use client' marks the component as a Client Component in Next.js App Router, which means it is not rendered on the server at all — eliminating the SSR/client mismatch by skipping SSR. This solves the warning but at a cost: the page header is above the fold and is exactly the content that benefits most from being server-rendered into the initial HTML. A blank header on slow connections degrades the user experience. The `useEffect` approach preserves SSR for the static parts (the `<h1>`) while deferring the time-sensitive part to the client."
+    }
+  ],
+  "hints": [
+    "`useEffect` does not run during server-side rendering — it only runs in the browser after the component mounts. What would happen if `timestamp` started as `null` on both server and client, with a `useEffect` responsible for setting it to `Date.now()` after hydration?",
+    "Line 4: `useState(Date.now())` calls `Date.now()` during render — on both the server and the client. Both are at different real-world times, so their rendered output differs. Initialize state to `null` (so both sides render the same empty state) and move `setTimestamp(Date.now())` into a `useEffect` that runs only after hydration."
+  ],
+  "explanationMd": "### Why the bug occurs\nServer-side rendering in Next.js executes the component's render function on the server to produce an HTML string. When the browser loads that HTML, React *hydrates* it: it runs the same render function again on the client and attaches event handlers to the existing DOM nodes. Hydration only works if the server-rendered output matches the client-rendered output exactly. `Date.now()` returns the current time in milliseconds. On the server it captures the render time (e.g. 10:42:17.123). On the client it captures the hydration time (e.g. 10:42:19.456) — always at least a few seconds later. The two formatted strings differ, React detects the mismatch, logs a warning, and discards the server-rendered HTML to re-render from scratch, eliminating the performance benefit of SSR.\n\n### Why the fix is correct\n`useEffect` is not called during server-side rendering — it runs only in the browser after the component has mounted and hydration is complete. Initializing `timestamp` to `null` makes both the server render and the initial client render produce identical output (no timestamp shown). After hydration, the `useEffect` fires, sets the real timestamp, and React updates only the affected part of the DOM. The SSR content (the `<h1>`) is preserved and the timestamp appears after hydration with no mismatch.",
+  "recruiterReview": "Correct fix and the explanation captures the key mechanism: `useEffect` is the boundary between SSR and client-only code. The `useRef` distractor is subtle — it looks like it might help because refs don't cause re-renders, but `useRef(initialValue)` initializes during render on both server and client, so the mismatch is unchanged. The `'use client'` distractor is the all-or-nothing escape hatch that teams reach for when they run out of patience with hydration — it works but trades correctness for a degraded SSR experience on exactly the above-the-fold content that SSR is meant to optimize. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## SSR Hydration and the useEffect Escape Hatch\n\nServer-side rendering (SSR) with React (Next.js, Remix) works in two stages:\n1. **Server render**: the component tree is rendered to an HTML string on the server and sent with the initial response.\n2. **Hydration**: the browser loads the HTML, React runs the same component tree again in the client, and attaches event handlers to the existing DOM nodes.\n\nHydration requires the client-rendered output to match the server-rendered output. Any mismatch triggers React's hydration error, and React falls back to discarding the server HTML and doing a full client render — negating the SSR performance benefit.\n\n### Sources of hydration mismatches\n- **Time-dependent values**: `Date.now()`, `new Date()`, timestamps — always different between server render and client hydration.\n- **Random values**: `Math.random()` — different per call.\n- **Client-only APIs**: `window.innerWidth`, `localStorage`, `navigator.language` — do not exist on the server.\n- **User-specific data not known at server render time**: user timezone, locale preferences set in the browser.\n\n### The useEffect escape hatch\n`useEffect` is the standard React mechanism for running code that should only execute on the client. It is never called during server-side rendering. The pattern:\n\n```jsx\nconst [value, setValue] = useState(null); // null: safe for SSR\n\nuseEffect(() => {\n  setValue(computeClientOnlyValue()); // runs after hydration\n}, []);\n\nreturn <div>{value ?? 'Loading...'}</div>;\n```\n\nBoth server and client render the same initial HTML (showing `null` or a placeholder). After hydration, the effect fires and updates the state to the real value. React re-renders only the affected subtree.\n\n### Suppression as a last resort\nReact provides the `suppressHydrationWarning` prop for elements where unavoidable mismatches are expected (server-rendered timestamps in HTML emails, for example):\n```jsx\n<span suppressHydrationWarning>{new Date().toLocaleTimeString()}</span>\n```\nThis silences the warning but does not prevent the mismatch — React still replaces the content. Use it sparingly and only for genuinely unavoidable cases.\n\n### Next.js App Router: 'use client'\nIn Next.js App Router, marking a component `'use client'` opts it out of server rendering entirely. The component and its subtree are client-only: no server HTML, no hydration. Use this when the entire component depends on client-only APIs, but avoid it for above-the-fold content where SSR provides meaningful performance benefits. The `useEffect` approach lets you SSR the static parts and defer only the dynamic parts.\n\n### Common variations of this bug\n- `Math.random()` used as a key or style value — different on server and client.\n- `localStorage.getItem('theme')` read during render — server has no `localStorage`.\n- Browser-timezone-formatted dates — server's timezone differs from the user's.\n- `window.matchMedia('(prefers-color-scheme: dark)')` read during render — `window` is undefined on the server.\n- Third-party components that call `Date.now()` or `Math.random()` internally — wrap them in a client-only boundary or lazy-load them.",
+    "videos": [
+      {
+        "title": "React SSR hydration mismatch — why it happens and how to fix it",
+        "searchQuery": "react nextjs ssr hydration mismatch error useEffect client only"
+      },
+      {
+        "title": "Next.js server vs client components — when to use useEffect",
+        "searchQuery": "nextjs server client components useEffect hydration Date.now fix"
+      }
+    ]
+  },
+  "estMinutes": 7,
+  "version": 1
+}
