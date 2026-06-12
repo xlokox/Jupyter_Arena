@@ -1,0 +1,62 @@
+{
+  "id": "db-015-window-function",
+  "sector": "db",
+  "difficulty": "hard",
+  "title": "db_015_window_function.sql",
+  "language": "sql",
+  "icon": "scale",
+  "conceptTags": ["sql", "window-functions", "rank", "over-partition", "analytics"],
+  "descriptionMd": "## Mission: Rank Employees Within Each Department Without Losing Rows\n\nThe HR report should show every employee alongside their salary rank within their department — 1 for the highest earner, 2 for the next, and so on. Employees with equal salaries share the same rank.\n\nThe current query uses a `GROUP BY` with `MAX(salary)` attempting to rank, but `GROUP BY` collapses all employees in a department into one row per department — losing the individual employee rows entirely.\n\nUse a SQL window function (`RANK() OVER (PARTITION BY ... ORDER BY ...)`) to compute the rank for each employee without collapsing rows. Window functions operate on a \"window\" of rows related to the current row but return one result per input row — they do not reduce row count.",
+  "initialCode": "-- Attempted with GROUP BY — loses individual employee rows:\nSELECT\n  department_id,\n  MAX(salary) AS top_salary\nFROM employees\nGROUP BY department_id;",
+  "buggyLineStart": 2,
+  "buggyLineEnd": 6,
+  "traceback": "Expected: one row per employee with their salary rank within their department.\nActual:   one row per department showing only the max salary.\n\nGROUP BY collapses all employees in a department into one row.\nIndividual employee names and salaries are lost.\n\nExample — Engineering (5 employees) → 1 row showing only MAX(salary)=120000.\nExpected: 5 rows, each showing employee name + rank 1..5.",
+  "correctOutput": "id  | name          | department_id | salary  | dept_rank\n----|---------------|---------------|---------|----------\n1   | Alice          | 1             | 120000  | 1\n2   | Bob            | 1             | 95000   | 2\n3   | Carol          | 1             | 95000   | 2\n4   | Dave           | 1             | 82000   | 4\n...\n(all employees shown, ranked within their department)",
+  "options": [
+    {
+      "key": "a",
+      "label": "Use RANK() OVER (PARTITION BY department_id ORDER BY salary DESC) as a window function",
+      "patchCode": "SELECT\n  id,\n  name,\n  department_id,\n  salary,\n  RANK() OVER (\n    PARTITION BY department_id\n    ORDER BY salary DESC\n  ) AS dept_rank\nFROM employees;",
+      "isCorrect": true,
+      "resultLog": "id  | name          | department_id | salary  | dept_rank\n----|---------------|---------------|---------|----------\n1   | Alice          | 1             | 120000  | 1\n2   | Bob            | 1             | 95000   | 2\n3   | Carol          | 1             | 95000   | 2\n4   | Dave           | 1             | 82000   | 4\n...\n(all employees shown, ranked within their department)",
+      "rationale": "`RANK() OVER (PARTITION BY department_id ORDER BY salary DESC)` is a window function. `PARTITION BY department_id` defines the window: each employee is compared only to others in the same department. `ORDER BY salary DESC` determines rank order within the window. `RANK()` assigns the same rank to ties and skips the next rank (two employees at rank 2 means the next is rank 4). The query returns all rows from `employees` — window functions never collapse rows, unlike `GROUP BY`."
+    },
+    {
+      "key": "b",
+      "label": "Use a correlated subquery to compute each employee's rank inline",
+      "patchCode": "SELECT\n  e.id,\n  e.name,\n  e.department_id,\n  e.salary,\n  (\n    SELECT COUNT(DISTINCT e2.salary) + 1\n    FROM employees e2\n    WHERE e2.department_id = e.department_id\n      AND e2.salary > e.salary\n  ) AS dept_rank\nFROM employees e;",
+      "isCorrect": false,
+      "resultLog": "id  | name  | department_id | salary  | dept_rank\n----|-------|---------------|---------|----------\n1   | Alice | 1             | 120000  | 1\n2   | Bob   | 1             | 95000   | 2\n3   | Carol | 1             | 95000   | 2\n4   | Dave  | 1             | 82000   | 4\n\nCorrect values ✓ — but subquery loops=N (one per employee).\nFor 10,000 employees: 10,000 inner queries.\nEXPLAIN: SubPlan loops=10000, total time ~3.5s vs 0.08s for window function.",
+      "rationale": "The correlated subquery computes the correct rank values by counting employees in the same department with a higher salary, then adding 1. The logic is sound and matches `RANK()` semantics. However, it is a correlated subquery — it executes once per employee row, producing O(N²) behavior for N employees. For 10,000 employees, this means 10,000 inner queries. `RANK() OVER (...)` is evaluated by the database with a single pass over the data, O(N log N) for sorting within partitions."
+    },
+    {
+      "key": "c",
+      "label": "Use ROW_NUMBER() instead of RANK() — assign sequential numbers with no ties",
+      "patchCode": "SELECT\n  id,\n  name,\n  department_id,\n  salary,\n  ROW_NUMBER() OVER (\n    PARTITION BY department_id\n    ORDER BY salary DESC\n  ) AS dept_rank\nFROM employees;",
+      "isCorrect": false,
+      "resultLog": "id  | name  | department_id | salary  | dept_rank\n----|-------|---------------|---------|----------\n1   | Alice | 1             | 120000  | 1\n2   | Bob   | 1             | 95000   | 2\n3   | Carol | 1             | 95000   | 3  ← should be 2 (tied with Bob)\n4   | Dave  | 1             | 82000   | 4\n\nBob and Carol earn the same salary — they should both be rank 2.\nROW_NUMBER() assigns sequential unique numbers regardless of ties.\nRANK() is the correct function for tied-rank semantics.",
+      "rationale": "`ROW_NUMBER()` assigns a unique sequential integer to every row within the window, with no ties. Bob and Carol both earn $95,000 and should share rank 2; `ROW_NUMBER()` assigns them 2 and 3 arbitrarily based on physical row order. `RANK()` is the window function for ranked positions with tied-rank semantics: tied rows get the same rank, and the next rank skips the number of tied rows. `DENSE_RANK()` is an alternative that does not skip — ranks 1, 2, 2, 3 instead of 1, 2, 2, 4."
+    }
+  ],
+  "hints": [
+    "`GROUP BY` collapses multiple rows into one. A window function computes a value that considers nearby rows but *keeps all rows* in the output. What SQL keyword introduces a window function, and what clauses define the window (which rows to consider) and the sort order within it?",
+    "Lines 2–6: replace the entire GROUP BY query with `SELECT id, name, department_id, salary, RANK() OVER (PARTITION BY department_id ORDER BY salary DESC) AS dept_rank FROM employees`. `PARTITION BY` defines the department-level window; `ORDER BY salary DESC` ranks highest salary as 1."
+  ],
+  "explanationMd": "### Why the bug occurs\n`GROUP BY` is an aggregation operation: it collapses all rows in a group into a single summary row. For an HR report that needs one row per employee with a per-department rank, `GROUP BY department_id` destroys the employee-level data — each department is reduced to one row. The individual names, IDs, and salaries are gone.\n\n### Why the fix is correct\nWindow functions (`RANK()`, `ROW_NUMBER()`, `SUM() OVER`, etc.) compute a value that is derived from a set of rows related to the current row (the \"window\"), but they return one result row for every input row — they do not collapse the dataset. `PARTITION BY department_id` defines the window as \"all employees in the same department as the current row\". `ORDER BY salary DESC` determines the ranking within that window. Each employee receives their rank number alongside their other column values, all in one query.",
+  "recruiterReview": "Correct fix. Window functions are the most powerful SQL feature many developers never learn — they're invisible in ORMs and the syntax is unfamiliar, so developers reach for correlated subqueries or multiple JOINs to do the same thing. The correlated-subquery distractor computes the right values but at O(N²) cost — 10,000 employees becomes 10,000 inner queries. The ROW_NUMBER distractor is a common mistake: it 'looks like' rank but doesn't handle ties, which matters for HR/finance reporting where two employees at the same salary must share the same rank. RANK vs DENSE_RANK vs ROW_NUMBER is a nuance that shows you've actually used window functions in a real context. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## SQL Window Functions: Rank, Aggregate, and Analyze Without Collapsing Rows\n\nWindow functions are one of the most powerful features in SQL. They compute a value based on a set of rows related to the current row — but unlike `GROUP BY`, they return one result row for every input row.\n\n### Syntax\n```sql\nfunction() OVER (\n  [PARTITION BY partition_expression]\n  [ORDER BY sort_expression [ASC | DESC]]\n  [frame_clause]\n)\n```\n\n- `PARTITION BY` — defines the \"window\" (which rows are peers for this row). Omit to treat the entire result set as one window.\n- `ORDER BY` — defines the order within the window (required for ranking functions; optional for aggregates).\n- `frame_clause` — defines a subset of the window (e.g., `ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING`).\n\n### Ranking functions\n```sql\nRANK()         -- tied rows get same rank; next rank skips (1, 2, 2, 4)\nDENSE_RANK()   -- tied rows get same rank; no gaps   (1, 2, 2, 3)\nROW_NUMBER()   -- unique sequential number, no ties   (1, 2, 3, 4)\nNTILE(n)       -- divide rows into n equal buckets\nPERCENT_RANK() -- relative rank as a fraction 0..1\n```\n\n### Aggregate window functions\nAny aggregate function can be used as a window function:\n```sql\nSELECT\n  name,\n  salary,\n  SUM(salary) OVER (PARTITION BY department_id) AS dept_total,\n  AVG(salary) OVER (PARTITION BY department_id) AS dept_avg,\n  salary / SUM(salary) OVER (PARTITION BY department_id) AS pct_of_dept\nFROM employees;\n```\nThis returns one row per employee with department-level aggregates alongside individual values.\n\n### LAG and LEAD: access adjacent rows\n```sql\nSELECT\n  date,\n  revenue,\n  LAG(revenue) OVER (ORDER BY date) AS prev_day_revenue,\n  revenue - LAG(revenue) OVER (ORDER BY date) AS day_over_day_change\nFROM daily_revenue;\n```\n\n### FIRST_VALUE and LAST_VALUE\n```sql\nSELECT\n  name,\n  department_id,\n  salary,\n  FIRST_VALUE(name) OVER (\n    PARTITION BY department_id\n    ORDER BY salary DESC\n  ) AS top_earner_in_dept\nFROM employees;\n```\n\n### Window functions vs GROUP BY\n- `GROUP BY` collapses rows — use it for summary reports\n- Window functions preserve rows — use them for per-row analytics alongside raw data\n- You can use both in the same query: `GROUP BY` to aggregate, then window functions in a subquery or CTE over the aggregated result\n\n### Common use cases\n- Salary ranking within departments\n- Running totals and moving averages (`SUM/AVG` with frame clause)\n- Year-over-year comparison (`LAG` / `LEAD`)\n- Top-N per group (`ROW_NUMBER` in a subquery with `WHERE rn <= 3`)\n- Cumulative distribution (`CUME_DIST()`)",
+    "videos": [
+      {
+        "title": "SQL window functions explained — RANK ROW_NUMBER PARTITION BY OVER",
+        "searchQuery": "SQL window functions explained RANK ROW_NUMBER PARTITION BY OVER tutorial"
+      },
+      {
+        "title": "SQL RANK vs DENSE_RANK vs ROW_NUMBER — differences explained",
+        "searchQuery": "SQL RANK DENSE_RANK ROW_NUMBER difference ties window function explained"
+      }
+    ]
+  },
+  "estMinutes": 8,
+  "version": 1
+}
