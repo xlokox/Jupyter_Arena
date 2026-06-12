@@ -17,7 +17,7 @@ export async function seedContent(admin: SupabaseClient): Promise<{
   const challenges = loadChallenges();
 
   const { error: sectorError } = await admin.from("sectors").upsert(
-    sectors.map((s) => ({ id: s.id, name: s.name, position: s.position })),
+    sectors.map((s) => ({ id: s.id, name: s.name, position: s.position, is_gated: s.isGated })),
     { onConflict: "id" },
   );
   if (sectorError) throw new Error(`sectors upsert failed: ${sectorError.message}`);

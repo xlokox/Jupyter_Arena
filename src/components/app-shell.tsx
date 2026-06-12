@@ -48,7 +48,7 @@ export function AppShell({ challenges, initialChallengeId, initialChallenge }: A
   // authed users the server returns awards via submit_attempt, so we skip.
   useEffect(() => {
     if (isAuthed) return;
-    const sectorTotals = { ml: 0, dl: 0, fullstack: 0, db: 0 } as Record<SectorId, number>;
+    const sectorTotals = { da: 0, ml: 0, dl: 0, fullstack: 0, db: 0 } as Record<SectorId, number>;
     const solved: SolvedFact[] = [];
     for (const c of challenges) {
       sectorTotals[c.sector] += 1;

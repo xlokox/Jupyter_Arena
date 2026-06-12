@@ -121,6 +121,7 @@ export const en = {
   },
   sectors: {
     all: "All",
+    da: "Data Analyst",
     ml: "Machine Learning",
     dl: "Deep Learning",
     fullstack: "Full Stack",

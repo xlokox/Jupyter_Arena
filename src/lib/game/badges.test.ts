@@ -9,7 +9,7 @@ import {
   type SolvedFact,
 } from "./badges";
 
-const FULL_TOTALS: Record<SectorId, number> = { ml: 15, dl: 15, fullstack: 15, db: 15 };
+const FULL_TOTALS: Record<SectorId, number> = { da: 15, ml: 15, dl: 15, fullstack: 15, db: 15 };
 
 const solved = (overrides: Partial<SolvedFact> = {}): SolvedFact => ({
   sector: "ml",

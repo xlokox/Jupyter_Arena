@@ -7,7 +7,7 @@ import { UNLOCK_LEVELS } from "@/lib/game/xp";
  * to snake_case columns 1:1.
  */
 
-export const SECTOR_IDS = ["ml", "dl", "fullstack", "db"] as const;
+export const SECTOR_IDS = ["da", "ml", "dl", "fullstack", "db"] as const;
 export const DIFFICULTIES = ["easy", "medium", "hard", "very_hard"] as const;
 export const LANGUAGES = ["python", "jsx", "javascript", "sql"] as const;
 export const OPTION_KEYS = ["a", "b", "c"] as const;
@@ -16,6 +16,8 @@ export const SectorSchema = z.object({
   id: z.enum(SECTOR_IDS),
   name: z.string().min(1),
   position: z.number().int().min(0),
+  /** Gated sectors level-lock by difficulty; the Data Analyst on-ramp is ungated. */
+  isGated: z.boolean().default(true),
 });
 
 export const SectorsFileSchema = z.array(SectorSchema).min(1);
@@ -30,7 +32,7 @@ export const ChallengeOptionSchema = z.object({
 });
 
 export const ChallengeSchema = z.object({
-  id: z.string().regex(/^(ml|dl|fullstack|db)-\d{3}-[a-z0-9-]+$/),
+  id: z.string().regex(/^(ml|dl|fullstack|db|da)-\d{3}-[a-z0-9-]+$/),
   sector: z.enum(SECTOR_IDS),
   difficulty: z.enum(DIFFICULTIES),
   title: z.string(),
@@ -75,7 +77,10 @@ export interface ChallengeMeta {
   unlockLevel: number;
 }
 
-export const toMeta = (c: z.infer<typeof ChallengeSchema>): ChallengeMeta => ({
+export const toMeta = (
+  c: z.infer<typeof ChallengeSchema>,
+  ungatedSectors?: ReadonlySet<string>,
+): ChallengeMeta => ({
   id: c.id,
   sector: c.sector,
   difficulty: c.difficulty,
@@ -84,7 +89,10 @@ export const toMeta = (c: z.infer<typeof ChallengeSchema>): ChallengeMeta => ({
   icon: c.icon,
   conceptTags: c.conceptTags,
   estMinutes: c.estMinutes,
-  unlockLevel: c.unlockLevelOverride ?? UNLOCK_LEVELS[c.difficulty] ?? 1,
+  // Ungated sectors (the Data Analyst on-ramp) are always playable → level 1.
+  unlockLevel: ungatedSectors?.has(c.sector)
+    ? 1
+    : (c.unlockLevelOverride ?? UNLOCK_LEVELS[c.difficulty] ?? 1),
 });
 export type ChallengeOption = z.infer<typeof ChallengeOptionSchema>;
 export type Challenge = z.infer<typeof ChallengeSchema>;

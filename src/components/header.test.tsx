@@ -28,13 +28,14 @@ describe("Header", () => {
     expect(bar.getAttribute("aria-valuemax")).toBe("50");
   });
 
-  it("renders all five sector filter pills with All active", () => {
+  it("renders all sector filter pills (Data Analyst first) with All active", () => {
     render(<Header />);
     const nav = screen.getByRole("navigation", { name: en.header.sectorFilterAria });
     const pills = Array.from(nav.querySelectorAll("button"));
-    expect(pills).toHaveLength(5);
+    expect(pills).toHaveLength(6);
     expect(pills.map((p) => p.textContent)).toEqual([
       en.sectors.all,
+      en.sectors.da,
       en.sectors.ml,
       en.sectors.dl,
       en.sectors.fullstack,

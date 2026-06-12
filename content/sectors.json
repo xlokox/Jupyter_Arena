@@ -1,6 +1,7 @@
 [
-  { "id": "ml", "name": "Machine Learning", "position": 0 },
-  { "id": "dl", "name": "Deep Learning", "position": 1 },
-  { "id": "fullstack", "name": "Full Stack", "position": 2 },
-  { "id": "db", "name": "Databases", "position": 3 }
+  { "id": "da", "name": "Data Analyst", "position": 0, "isGated": false },
+  { "id": "ml", "name": "Machine Learning", "position": 1, "isGated": true },
+  { "id": "dl", "name": "Deep Learning", "position": 2, "isGated": true },
+  { "id": "fullstack", "name": "Full Stack", "position": 3, "isGated": true },
+  { "id": "db", "name": "Databases", "position": 4, "isGated": true }
 ]

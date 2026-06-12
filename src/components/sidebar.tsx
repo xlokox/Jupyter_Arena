@@ -22,7 +22,13 @@ const TABS: Array<{ id: SidebarTab; label: string; icon: typeof FileCode2 }> = [
   { id: "tutorials", label: en.sidebar.tutorials, icon: BookOpen },
 ];
 
-const SECTOR_SHORT: Record<SectorId, string> = { ml: "ML", dl: "DL", fullstack: "FS", db: "DB" };
+const SECTOR_SHORT: Record<SectorId, string> = {
+  da: "DA",
+  ml: "ML",
+  dl: "DL",
+  fullstack: "FS",
+  db: "DB",
+};
 
 /** Compact per-sector completion rings (missions tab). */
 function SectorRings({

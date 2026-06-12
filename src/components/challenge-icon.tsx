@@ -1,5 +1,6 @@
 import {
   Activity,
+  BarChart3,
   Boxes,
   Brain,
   Bug,
@@ -34,6 +35,7 @@ import {
   Sparkles,
   Split,
   Table,
+  Table2,
   Target,
   Timer,
   Users,
@@ -49,6 +51,7 @@ import {
  */
 const ICONS: Record<string, LucideIcon> = {
   activity: Activity,
+  "bar-chart-3": BarChart3,
   boxes: Boxes,
   brain: Brain,
   bug: Bug,
@@ -82,6 +85,7 @@ const ICONS: Record<string, LucideIcon> = {
   sparkles: Sparkles,
   split: Split,
   table: Table,
+  "table-2": Table2,
   target: Target,
   timer: Timer,
   users: Users,

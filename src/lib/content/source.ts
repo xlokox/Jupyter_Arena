@@ -113,7 +113,7 @@ function supabaseEnv(): { url: string; anonKey: string } | null {
   return url && anonKey ? { url, anonKey } : null;
 }
 
-const SECTOR_ORDER: Record<string, number> = { ml: 0, dl: 1, fullstack: 2, db: 3 };
+const SECTOR_ORDER: Record<string, number> = { da: 0, ml: 1, dl: 2, fullstack: 3, db: 4 };
 
 export async function getChallenges(): Promise<Challenge[]> {
   const env = supabaseEnv();
@@ -148,7 +148,8 @@ interface MetaRow {
 /** List views ship metadata only (Section 11); bodies come via getChallenge. */
 export async function getChallengeMetas(): Promise<ChallengeMeta[]> {
   const env = supabaseEnv();
-  if (!env) return loadChallenges().map(toMeta);
+  const ungated = await ungatedSectorIds();
+  if (!env) return loadChallenges().map((c) => toMeta(c, ungated));
 
   const anon = createClient(env.url, env.anonKey, { auth: { persistSession: false } });
   const { data, error } = await anon.from("challenges").select(META_SELECT);
@@ -163,7 +164,9 @@ export async function getChallengeMetas(): Promise<ChallengeMeta[]> {
       icon: row.icon,
       conceptTags: row.concept_tags,
       estMinutes: row.est_minutes,
-      unlockLevel: row.unlock_level_override ?? UNLOCK_LEVELS[row.difficulty] ?? 1,
+      unlockLevel: ungated.has(row.sector_id)
+        ? 1
+        : (row.unlock_level_override ?? UNLOCK_LEVELS[row.difficulty] ?? 1),
     }))
     .sort(
       (a, b) =>
@@ -192,7 +195,23 @@ export async function getSectors(): Promise<Sector[]> {
   if (!env) return loadSectors();
 
   const anon = createClient(env.url, env.anonKey, { auth: { persistSession: false } });
-  const { data, error } = await anon.from("sectors").select("*").order("position");
+  const { data, error } = await anon
+    .from("sectors")
+    .select("id, name, position, is_gated")
+    .order("position");
   if (error) throw new Error(`sectors read failed: ${error.message}`);
-  return SectorsFileSchema.parse(data);
+  // Map the snake_case column to the camelCase schema field.
+  return SectorsFileSchema.parse(
+    (data as Array<{ id: string; name: string; position: number; is_gated: boolean }>).map((r) => ({
+      id: r.id,
+      name: r.name,
+      position: r.position,
+      isGated: r.is_gated,
+    })),
+  );
+}
+
+/** Sector ids that are ungated (always playable) — drives client unlock display. */
+async function ungatedSectorIds(): Promise<Set<string>> {
+  return new Set((await getSectors()).filter((s) => !s.isGated).map((s) => s.id));
 }

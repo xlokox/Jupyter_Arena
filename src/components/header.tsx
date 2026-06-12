@@ -35,6 +35,7 @@ import { en } from "@/i18n/en";
 
 const SECTOR_FILTERS: Array<{ id: SectorFilter; label: string }> = [
   { id: "all", label: en.sectors.all },
+  { id: "da", label: en.sectors.da },
   { id: "ml", label: en.sectors.ml },
   { id: "dl", label: en.sectors.dl },
   { id: "fullstack", label: en.sectors.fullstack },

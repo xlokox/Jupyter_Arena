@@ -79,7 +79,8 @@ export const BADGE_DEFS: readonly BadgeDef[] = [
   { id: "daily_devoted", tier: "gold", icon: "crown", sort: 130 },
 ] as const;
 
-const SECTOR_SWEEP: Record<SectorId, BadgeId> = {
+// Partial: the ungated Data Analyst on-ramp has no Sector Sweep badge.
+const SECTOR_SWEEP: Partial<Record<SectorId, BadgeId>> = {
   ml: "sector_sweep_ml",
   dl: "sector_sweep_dl",
   fullstack: "sector_sweep_fullstack",
@@ -97,9 +98,11 @@ export function evaluateBadges(ctx: BadgeContext): Set<BadgeId> {
   if (ctx.solved.filter((s) => s.flawless).length >= 5) earned.add("flawless_five");
 
   for (const sector of Object.keys(SECTOR_SWEEP) as SectorId[]) {
+    const badge = SECTOR_SWEEP[sector];
+    if (!badge) continue;
     const total = ctx.sectorTotals[sector] ?? 0;
     const solvedInSector = ctx.solved.filter((s) => s.sector === sector).length;
-    if (total > 0 && solvedInSector >= total) earned.add(SECTOR_SWEEP[sector]);
+    if (total > 0 && solvedInSector >= total) earned.add(badge);
   }
 
   if (
