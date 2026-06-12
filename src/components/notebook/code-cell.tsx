@@ -18,9 +18,11 @@ interface CodeCellProps {
   /** 1-based inclusive bug region; only shown for the unpatched code. */
   bugRegion: { start: number; end: number } | null;
   title: string;
+  /** True on the first render after a correct fix — flashes the patched code green. */
+  justSolved?: boolean;
 }
 
-export function CodeCell({ code, language, bugRegion, title }: CodeCellProps) {
+export function CodeCell({ code, language, bugRegion, title, justSolved = false }: CodeCellProps) {
   const lines = tokenize(code, language);
 
   return (
@@ -35,7 +37,11 @@ export function CodeCell({ code, language, bugRegion, title }: CodeCellProps) {
             {language}
           </span>
         </div>
-        <pre className="overflow-x-auto p-0 font-mono text-[13px] leading-6">
+        <pre
+          className={`overflow-x-auto p-0 font-mono text-[13px] leading-6 ${
+            justSolved ? "motion-safe:animate-[line-patch_0.6s_ease-out]" : ""
+          }`}
+        >
           <code>
             {lines.map((tokens, index) => {
               const lineNumber = index + 1;

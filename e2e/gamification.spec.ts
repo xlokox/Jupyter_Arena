@@ -13,7 +13,7 @@ async function solveKmeans(page: Page) {
 }
 
 test("a clean solve shows the XP toast and updates the header stats", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/app");
   await solveKmeans(page);
 
   const toast = page.getByRole("status", { name: "XP earned" });
@@ -28,7 +28,7 @@ test("a clean solve shows the XP toast and updates the header stats", async ({ p
 });
 
 test("a wrong attempt floors XP at 0 in the toast and header", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/app");
   await page
     .getByRole("button", { name: /01_kmeans_customer_segmentation\.ipynb/ })
     .first()
@@ -42,7 +42,7 @@ test("a wrong attempt floors XP at 0 in the toast and header", async ({ page }) 
 });
 
 test("refresh restores anonymous progress from localStorage", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/app");
   await solveKmeans(page);
   await expect(page.getByText("20/50 XP")).toBeVisible();
 
@@ -63,7 +63,7 @@ test("refresh restores anonymous progress from localStorage", async ({ page }) =
 });
 
 test("portfolio reflects earned stats and sector progress", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/app");
   await solveKmeans(page);
   await page.getByRole("link", { name: "Portfolio" }).click();
 
@@ -89,13 +89,24 @@ test("portfolio reflects earned stats and sector progress", async ({ page }) => 
 });
 
 test("the daily challenge route opens the same mission on every visit", async ({ page }) => {
+  // Determinism is the contract here (same UTC day → same pick).
   await page.goto("/daily");
   const heading = page.getByRole("heading", { level: 1 });
-  await expect(page.getByRole("button", { name: "Run Cell" })).toBeVisible();
+  await expect(heading).toBeVisible();
   const firstTitle = await heading.textContent();
   expect(firstTitle).toBeTruthy();
 
   await page.goto("/daily");
-  await expect(page.getByRole("button", { name: "Run Cell" })).toBeVisible();
+  await expect(heading).toBeVisible();
   expect(await heading.textContent()).toBe(firstTitle);
+});
+
+test("the daily challenge is always playable for a fresh anonymous player", async ({ page }) => {
+  // The day's pick may be a higher difficulty (level-locked for a level-1 user),
+  // but the daily is exempt from gating — the Run cell renders, never the locked
+  // panel (5.6b: exemption in notebook-view + submit_attempt).
+  await page.goto("/daily");
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(page.locator("[data-run-cell]")).toBeVisible();
+  await expect(page.getByRole("region", { name: "This mission is locked" })).toHaveCount(0);
 });

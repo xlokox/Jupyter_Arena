@@ -7,6 +7,7 @@ import {
   type ChallengeMeta,
   type Sector,
 } from "./schema";
+import { UNLOCK_LEVELS } from "@/lib/game/xp";
 import { loadChallenges, loadSectors } from "./load";
 
 /**
@@ -129,7 +130,8 @@ export async function getChallenges(): Promise<Challenge[]> {
     );
 }
 
-const META_SELECT = "id, sector_id, difficulty, title, language, icon, concept_tags, est_minutes";
+const META_SELECT =
+  "id, sector_id, difficulty, title, language, icon, concept_tags, est_minutes, unlock_level_override";
 
 interface MetaRow {
   id: string;
@@ -140,6 +142,7 @@ interface MetaRow {
   icon: string;
   concept_tags: string[];
   est_minutes: number;
+  unlock_level_override: number | null;
 }
 
 /** List views ship metadata only (Section 11); bodies come via getChallenge. */
@@ -160,6 +163,7 @@ export async function getChallengeMetas(): Promise<ChallengeMeta[]> {
       icon: row.icon,
       conceptTags: row.concept_tags,
       estMinutes: row.est_minutes,
+      unlockLevel: row.unlock_level_override ?? UNLOCK_LEVELS[row.difficulty] ?? 1,
     }))
     .sort(
       (a, b) =>

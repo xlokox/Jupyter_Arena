@@ -7,7 +7,7 @@ import { expect, test, type Page } from "@playwright/test";
  */
 
 async function openFirstMission(page: Page) {
-  await page.goto("/");
+  await page.goto("/app");
   await page
     .getByRole("button", { name: /01_kmeans_customer_segmentation\.ipynb/ })
     .first()
@@ -63,7 +63,7 @@ test.describe("notebook flows", () => {
   });
 
   test("tutorials tab opens the lesson with video search cards", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/app");
     await page.getByRole("tab", { name: "Tutorials" }).click();
     await page
       .getByRole("button", { name: /01_kmeans_customer_segmentation\.ipynb/ })
@@ -77,7 +77,7 @@ test.describe("notebook flows", () => {
   });
 
   test("sector and difficulty filters narrow the explorer", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/app");
     await page
       .getByRole("navigation", { name: "Filter challenges by sector" })
       .getByRole("button", { name: "Databases" })
@@ -111,7 +111,7 @@ test.describe("notebook flows", () => {
 test.describe("responsive", () => {
   test("mobile 360: sidebar is a drawer behind the menu button", async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 740 });
-    await page.goto("/");
+    await page.goto("/app");
     await expect(page.getByRole("tab", { name: "Missions" })).not.toBeVisible();
     await page.getByRole("button", { name: "Open file explorer" }).click();
     await expect(page.getByRole("dialog", { name: "Notebook file explorer" })).toBeVisible();
@@ -126,7 +126,7 @@ test.describe("responsive", () => {
   test("tablet 768 and desktop 1280: static sidebar, no hamburger", async ({ page }) => {
     for (const width of [768, 1280]) {
       await page.setViewportSize({ width, height: 900 });
-      await page.goto("/");
+      await page.goto("/app");
       await expect(page.getByRole("tab", { name: "Missions" })).toBeVisible();
       await expect(page.getByRole("button", { name: "Open file explorer" })).not.toBeVisible();
     }
@@ -137,7 +137,7 @@ test.describe("accessibility", () => {
   test("axe scan is clean on the workspace (empty, mission, and solved states)", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/app");
     let results = await new AxeBuilder({ page }).analyze();
     expect(results.violations).toEqual([]);
 
@@ -153,7 +153,7 @@ test.describe("accessibility", () => {
   });
 
   test("axe scan is clean on the tutorial view and the portfolio", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/app");
     await page.getByRole("tab", { name: "Tutorials" }).click();
     await page
       .getByRole("button", { name: /01_kmeans_customer_segmentation\.ipynb/ })

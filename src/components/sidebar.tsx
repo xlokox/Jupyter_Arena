@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, CheckCircle2, FileCode2, Search, X } from "lucide-react";
+import { BookOpen, CheckCircle2, FileCode2, Lock, Search, X } from "lucide-react";
 import type { ChallengeMeta } from "@/lib/content/schema";
 import { DIFFICULTIES } from "@/lib/content/schema";
 import { ChallengeIcon } from "@/components/challenge-icon";
@@ -12,6 +12,7 @@ import {
   type DifficultyFilter,
   type SidebarTab,
 } from "@/store/workspace";
+import { levelForXp } from "@/lib/game/xp";
 import { useFocusTrap } from "@/lib/use-focus-trap";
 import { en } from "@/i18n/en";
 
@@ -31,8 +32,11 @@ function SidebarContent({ challenges }: { challenges: ChallengeMeta[] }) {
   const activeChallengeId = useWorkspaceStore((s) => s.activeChallengeId);
   const view = useWorkspaceStore((s) => s.view);
   const attempts = useWorkspaceStore((s) => s.attempts);
+  const stats = useWorkspaceStore((s) => s.stats);
   const openMission = useWorkspaceStore((s) => s.openMission);
   const openTutorial = useWorkspaceStore((s) => s.openTutorial);
+
+  const userLevel = levelForXp(stats.xp);
 
   const visible = filterChallenges(challenges, {
     sector: sectorFilter,
@@ -127,11 +131,17 @@ function SidebarContent({ challenges }: { challenges: ChallengeMeta[] }) {
               const isActive =
                 activeChallengeId === challenge.id &&
                 view === (sidebarTab === "missions" ? "mission" : "tutorial");
+              const isLocked = challenge.unlockLevel > userLevel;
               return (
                 <li key={challenge.id}>
                   <button
                     type="button"
                     aria-current={isActive ? "true" : undefined}
+                    aria-label={
+                      isLocked
+                        ? `${challenge.title} — ${en.lock.lockedAria} ${challenge.unlockLevel}`
+                        : undefined
+                    }
                     onClick={() =>
                       sidebarTab === "missions"
                         ? openMission(challenge.id)
@@ -144,23 +154,39 @@ function SidebarContent({ challenges }: { challenges: ChallengeMeta[] }) {
                     }`}
                   >
                     {sidebarTab === "missions" ? (
-                      <ChallengeIcon
-                        name={challenge.icon}
-                        className="size-4 shrink-0 text-accent"
-                      />
+                      isLocked ? (
+                        <Lock className="size-4 shrink-0 text-muted" aria-hidden />
+                      ) : (
+                        <ChallengeIcon
+                          name={challenge.icon}
+                          className="size-4 shrink-0 text-accent"
+                        />
+                      )
                     ) : (
                       <BookOpen className="size-4 shrink-0 text-accent" aria-hidden />
                     )}
-                    <span className="min-w-0 flex-1 truncate font-mono text-xs text-text">
+                    <span
+                      className={`min-w-0 flex-1 truncate font-mono text-xs ${
+                        isLocked ? "text-muted" : "text-text"
+                      }`}
+                    >
                       {challenge.title}
                     </span>
-                    {solved && sidebarTab === "missions" && (
-                      <CheckCircle2
-                        className="size-4 shrink-0 text-success"
-                        aria-label={en.sidebar.solvedAria}
-                      />
+                    {isLocked && sidebarTab === "missions" ? (
+                      <span className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted">
+                        {en.lock.lockedLabel} {challenge.unlockLevel}
+                      </span>
+                    ) : (
+                      <>
+                        {solved && sidebarTab === "missions" && (
+                          <CheckCircle2
+                            className="size-4 shrink-0 text-success"
+                            aria-label={en.sidebar.solvedAria}
+                          />
+                        )}
+                        <DifficultyBadge difficulty={challenge.difficulty} />
+                      </>
                     )}
-                    <DifficultyBadge difficulty={challenge.difficulty} />
                   </button>
                 </li>
               );

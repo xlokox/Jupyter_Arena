@@ -6,6 +6,7 @@ import {
   applyWrongAttempt,
   displayStreak,
   INITIAL_STATS,
+  isFlawless,
   levelForXp,
   rankForLevel,
   utcDayOf,
@@ -45,6 +46,33 @@ describe("levels and ranks", () => {
     expect(rankForLevel(30)).toBe("kernelEngineer");
     expect(rankForLevel(31)).toBe("overlordCompiler");
     expect(rankForLevel(99)).toBe("overlordCompiler");
+  });
+});
+
+describe("isFlawless (first-try clean solve rule)", () => {
+  it("is true with no wrong attempts and 0 or 1 hint", () => {
+    expect(isFlawless(0, 0)).toBe(true);
+    expect(isFlawless(0, 1)).toBe(true);
+  });
+
+  it("is false once a second hint is taken", () => {
+    expect(isFlawless(0, 2)).toBe(false);
+  });
+
+  it("is false after any wrong attempt", () => {
+    expect(isFlawless(1, 0)).toBe(false);
+    expect(isFlawless(2, 1)).toBe(false);
+  });
+
+  it("agrees with the first_try_bonus that applyCorrectSolve grants", () => {
+    // Same inputs that earn the bonus must report flawless, and vice versa.
+    const flawless = applyCorrectSolve(stats({ lastActiveDay: utcDayOf(at("2026-01-01")) }), {
+      ...freshSolve,
+      now: at("2026-01-01"),
+    });
+    expect(flawless.events.some((e) => e.reason === "first_try_bonus")).toBe(
+      isFlawless(freshSolve.wrongAttempts, freshSolve.hintsUsed),
+    );
   });
 });
 

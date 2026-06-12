@@ -122,6 +122,26 @@ describe("hints", () => {
   });
 });
 
+describe("sound preference", () => {
+  it("defaults to off", () => {
+    expect(useWorkspaceStore.getState().soundEnabled).toBe(false);
+  });
+
+  it("toggleSound flips the flag both ways", () => {
+    const store = useWorkspaceStore.getState();
+    store.toggleSound();
+    expect(useWorkspaceStore.getState().soundEnabled).toBe(true);
+    store.toggleSound();
+    expect(useWorkspaceStore.getState().soundEnabled).toBe(false);
+  });
+
+  it("is included in the persisted slice (survives reload)", () => {
+    const partialize = useWorkspaceStore.persist.getOptions().partialize!;
+    const slice = partialize({ ...useWorkspaceStore.getState(), soundEnabled: true });
+    expect(slice).toHaveProperty("soundEnabled", true);
+  });
+});
+
 const stub = (overrides: Partial<FilterableChallenge>): FilterableChallenge => ({
   id: "ml-001-a",
   sector: "ml",

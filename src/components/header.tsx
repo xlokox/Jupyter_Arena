@@ -1,16 +1,22 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useState } from "react";
-import { BriefcaseBusiness, CheckCircle2, Flame, LogIn, LogOut, Menu } from "lucide-react";
+import {
+  BriefcaseBusiness,
+  Calendar,
+  CheckCircle2,
+  Flame,
+  LogIn,
+  LogOut,
+  Menu,
+  Volume2,
+  VolumeX,
+} from "lucide-react";
 import { publicSupabaseEnv } from "@/lib/supabase/env";
 import { useAuthStore } from "@/store/auth";
 import { displayStreak, levelForXp, rankForLevel, XP_PER_LEVEL, xpIntoLevel } from "@/lib/game/xp";
 import { useWorkspaceStore, type SectorFilter } from "@/store/workspace";
 import { en } from "@/i18n/en";
-
-const SignInDialog = dynamic(() => import("@/components/auth/sign-in-dialog"), { ssr: false });
 
 /**
  * Header — MASTER_BRIEF.md Section 8. Sector pills drive the store filter;
@@ -25,8 +31,17 @@ const SECTOR_FILTERS: Array<{ id: SectorFilter; label: string }> = [
   { id: "db", label: en.sectors.db },
 ];
 
+/** Next unlock threshold above the user's current level, or null if all unlocked. */
+function nextUnlock(level: number) {
+  const thresholds = [
+    { level: 3, label: "medium" },
+    { level: 6, label: "hard" },
+    { level: 10, label: "very hard" },
+  ];
+  return thresholds.find((t) => t.level > level) ?? null;
+}
+
 export function Header() {
-  const [signInOpen, setSignInOpen] = useState(false);
   const authStatus = useAuthStore((s) => s.status);
   const authEmail = useAuthStore((s) => s.email);
   const supabaseConfigured = publicSupabaseEnv() !== null;
@@ -35,6 +50,9 @@ export function Header() {
   const setSidebarOpen = useWorkspaceStore((s) => s.setSidebarOpen);
   const attempts = useWorkspaceStore((s) => s.attempts);
   const stats = useWorkspaceStore((s) => s.stats);
+  const soundEnabled = useWorkspaceStore((s) => s.soundEnabled);
+  const toggleSound = useWorkspaceStore((s) => s.toggleSound);
+  const lastReward = useWorkspaceStore((s) => s.lastReward);
   const completed = Object.values(attempts).filter((a) => a.solved).length;
 
   const level = levelForXp(stats.xp);
@@ -42,6 +60,9 @@ export function Header() {
   const intoLevel = xpIntoLevel(stats.xp);
   const streak = displayStreak(stats, new Date());
   const xpPercent = (intoLevel / XP_PER_LEVEL) * 100;
+  const next = nextUnlock(level);
+  const xpToUnlock = next ? Math.max(0, (next.level - 1) * XP_PER_LEVEL - stats.xp) : null;
+  const justLeveled = lastReward?.leveledUp ?? false;
 
   return (
     <header className="border-b border-border bg-panel">
@@ -64,33 +85,62 @@ export function Header() {
           className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm"
         >
           <div className="flex items-center gap-2">
-            <span className="rounded-md border border-border bg-panel-2 px-2 py-0.5 font-mono text-xs text-accent">
+            <span
+              className={`rounded-md border border-border bg-panel-2 px-2 py-0.5 font-mono text-xs text-accent ${
+                justLeveled ? "motion-safe:animate-[level-pulse_0.6s_ease-in-out]" : ""
+              }`}
+            >
               {en.header.level} {level}
             </span>
             <span className="hidden text-muted sm:inline">{rank}</span>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div
-              role="progressbar"
-              aria-valuemin={0}
-              aria-valuemax={XP_PER_LEVEL}
-              aria-valuenow={intoLevel}
-              aria-label={en.header.xp}
-              className="h-2 w-24 overflow-hidden rounded-full border border-border bg-panel-2"
-            >
+          <div className="flex flex-col gap-0.5">
+            <div className="flex items-center gap-2">
               <div
-                className="h-full rounded-full bg-accent motion-safe:transition-[width] motion-safe:duration-500"
-                style={{ width: `${xpPercent}%` }}
-              />
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={XP_PER_LEVEL}
+                aria-valuenow={intoLevel}
+                aria-label={en.header.xp}
+                className="h-2 w-24 overflow-hidden rounded-full border border-border bg-panel-2"
+              >
+                <div
+                  className="h-full rounded-full bg-accent motion-safe:transition-[width] motion-safe:duration-500"
+                  style={{ width: `${xpPercent}%` }}
+                />
+              </div>
+              <span className="font-mono text-xs text-muted">
+                <span
+                  key={intoLevel}
+                  className="inline-block motion-safe:animate-[xp-pop_0.3s_ease-out]"
+                >
+                  {intoLevel}
+                </span>
+                /{XP_PER_LEVEL} {en.header.xp}
+              </span>
             </div>
-            <span className="font-mono text-xs text-muted">
-              {intoLevel}/{XP_PER_LEVEL} {en.header.xp}
-            </span>
+            {next && xpToUnlock !== null && xpToUnlock > 0 && (
+              <p className="font-mono text-[10px] text-muted">
+                {xpToUnlock} {en.header.xp} → {en.lock.nextUnlockAt} {next.level} ({next.label})
+              </p>
+            )}
+            {next && xpToUnlock === 0 && (
+              <p className="font-mono text-[10px] text-success">
+                {en.lock.nextUnlockAt} {next.level} {en.lock.nextUnlockContent} unlocked!
+              </p>
+            )}
           </div>
 
           <div className="flex items-center gap-1.5">
-            <Flame aria-hidden className="size-4 text-muted" />
+            <Flame
+              aria-hidden
+              className={`size-4 ${
+                streak >= 1
+                  ? "text-accent motion-safe:animate-[flame-flicker_1.6s_ease-in-out_infinite]"
+                  : "text-muted"
+              }`}
+            />
             <span className="font-mono text-xs text-muted">
               {streak} {en.header.streakLabel}
             </span>
@@ -99,7 +149,13 @@ export function Header() {
           <div className="flex items-center gap-1.5">
             <CheckCircle2 aria-hidden className="size-4 text-muted" />
             <span className="font-mono text-xs text-muted">
-              {completed} {en.header.completedLabel}
+              <span
+                key={completed}
+                className="inline-block motion-safe:animate-[xp-pop_0.3s_ease-out]"
+              >
+                {completed}
+              </span>{" "}
+              {en.header.completedLabel}
             </span>
           </div>
         </div>
@@ -129,6 +185,29 @@ export function Header() {
         </nav>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            aria-pressed={soundEnabled}
+            aria-label={soundEnabled ? en.sounds.disable : en.sounds.enable}
+            title={soundEnabled ? en.sounds.disable : en.sounds.enable}
+            onClick={toggleSound}
+            className="flex size-11 items-center justify-center rounded-md border border-border bg-panel-2 text-muted transition-colors hover:border-accent-hover hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            {soundEnabled ? (
+              <Volume2 className="size-4 text-accent" aria-hidden />
+            ) : (
+              <VolumeX className="size-4" aria-hidden />
+            )}
+          </button>
+
+          <Link
+            href="/daily"
+            className="flex min-h-[44px] items-center gap-1.5 rounded-md border border-border bg-panel-2 px-3 text-sm text-muted transition-colors hover:border-accent-hover hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            <Calendar className="size-4 text-accent" aria-hidden />
+            <span className="hidden sm:inline">Daily</span>
+          </Link>
+
           <Link
             href="/portfolio"
             className="flex min-h-[44px] items-center gap-1.5 rounded-md border border-border bg-panel-2 px-3 text-sm text-muted transition-colors hover:border-accent-hover hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
@@ -151,18 +230,16 @@ export function Header() {
             </button>
           )}
           {supabaseConfigured && authStatus === "signedOut" && (
-            <button
-              type="button"
-              onClick={() => setSignInOpen(true)}
+            <Link
+              href="/login"
               className="flex min-h-[44px] items-center gap-1.5 rounded-md border border-accent/50 bg-accent/10 px-3 text-sm text-accent transition-colors hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
               <LogIn className="size-4" aria-hidden />
               {en.auth.signIn}
-            </button>
+            </Link>
           )}
         </div>
       </div>
-      {signInOpen && <SignInDialog onClose={() => setSignInOpen(false)} />}
     </header>
   );
 }

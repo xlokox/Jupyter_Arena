@@ -10,6 +10,14 @@
  */
 
 export const XP_PER_LEVEL = 50;
+
+/** Minimum player level required to attempt each difficulty tier. */
+export const UNLOCK_LEVELS: Record<string, number> = {
+  easy: 1,
+  medium: 3,
+  hard: 6,
+  very_hard: 10,
+};
 export const XP_CORRECT = 10;
 export const XP_WRONG = -5;
 export const XP_FIRST_TRY_BONUS = 5;
@@ -88,6 +96,15 @@ export function accuracy(stats: GameStats): number | null {
   return stats.totalAttempts === 0 ? null : stats.correctAttempts / stats.totalAttempts;
 }
 
+/**
+ * A "flawless" solve — no wrong attempts and ≤1 hint — earns the first-try
+ * bonus. Single source of truth for that rule (applyCorrectSolve below and the
+ * "Flawless" UI chip both consult it).
+ */
+export function isFlawless(wrongAttempts: number, hintsUsed: number): boolean {
+  return wrongAttempts === 0 && hintsUsed <= FIRST_TRY_MAX_HINTS;
+}
+
 export function applyWrongAttempt(stats: GameStats): Outcome {
   // `|| 0` normalizes the -0 that Math.max(-5, -0) produces at the floor.
   const delta = Math.max(XP_WRONG, -stats.xp) || 0;
@@ -112,7 +129,7 @@ export function applyCorrectSolve(stats: GameStats, context: SolveContext): Outc
   }
 
   const events: XpEvent[] = [{ reason: "correct_fix", delta: XP_CORRECT }];
-  if (context.wrongAttempts === 0 && context.hintsUsed <= FIRST_TRY_MAX_HINTS) {
+  if (isFlawless(context.wrongAttempts, context.hintsUsed)) {
     events.push({ reason: "first_try_bonus", delta: XP_FIRST_TRY_BONUS });
   }
 

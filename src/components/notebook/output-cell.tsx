@@ -13,6 +13,13 @@ export function OutputCell({ challenge, attempt }: OutputCellProps) {
 
   let body: React.ReactNode;
   let tone = "text-danger";
+  // Solved output expands into place; a failed run gives the cell one shake.
+  const anim =
+    runState === "solved"
+      ? "motion-safe:animate-[output-reveal_0.35s_ease-out]"
+      : runState === "failed"
+        ? "motion-safe:animate-[shake_0.3s_ease-in-out]"
+        : "";
 
   if (runState === "running") {
     body = (
@@ -45,7 +52,8 @@ export function OutputCell({ challenge, attempt }: OutputCellProps) {
         className="min-w-0 flex-1 overflow-hidden rounded-md border border-border bg-code-bg"
       >
         <pre
-          className={`overflow-x-auto whitespace-pre-wrap p-3 font-mono text-xs leading-5 motion-safe:transition-colors ${tone}`}
+          key={`${runState}-${lastRunOption ?? "none"}`}
+          className={`overflow-x-auto whitespace-pre-wrap p-3 font-mono text-xs leading-5 motion-safe:transition-colors ${tone} ${anim}`}
         >
           {body}
         </pre>

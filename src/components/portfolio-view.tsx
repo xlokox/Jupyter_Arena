@@ -45,7 +45,7 @@ export function PortfolioView({ challenges }: { challenges: ChallengeMeta[] }) {
   return (
     <main className="mx-auto max-w-3xl space-y-6 p-4 md:p-8">
       <Link
-        href="/"
+        href="/app"
         className="inline-flex min-h-[44px] items-center gap-1.5 text-sm text-muted transition-colors hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
         <ArrowLeft className="size-4" aria-hidden />

@@ -9,7 +9,7 @@ export function SolvePanel({ challenge }: { challenge: Challenge }) {
     <div className="space-y-4">
       <section
         aria-label={en.workspace.explanationHeading}
-        className="rounded-md border border-border bg-panel p-4"
+        className="rounded-md border border-border bg-panel p-4 motion-safe:animate-[toast-in_0.4s_ease-out_both]"
       >
         <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-text">
           <GraduationCap className="size-4 text-accent" aria-hidden />
@@ -22,7 +22,7 @@ export function SolvePanel({ challenge }: { challenge: Challenge }) {
 
       <section
         aria-label={en.workspace.recruiterHeading}
-        className="relative overflow-hidden rounded-md border border-success/40 bg-panel p-4"
+        className="relative overflow-hidden rounded-md border border-success/40 bg-panel p-4 motion-safe:animate-[toast-in_0.4s_ease-out_0.12s_both]"
       >
         <div className="mb-3 flex items-center gap-3">
           <span className="flex size-9 items-center justify-center rounded-full border border-border bg-panel-2">

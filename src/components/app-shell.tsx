@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { FlaskConical } from "lucide-react";
 import type { Challenge, ChallengeMeta, Sector } from "@/lib/content/schema";
 import { Header } from "@/components/header";
@@ -8,6 +8,8 @@ import { Sidebar } from "@/components/sidebar";
 import { XpToast } from "@/components/xp-toast";
 import { NotebookView } from "@/components/notebook/notebook-view";
 import { TutorialView } from "@/components/tutorial-view";
+import { dailyChallengeId } from "@/lib/game/daily";
+import { utcDayOf } from "@/lib/game/xp";
 import { filterChallenges, getAttempt, useWorkspaceStore } from "@/store/workspace";
 import { en } from "@/i18n/en";
 
@@ -31,6 +33,14 @@ export function AppShell({ challenges, initialChallengeId, initialChallenge }: A
   const openMission = useWorkspaceStore((s) => s.openMission);
 
   const active = challenges.find((c) => c.id === activeChallengeId) ?? null;
+
+  // Today's featured pick is exempt from level-gating everywhere it can be
+  // opened (kept in lockstep with submit_attempt on the server). Computed once
+  // per session from the same algorithm /daily uses.
+  const dailyId = useMemo(
+    () => dailyChallengeId(challenges.map((c) => c.id), utcDayOf(new Date())),
+    [challenges],
+  );
 
   // Restore anonymous progress from localStorage (persist is SSR-safe via
   // skipHydration), then honor a route-provided initial mission.
@@ -113,12 +123,13 @@ export function AppShell({ challenges, initialChallengeId, initialChallenge }: A
             <NotebookView
               meta={active}
               initialChallenge={initialChallenge?.id === active.id ? initialChallenge : null}
+              isDaily={active.id === dailyId}
               onNext={goToNext}
             />
           )}
         </main>
       </div>
-      <XpToast />
+      <XpToast challenges={challenges} />
     </div>
   );
 }

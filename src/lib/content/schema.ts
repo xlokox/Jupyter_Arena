@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { UNLOCK_LEVELS } from "@/lib/game/xp";
 
 /**
  * Content schemas — MASTER_BRIEF.md Section 6. These mirror the Postgres
@@ -52,6 +53,7 @@ export const ChallengeSchema = z.object({
   }),
   estMinutes: z.number().int().min(2).max(20),
   version: z.number().int().min(1),
+  unlockLevelOverride: z.number().int().positive().optional(),
 });
 
 export type Sector = z.infer<typeof SectorSchema>;
@@ -69,6 +71,8 @@ export interface ChallengeMeta {
   icon: string;
   conceptTags: string[];
   estMinutes: number;
+  /** Minimum player level required to attempt this challenge (client display + anon gate). */
+  unlockLevel: number;
 }
 
 export const toMeta = (c: z.infer<typeof ChallengeSchema>): ChallengeMeta => ({
@@ -80,6 +84,7 @@ export const toMeta = (c: z.infer<typeof ChallengeSchema>): ChallengeMeta => ({
   icon: c.icon,
   conceptTags: c.conceptTags,
   estMinutes: c.estMinutes,
+  unlockLevel: c.unlockLevelOverride ?? UNLOCK_LEVELS[c.difficulty] ?? 1,
 });
 export type ChallengeOption = z.infer<typeof ChallengeOptionSchema>;
 export type Challenge = z.infer<typeof ChallengeSchema>;

@@ -1,7 +1,13 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { act, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
 import { en } from "@/i18n/en";
+import { useWorkspaceStore } from "@/store/workspace";
 import { Header } from "./header";
+
+afterEach(() => {
+  // Sound defaults to off; reset in case a test toggled it.
+  useWorkspaceStore.setState({ soundEnabled: false });
+});
 
 describe("Header", () => {
   it("renders the app name", () => {
@@ -35,5 +41,13 @@ describe("Header", () => {
       en.sectors.db,
     ]);
     expect(pills[0]?.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("renders the sound toggle off by default and flips the store on click", () => {
+    render(<Header />);
+    const toggle = screen.getByRole("button", { name: en.sounds.enable });
+    expect(toggle.getAttribute("aria-pressed")).toBe("false");
+    act(() => toggle.click());
+    expect(useWorkspaceStore.getState().soundEnabled).toBe(true);
   });
 });

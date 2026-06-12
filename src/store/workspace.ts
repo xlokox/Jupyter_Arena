@@ -53,6 +53,8 @@ export interface Reward {
   total: number;
   leveledUp: boolean;
   newLevel: number;
+  /** Level before this reward, so the toast can compute newly unlocked content. */
+  prevLevel: number;
 }
 
 interface WorkspaceStore {
@@ -66,6 +68,8 @@ interface WorkspaceStore {
   attempts: Record<string, AttemptState>;
   stats: GameStats;
   lastReward: Reward | null;
+  /** Opt-in audio cues — off by default, persisted, toggled by the user. */
+  soundEnabled: boolean;
 
   openMission: (challengeId: string) => void;
   openTutorial: (challengeId: string) => void;
@@ -87,6 +91,8 @@ interface WorkspaceStore {
   resetProgress: () => void;
   revealHint: (challengeId: string) => void;
   dismissReward: () => void;
+  /** Flip the opt-in sound preference (this click also unlocks the AudioContext). */
+  toggleSound: () => void;
 }
 
 /** Shape of the submit_attempt RPC response the store consumes. */
@@ -142,6 +148,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       attempts: {},
       stats: INITIAL_STATS,
       lastReward: null,
+      soundEnabled: false,
 
       openMission: (challengeId) =>
         set({ activeChallengeId: challengeId, view: "mission", sidebarOpen: false }),
@@ -219,6 +226,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
               total: outcome.events.reduce((sum, e) => sum + e.delta, 0),
               leveledUp: outcome.leveledUp,
               newLevel: levelForXp(outcome.stats.xp),
+              prevLevel: levelForXp(state.stats.xp),
             },
           };
         }),
@@ -272,6 +280,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
                     total: result.xp_delta,
                     leveledUp: result.level > levelForXp(state.stats.xp),
                     newLevel: result.level,
+                    prevLevel: levelForXp(state.stats.xp),
                   },
           };
         }),
@@ -310,11 +319,17 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         }),
 
       dismissReward: () => set({ lastReward: null }),
+
+      toggleSound: () => set((state) => ({ soundEnabled: !state.soundEnabled })),
     }),
     {
       name: "jupyter-arena-progress-v1",
       storage: createJSONStorage(() => localStorage),
-      partialize: (state) => ({ attempts: state.attempts, stats: state.stats }),
+      partialize: (state) => ({
+        attempts: state.attempts,
+        stats: state.stats,
+        soundEnabled: state.soundEnabled,
+      }),
       // SSR-safe: AppShell calls persist.rehydrate() in an effect.
       skipHydration: true,
       merge: (persisted, current) => {
@@ -323,6 +338,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           ...current,
           stats: { ...INITIAL_STATS, ...(incoming.stats ?? {}) },
           attempts: sanitizeAttempts(incoming.attempts ?? {}),
+          soundEnabled: incoming.soundEnabled ?? false,
         };
       },
     },

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Loader2, Lock, RefreshCw } from "lucide-react";
 import type { Challenge, ChallengeMeta } from "@/lib/content/schema";
 import { useChallenge } from "@/lib/content/use-challenge";
 import { Markdown } from "@/components/markdown";
@@ -14,6 +14,7 @@ import { SolvePanel } from "./solve-panel";
 import { useWorkspaceStore, getAttempt, type OptionKey } from "@/store/workspace";
 import { useAuthStore } from "@/store/auth";
 import { submitAttemptServer } from "@/lib/game/server-progress";
+import { levelForXp, XP_PER_LEVEL } from "@/lib/game/xp";
 import { en } from "@/i18n/en";
 
 const RUN_SIMULATION_MS = 700;
@@ -23,15 +24,17 @@ interface NotebookViewProps {
   meta: ChallengeMeta;
   /** Server-rendered permalink pages seed the body for SEO + instant paint. */
   initialChallenge?: Challenge | null;
+  /** Today's featured pick is always playable, regardless of player level. */
+  isDaily?: boolean;
   onNext: () => void;
 }
 
-export function NotebookView({ meta, initialChallenge, onNext }: NotebookViewProps) {
+export function NotebookView({ meta, initialChallenge, isDaily, onNext }: NotebookViewProps) {
   const { challenge, failed } = useChallenge(meta.id, initialChallenge);
   if (!challenge) {
     return <NotebookFallback meta={meta} failed={failed} />;
   }
-  return <LoadedNotebook challenge={challenge} onNext={onNext} />;
+  return <LoadedNotebook challenge={challenge} meta={meta} isDaily={isDaily} onNext={onNext} />;
 }
 
 function NotebookFallback({ meta, failed }: { meta: ChallengeMeta; failed: boolean }) {
@@ -70,7 +73,70 @@ function NotebookFallback({ meta, failed }: { meta: ChallengeMeta; failed: boole
   );
 }
 
-function LoadedNotebook({ challenge, onNext }: { challenge: Challenge; onNext: () => void }) {
+function LockedPanel({ unlockLevel }: { unlockLevel: number }) {
+  const stats = useWorkspaceStore((s) => s.stats);
+  const setSidebarOpen = useWorkspaceStore((s) => s.setSidebarOpen);
+  const xp = stats.xp;
+  const xpNeeded = (unlockLevel - 1) * XP_PER_LEVEL;
+  const xpPercent = Math.min(100, (xp / xpNeeded) * 100);
+
+  return (
+    <section
+      aria-label={en.lock.lockedPanelTitle}
+      className="flex flex-col items-center gap-5 rounded-md border border-border bg-panel p-8 text-center"
+    >
+      <Lock className="size-10 text-muted" aria-hidden />
+      <div>
+        <h2 className="font-mono text-base font-semibold text-text">{en.lock.lockedPanelTitle}</h2>
+        <p className="mt-1 text-sm text-muted">
+          {en.lock.lockedPanelBody.replace("{level}", String(unlockLevel))}
+        </p>
+      </div>
+      <div className="w-full max-w-xs">
+        <div className="mb-1.5 flex justify-between font-mono text-xs text-muted">
+          <span>{xp} XP</span>
+          <span>{xpNeeded} XP</span>
+        </div>
+        <div
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={xpNeeded}
+          aria-valuenow={xp}
+          aria-label={`XP toward Level ${unlockLevel}`}
+          className="h-2 w-full overflow-hidden rounded-full border border-border bg-panel-2"
+        >
+          <div
+            className="h-full rounded-full bg-accent motion-safe:transition-[width] motion-safe:duration-500"
+            style={{ width: `${xpPercent}%` }}
+          />
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={() => setSidebarOpen(true)}
+        className="flex min-h-[44px] items-center gap-2 rounded-md border border-border bg-panel-2 px-4 text-sm text-text transition-colors hover:border-accent-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      >
+        {en.lock.lockedPanelCta}
+      </button>
+    </section>
+  );
+}
+
+function LoadedNotebook({
+  challenge,
+  meta,
+  isDaily,
+  onNext,
+}: {
+  challenge: Challenge;
+  meta: ChallengeMeta;
+  isDaily?: boolean;
+  onNext: () => void;
+}) {
+  const stats = useWorkspaceStore((s) => s.stats);
+  const userLevel = levelForXp(stats.xp);
+  // The daily featured challenge bypasses gating (see app-shell + submit_attempt).
+  const isLocked = meta.unlockLevel > userLevel && !isDaily;
   const attempt = useWorkspaceStore((s) => getAttempt(s.attempts, challenge.id));
   const selectOption = useWorkspaceStore((s) => s.selectOption);
   const startRun = useWorkspaceStore((s) => s.startRun);
@@ -156,6 +222,7 @@ function LoadedNotebook({ challenge, onNext }: { challenge: Challenge; onNext: (
         language={challenge.language}
         bugRegion={bugRegion}
         title={challenge.title}
+        justSolved={attempt.runState === "solved"}
       />
 
       <OutputCell challenge={challenge} attempt={attempt} />
@@ -169,16 +236,21 @@ function LoadedNotebook({ challenge, onNext }: { challenge: Challenge; onNext: (
         </p>
       )}
 
-      <ControlCell
-        challenge={challenge}
-        attempt={attempt}
-        onSelect={handleSelect}
-        onRun={handleRun}
-        onHint={() => revealHint(challenge.id)}
-        onNext={onNext}
-      />
-
-      {attempt.solved && <SolvePanel challenge={challenge} />}
+      {isLocked ? (
+        <LockedPanel unlockLevel={meta.unlockLevel} />
+      ) : (
+        <>
+          <ControlCell
+            challenge={challenge}
+            attempt={attempt}
+            onSelect={handleSelect}
+            onRun={handleRun}
+            onHint={() => revealHint(challenge.id)}
+            onNext={onNext}
+          />
+          {attempt.solved && <SolvePanel challenge={challenge} />}
+        </>
+      )}
     </div>
   );
 }

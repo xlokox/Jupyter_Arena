@@ -106,3 +106,135 @@ code {
     box-shadow: 0 0 24px 4px color-mix(in srgb, var(--accent) 45%, transparent);
   }
 }
+
+/*
+ * Phase 5.6 game-feel keyframes. Transform/opacity/box-shadow only, tokens
+ * only — all consumed via motion-safe: so reduced-motion users get the
+ * end state instantly (no movement, no flash).
+ */
+
+/* The patched code block flashes a green glow to confirm the fix landed.
+   Box-shadow only (never a background tint) so syntax-text contrast is untouched. */
+@keyframes line-patch {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+  40% {
+    box-shadow: 0 0 16px 1px color-mix(in srgb, var(--success) 35%, transparent);
+  }
+}
+
+/* The green success output slides into place after a correct run.
+   Transform-only (no opacity fade) so the output text contrast holds mid-animation. */
+@keyframes output-reveal {
+  from {
+    transform: translateY(-6px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* A reward number / counter pops in. */
+@keyframes xp-pop {
+  0% {
+    transform: scale(0.6);
+  }
+  60% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* "+N XP" drifts up from the run button and fades — the number "flies". */
+@keyframes xp-float {
+  0% {
+    opacity: 0;
+    transform: translateY(0) scale(0.9);
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-34px) scale(1.05);
+  }
+}
+
+/* The "Flawless" chip scales in on a clean first-try solve.
+   Transform-only (no opacity fade) so the chip text contrast holds mid-animation. */
+@keyframes chip-pop {
+  0% {
+    transform: scale(0.7);
+  }
+  60% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Correct option card — a contained green pulse (the success twin of level-pulse). */
+@keyframes success-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+  50% {
+    box-shadow: 0 0 20px 2px color-mix(in srgb, var(--success) 40%, transparent);
+  }
+}
+
+/* Check / X icon pops into the radio circle on a completed run. */
+@keyframes icon-pop {
+  0% {
+    transform: scale(0);
+  }
+  70% {
+    transform: scale(1.25);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Toast event rows cascade in (staggered via inline animation-delay + backwards fill).
+   Transform-only (no opacity fade) so text contrast holds at every frame — axe-safe. */
+@keyframes event-cascade {
+  from {
+    transform: translateX(-6px);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* Level-up sparkle spins once on the celebratory beat. */
+@keyframes sparkle-spin {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(180deg) scale(1.3);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+/* Streak flame flickers gently while a streak is live. */
+@keyframes flame-flicker {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 0.85;
+  }
+}

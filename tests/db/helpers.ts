@@ -109,6 +109,32 @@ export async function submit(
   return data as SubmitResult;
 }
 
+/** Today's deterministic daily pick, as the server computes it. */
+export async function dailyChallengeIdServer(): Promise<string | null> {
+  const { data, error } = await admin.rpc("daily_challenge_id");
+  if (error) throw new Error(error.message);
+  return data as string | null;
+}
+
+/**
+ * A published challenge of the given difficulty, excluding today's daily pick
+ * (which is exempt from gating, so it can't be used to prove gating works).
+ */
+export async function lockedChallengeOfDifficulty(
+  difficulty: "medium" | "hard" | "very_hard",
+  excludeId?: string | null,
+): Promise<string> {
+  let query = admin
+    .from("challenges")
+    .select("id")
+    .eq("is_published", true)
+    .eq("difficulty", difficulty);
+  if (excludeId) query = query.neq("id", excludeId);
+  const { data, error } = await query.order("id").limit(1).single();
+  if (error) throw new Error(error.message);
+  return (data as { id: string }).id;
+}
+
 /** Known seed content: ml-001 has correct option "a"; "b"/"c" are wrong. */
 export const ML_001 = "ml-001-kmeans-scaling";
 export const ML_002 = "ml-002-test-set-leakage";
