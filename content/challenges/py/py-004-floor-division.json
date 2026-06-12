@@ -58,5 +58,17 @@
     ]
   },
   "estMinutes": 4,
-  "version": 1
+  "version": 1,
+  "conceptCard": "This mission is about **division** — and Python has two kinds.\n\n- `/` is true division and keeps the decimal: `7 / 2` is `3.5`.\n- `//` is floor division and drops the remainder: `7 // 2` is `3`.\n\nThe code splits a $7 bill between 2 people and should give `3.5`, but it uses the wrong slash. Pick the division that keeps the half.",
+  "lineNotes": [
+    {
+      "line": 4,
+      "noteMd": "Divides the bill by the number of people. It uses `//`, which is *floor* division — it rounds down and throws away the `.5`. That's the bug."
+    },
+    {
+      "line": 5,
+      "noteMd": "Prints each person's share — whatever line 4 worked out."
+    }
+  ],
+  "takeaway": "Use / for an exact answer; // rounds down and discards the remainder."
 }

@@ -58,5 +58,17 @@
     ]
   },
   "estMinutes": 4,
-  "version": 1
+  "version": 1,
+  "conceptCard": "This mission is about **dictionaries**.\n\n- A dictionary stores `key → value` pairs in curly braces: `{\"name\": \"Ada\"}`.\n- You fetch a value by its key in square brackets: `user[\"name\"]`.\n- Keys match **exactly**, capital letters included — `\"Name\"` ≠ `\"name\"`.\n\nThe code asks for a key that doesn't quite match the one stored. Use the exact key.",
+  "lineNotes": [
+    {
+      "line": 2,
+      "noteMd": "Creates a **dictionary** with two keys, `\"name\"` and `\"age\"` (both lowercase), each pointing to a value."
+    },
+    {
+      "line": 3,
+      "noteMd": "Looks up `\"Name\"` with a capital N — but the stored key is lowercase `\"name\"`, so there's no match. Keys are case-sensitive."
+    }
+  ],
+  "takeaway": "Dictionary keys must match exactly, capitalization included — use the precise key."
 }

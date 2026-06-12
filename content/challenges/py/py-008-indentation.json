@@ -58,5 +58,17 @@
     ]
   },
   "estMinutes": 4,
-  "version": 1
+  "version": 1,
+  "conceptCard": "This mission is about **indentation** — how Python groups code.\n\n- Python uses **spacing**, not braces, to know which lines belong inside an `if`, loop, or function.\n- The header line ends with a colon `:`, and the lines inside it are **indented** (4 spaces).\n\nThe code has an `if` whose body isn't indented. Set it in so Python sees it as the block to run.",
+  "lineNotes": [
+    {
+      "line": 3,
+      "noteMd": "An `if` checks a condition and ends with a colon `:`. The line(s) to run when it's true must be **indented** underneath it."
+    },
+    {
+      "line": 4,
+      "noteMd": "This should be the body of the `if`, but it's flush against the left edge — not indented. That's why Python complains."
+    }
+  ],
+  "takeaway": "Indent the body of an if/loop/function under its colon header; spacing is structure in Python."
 }

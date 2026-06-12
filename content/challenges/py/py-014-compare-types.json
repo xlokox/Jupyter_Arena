@@ -58,5 +58,17 @@
     ]
   },
   "estMinutes": 5,
-  "version": 1
+  "version": 1,
+  "conceptCard": "This mission is about **comparing values**.\n\n- Comparisons (`>`, `<`, `==`, …) give back True or False.\n- They only work between the **same kind** of value — number vs number, or text vs text.\n- Quotes make something text: `50` is a number, `\"50\"` is text.\n\nThe code compares a number against text and fails. Compare numbers with numbers.",
+  "lineNotes": [
+    {
+      "line": 2,
+      "noteMd": "`score` is the **number** 72 (no quotes)."
+    },
+    {
+      "line": 3,
+      "noteMd": "Compares the number `score` with `\"50\"` — which is **text** because of the quotes. Python can't order a number against text. Drop the quotes to make 50 a number."
+    }
+  ],
+  "takeaway": "Compare numbers with numbers — quotes turn 50 into text, which can't be compared to a number."
 }

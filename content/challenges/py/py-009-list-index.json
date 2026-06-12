@@ -58,5 +58,17 @@
     ]
   },
   "estMinutes": 4,
-  "version": 1
+  "version": 1,
+  "conceptCard": "This mission is about **lists** and **indexing**.\n\n- A list holds items in order, in square brackets: `[\"a\", \"b\", \"c\"]`.\n- You reach an item by its position — and positions start at **0**, not 1.\n- So a 3-item list has positions 0, 1, 2; `[-1]` always means the last item.\n\nThe code asks for a position that doesn't exist. Pick the right index for the last fruit.",
+  "lineNotes": [
+    {
+      "line": 2,
+      "noteMd": "Creates a **list** of three fruits. Their positions are 0 (`apple`), 1 (`banana`), and 2 (`cherry`)."
+    },
+    {
+      "line": 3,
+      "noteMd": "Asks for `fruits[3]` — but the highest position is 2, so 3 is out of range. The last item is at index 2 (or `-1`)."
+    }
+  ],
+  "takeaway": "List positions start at 0, so the last of N items is index N-1 — or just use [-1]."
 }

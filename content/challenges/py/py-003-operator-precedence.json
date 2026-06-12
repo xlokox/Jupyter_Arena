@@ -58,5 +58,17 @@
     ]
   },
   "estMinutes": 3,
-  "version": 1
+  "version": 1,
+  "conceptCard": "This mission is about the **order of operations** — the order Python does maths in.\n\n- Just like school maths: `×` and `÷` happen **before** `+` and `−`.\n- **Parentheses** `( )` always go first, so you can group any part you want.\n\nThe code expects `(2 + 3) × 4 = 20` but writes it without parentheses. Work out what Python actually computes, then fix the grouping.",
+  "lineNotes": [
+    {
+      "line": 2,
+      "noteMd": "The calculation. Python does `3 * 4` **first** (multiplication before addition), then adds 2 — so this is `2 + 12`, not `(2 + 3) * 4`."
+    },
+    {
+      "line": 3,
+      "noteMd": "Prints the result with a label. The number that appears here is whatever line 2 calculated."
+    }
+  ],
+  "takeaway": "Python does × and ÷ before + and −; wrap a part in parentheses to make it happen first."
 }

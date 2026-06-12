@@ -58,5 +58,21 @@
     ]
   },
   "estMinutes": 3,
-  "version": 1
+  "version": 1,
+  "conceptCard": "This mission is about **variables** — names that hold values.\n\n- You create a variable with `=`, e.g. `price = 12`.\n- You can combine them: `total = price_one + price_two`.\n- Every time you use a variable, spell it **exactly** the same — Python won't guess at typos, and capital letters matter.\n\nThe code adds two prices but prints a name that doesn't quite match. Find the mismatch.",
+  "lineNotes": [
+    {
+      "line": 2,
+      "noteMd": "Creates a **variable** called `price_one` and stores the number `12` in it. `=` means \"store the value on the right under the name on the left\"."
+    },
+    {
+      "line": 4,
+      "noteMd": "Adds the two prices and stores the result in a new variable named `total`."
+    },
+    {
+      "line": 5,
+      "noteMd": "Tries to print `totl` — but no variable by that name was ever created. Compare it carefully with the name on line 4."
+    }
+  ],
+  "takeaway": "A variable must be spelled exactly the same everywhere it's used, capital letters included."
 }

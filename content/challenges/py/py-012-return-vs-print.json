@@ -58,5 +58,17 @@
     ]
   },
   "estMinutes": 5,
-  "version": 1
+  "version": 1,
+  "conceptCard": "This mission is about **functions** and how they give answers back.\n\n- A function (`def`) packages reusable work you can call by name.\n- `print` *shows* a value on screen; `return` *hands it back* to the caller.\n- A function with no `return` gives back `None`.\n\nThe code's function prints its answer but never returns it, so the caller gets `None`. Return the value.",
+  "lineNotes": [
+    {
+      "line": 3,
+      "noteMd": "Inside the function: it `print`s the sum. But printing only displays it — it doesn't send the value back to whoever called the function."
+    },
+    {
+      "line": 5,
+      "noteMd": "Calls `add(3, 4)` and stores the result in `result`. Because the function only printed (never returned), `result` ends up as `None`."
+    }
+  ],
+  "takeaway": "print shows a value; return hands it back so the caller can store or reuse it."
 }

@@ -58,5 +58,21 @@
     ]
   },
   "estMinutes": 5,
-  "version": 1
+  "version": 1,
+  "conceptCard": "This mission is about the **accumulator pattern** — building up a result in a loop.\n\n- Start a collecting variable (like a running total) at 0 **once, before** the loop.\n- Add to it **inside** the loop, one item at a time.\n- Use it **after** the loop.\n\nThe code resets the total inside the loop, so it never builds up. Move the start outside.",
+  "lineNotes": [
+    {
+      "line": 3,
+      "noteMd": "Loops over each number in the list, one per pass."
+    },
+    {
+      "line": 4,
+      "noteMd": "Resets `total` to 0 — but this is **inside** the loop, so it wipes the running sum at the start of every pass. This line belongs *before* the loop."
+    },
+    {
+      "line": 5,
+      "noteMd": "Adds the current number to `total`. This is correct; it's the reset above it that breaks the running total."
+    }
+  ],
+  "takeaway": "Initialize an accumulator once before the loop, then add to it inside — never reset it each pass."
 }

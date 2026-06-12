@@ -58,5 +58,17 @@
     ]
   },
   "estMinutes": 5,
-  "version": 1
+  "version": 1,
+  "conceptCard": "This mission is about **while loops**.\n\n- A `while` loop repeats its body **as long as a condition is true**.\n- *You* are responsible for eventually making the condition false — usually by changing a counter inside the loop.\n- If nothing changes, it runs forever (an infinite loop).\n\nThe code counts down but never changes the counter. Make it move toward the exit.",
+  "lineNotes": [
+    {
+      "line": 3,
+      "noteMd": "The loop keeps running while `count > 0` is true. Something inside must eventually make this false, or it never stops."
+    },
+    {
+      "line": 4,
+      "noteMd": "Prints `count` every pass — but nothing here changes `count`, so it stays 3 forever. You need to decrease it each time and store the new value."
+    }
+  ],
+  "takeaway": "A while loop's body must make progress toward its condition becoming false, or it never ends."
 }

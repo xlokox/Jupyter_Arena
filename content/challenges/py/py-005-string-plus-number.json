@@ -58,5 +58,17 @@
     ]
   },
   "estMinutes": 4,
-  "version": 1
+  "version": 1,
+  "conceptCard": "This mission is about mixing **text and numbers**.\n\n- Text is a `str` (in quotes); a whole number is an `int` (no quotes).\n- `+` joins two strings or adds two numbers — but it can't mix them.\n- An **f-string** puts a value inside text: `f\"Age: {age}\"`.\n\nThe code tries to glue a number onto text with `+` and fails. Use an f-string instead.",
+  "lineNotes": [
+    {
+      "line": 2,
+      "noteMd": "Stores the **number** `25` (no quotes, so it's an `int`) in `age`."
+    },
+    {
+      "line": 3,
+      "noteMd": "Tries to join text and a number with `+`. Python won't mix a `str` and an `int` — this is where it fails. An f-string fixes it."
+    }
+  ],
+  "takeaway": "Text and numbers don't add with +; use an f-string like f\"... {value}\" to combine them."
 }

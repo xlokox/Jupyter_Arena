@@ -58,5 +58,21 @@
     ]
   },
   "estMinutes": 4,
-  "version": 1
+  "version": 1,
+  "conceptCard": "This mission is about two look-alike symbols, `=` and `==`.\n\n- A single `=` **stores** a value in a variable: `score = 100`.\n- A double `==` **compares** two values and gives back True or False.\n- An `if` needs a comparison, so it uses `==`.\n\nThe code uses the wrong one inside an `if`. Swap it for the comparison.",
+  "lineNotes": [
+    {
+      "line": 2,
+      "noteMd": "A single `=` **stores** the value 100 in `score`. This line is correct."
+    },
+    {
+      "line": 3,
+      "noteMd": "Inside an `if` you must **compare**, not store. `=` is assignment — you need `==` to ask \"is score equal to 100?\". This is the bug."
+    },
+    {
+      "line": 4,
+      "noteMd": "Indented under the `if`, so it only runs when the condition above is true."
+    }
+  ],
+  "takeaway": "One equals (=) stores a value; two equals (==) compares — an if needs ==."
 }

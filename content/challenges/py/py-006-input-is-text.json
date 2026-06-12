@@ -58,5 +58,17 @@
     ]
   },
   "estMinutes": 4,
-  "version": 1
+  "version": 1,
+  "conceptCard": "This mission is about reading **input** from a person.\n\n- `input(...)` always hands back **text**, even when the user types digits.\n- Text behaves differently from numbers: `\"5\" * 2` is `\"55\"`, not `10`.\n- Convert text to a number with `int(...)` before doing maths.\n\nThe code doubles what the user types but forgets to convert it. Fix the conversion.",
+  "lineNotes": [
+    {
+      "line": 2,
+      "noteMd": "`input(...)` shows the prompt and returns whatever the user types — **as text**. So `number` holds `\"5\"`, not the number 5."
+    },
+    {
+      "line": 3,
+      "noteMd": "Multiplies that text by 2. Multiplying text *repeats* it, so `\"5\" * 2` is `\"55\"` — the bug. Convert with `int()` first."
+    }
+  ],
+  "takeaway": "input() always returns text — wrap it in int() before doing any maths."
 }

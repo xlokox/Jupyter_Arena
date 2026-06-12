@@ -58,5 +58,17 @@
     ]
   },
   "estMinutes": 4,
-  "version": 1
+  "version": 1,
+  "conceptCard": "This mission is about **loops** and `range()`.\n\n- A `for` loop repeats its body for each value it's given.\n- `range(start, stop)` makes numbers from `start` up to **but not including** `stop`.\n- So `range(1, 5)` is 1, 2, 3, 4 — the stop value is left out.\n\nThe code is meant to count 1 through 5 but stops early. Adjust the range to include 5.",
+  "lineNotes": [
+    {
+      "line": 2,
+      "noteMd": "`range(1, 5)` produces 1, 2, 3, 4 — it stops **before** 5. To reach 5, the stop value needs to be one higher."
+    },
+    {
+      "line": 3,
+      "noteMd": "Indented under the `for`, so it runs once for each number the loop produces."
+    }
+  ],
+  "takeaway": "range(a, b) stops just before b — to count through b, set the stop to b + 1."
 }
