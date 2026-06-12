@@ -1,0 +1,62 @@
+{
+  "id": "da-008-order-by-limit",
+  "sector": "da",
+  "difficulty": "easy",
+  "title": "08_top_five_customers.sql",
+  "language": "sql",
+  "icon": "list-todo",
+  "conceptTags": ["order-by", "limit", "ranking"],
+  "descriptionMd": "## Mission: Top 5 Customers by Spend\n\nThe sales lead asked for the five biggest-spending customers to send a thank-you gift. You wrote a query to pull `name` and `total_spent` — but it returns every customer, and not in any useful order, so you can't tell who the top five are.\n\nA `SELECT` returns rows in no guaranteed order unless you ask for one, and it returns *all* matching rows unless you cap the count. Add the ordering and the cap so the query hands back exactly the top five spenders.",
+  "initialCode": "-- Top 5 customers by total spend\nSELECT name, total_spent\nFROM customers;",
+  "buggyLineStart": 2,
+  "buggyLineEnd": 3,
+  "traceback": "name | total_spent\n-----+------------\nAva  |        4200\nBen  |        1500\nCara |        9800\nDan  |         300\nEve  |        6100\nFinn |        8700\nGia  |        2200\nHugo |        5400\n(8 rows)\n\n-- All customers, unordered: the top five are impossible to read off.",
+  "correctOutput": "name | total_spent\n-----+------------\nCara |        9800\nFinn |        8700\nEve  |        6100\nHugo |        5400\nAva  |        4200\n(5 rows)",
+  "options": [
+    {
+      "key": "a",
+      "label": "Order by total_spent descending, then keep the first 5",
+      "patchCode": "-- Top 5 customers by total spend\nSELECT name, total_spent\nFROM customers\nORDER BY total_spent DESC\nLIMIT 5;",
+      "isCorrect": true,
+      "resultLog": "name | total_spent\n-----+------------\nCara |        9800\nFinn |        8700\nEve  |        6100\nHugo |        5400\nAva  |        4200\n(5 rows)",
+      "rationale": "`ORDER BY total_spent DESC` sorts the rows from highest spend to lowest, and `LIMIT 5` then keeps only the first five. Together they answer 'top 5'. Both clauses are needed: without `ORDER BY` the database returns rows in whatever order is convenient, and without `LIMIT` you get everyone."
+    },
+    {
+      "key": "b",
+      "label": "Just LIMIT the result to 5 rows",
+      "patchCode": "-- Top 5 customers by total spend\nSELECT name, total_spent\nFROM customers\nLIMIT 5;",
+      "isCorrect": false,
+      "resultLog": "name | total_spent\n-----+------------\nAva  |        4200\nBen  |        1500\nCara |        9800\nDan  |         300\nEve  |        6100\n(5 rows)",
+      "rationale": "`LIMIT 5` caps the count, but with no `ORDER BY` the database is free to return *whichever* five rows it reaches first — here just the first five in storage order. Ben (1500) and Dan (300) are nowhere near the top spenders. You must sort before you limit."
+    },
+    {
+      "key": "c",
+      "label": "Order by total_spent and take 5",
+      "patchCode": "-- Top 5 customers by total spend\nSELECT name, total_spent\nFROM customers\nORDER BY total_spent\nLIMIT 5;",
+      "isCorrect": false,
+      "resultLog": "name | total_spent\n-----+------------\nDan  |         300\nBen  |        1500\nGia  |        2200\nAva  |        4200\nHugo |        5400\n(5 rows)",
+      "rationale": "`ORDER BY` defaults to ascending, so this returns the five *lowest* spenders — the exact opposite of what you want. Add `DESC` to sort from highest to lowest before applying `LIMIT 5`."
+    }
+  ],
+  "hints": [
+    "A plain SELECT makes no promise about row order, and it returns every matching row. To answer 'top 5' you need to control both: how the rows are sorted, and how many you keep.",
+    "`ORDER BY column DESC` sorts largest-first; `LIMIT 5` keeps the first five. You need both, in that order."
+  ],
+  "explanationMd": "### Why the bug occurs\nSQL is set-based: a `SELECT` with no `ORDER BY` returns the matching rows in an order the database finds convenient, which you must never rely on. And with no `LIMIT`, it returns *all* of them. So 'top 5 by spend' written as a bare `SELECT name, total_spent FROM customers` gives you every customer in an arbitrary order — there's no top, and no five.\n\n### Why the fix is correct\n`ORDER BY total_spent DESC` imposes a definite order, highest spend first. `LIMIT 5` then slices off the first five rows of that ordered result. The clauses run in a fixed sequence — filter, group, **order, then limit** — so the limit always applies to already-sorted rows. Drop the `DESC` and you'd get the bottom five; drop the `ORDER BY` and `LIMIT` just grabs an arbitrary handful.",
+  "recruiterReview": "Clean — you recognized that 'top N' is always two ideas in SQL: an explicit sort and a cap. Relying on natural row order is a classic source of bugs that only surface once the data grows or the storage changes, so making the `ORDER BY` explicit is the professional habit. When ties matter (two customers at the same spend), add a tiebreaker column to `ORDER BY` for deterministic results, and remember `LIMIT ... OFFSET` for pagination. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Sorting and Limiting Query Results\n\n'Top 10 products', 'most recent 20 orders', 'five biggest accounts' — ranking questions are everywhere, and SQL answers them with two small clauses.\n\n### Rows have no order unless you ask\nThis surprises everyone at first: a `SELECT` does **not** guarantee any particular row order. The database returns matching rows in whatever order is fastest for it, which can change over time. If order matters, you must say so with `ORDER BY`.\n\n### ORDER BY\n```sql\nORDER BY total_spent DESC   -- highest first\nORDER BY name ASC           -- A→Z (ASC is the default)\n```\n- `DESC` = descending (largest/latest first), `ASC` = ascending (smallest/earliest first, the default).\n- You can sort by several columns: `ORDER BY region ASC, total_spent DESC`.\n\n### LIMIT\n`LIMIT n` keeps only the first `n` rows of the result. Crucially, it applies *after* `ORDER BY`, so `ORDER BY ... DESC LIMIT 5` means 'the five largest'.\n\n### A tiny worked example\nGiven spends `Ava 4200, Cara 9800, Dan 300`:\n```sql\nSELECT name FROM customers ORDER BY total_spent DESC LIMIT 2;\n-- Cara, Ava\n```\nCara (9800) and Ava (4200) are the top two; Dan is dropped.\n\n### The order of clauses\nSQL evaluates clauses in a set sequence: `FROM` → `WHERE` → `GROUP BY` → `HAVING` → `SELECT` → `ORDER BY` → `LIMIT`. That's why the limit always lands on sorted rows.\n\n### How to spot it\nIf 'top N' results look random or include obviously small values, you almost certainly limited without ordering — or ordered ascending when you meant descending.\n\n### Common beginner mistakes\n- Using `LIMIT` with no `ORDER BY` and trusting the order.\n- Forgetting `DESC`, so you get the bottom N instead of the top N.\n- Assuming insertion order is preserved (it isn't, in general).\n- Sorting by the wrong column (e.g. `name` instead of `total_spent`).\n\nYou'll hit this the first time someone asks for the 'top' anything.",
+    "videos": [
+      {
+        "title": "SQL ORDER BY and LIMIT explained",
+        "searchQuery": "sql order by desc limit top n rows tutorial"
+      },
+      {
+        "title": "Logical order of SQL clauses",
+        "searchQuery": "sql order of execution from where group by having select order by limit"
+      }
+    ]
+  },
+  "estMinutes": 4,
+  "version": 1
+}

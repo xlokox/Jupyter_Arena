@@ -1,0 +1,62 @@
+{
+  "id": "da-013-group-by-rule",
+  "sector": "da",
+  "difficulty": "medium",
+  "title": "13_revenue_per_category.sql",
+  "language": "sql",
+  "icon": "layers",
+  "conceptTags": ["group-by", "aggregation", "sql-rules"],
+  "descriptionMd": "## Mission: Revenue per Category\n\nYou need total revenue for each product category. You wrote a `GROUP BY category` with `SUM(amount)` — but also selected `region`, and the database rejects the query with an error about `region` needing to be in the `GROUP BY` clause or an aggregate.\n\nWhen you group rows, every selected column must either be one you grouped by or be wrapped in an aggregate — otherwise the database can't decide which value to show per group. Since the report is per *category*, decide what to do with `region` and fix the query.",
+  "initialCode": "-- Total revenue per product category\nSELECT category, region, SUM(amount) AS revenue\nFROM sales\nGROUP BY category;",
+  "buggyLineStart": 2,
+  "buggyLineEnd": 2,
+  "traceback": "ERROR:  column \"sales.region\" must appear in the GROUP BY clause or be used in an aggregate function\nLINE 2: SELECT category, region, SUM(amount) AS revenue\n                         ^",
+  "correctOutput": "category | revenue\n---------+--------\nBooks    |    5400\nGames    |    8900\nToys     |    3200\n(3 rows)",
+  "options": [
+    {
+      "key": "a",
+      "label": "Drop region — the report is per category",
+      "patchCode": "-- Total revenue per product category\nSELECT category, SUM(amount) AS revenue\nFROM sales\nGROUP BY category;",
+      "isCorrect": true,
+      "resultLog": "category | revenue\n---------+--------\nBooks    |    5400\nGames    |    8900\nToys     |    3200\n(3 rows)",
+      "rationale": "Grouping by `category` collapses many rows (with different regions) into one row per category, so there is no single `region` to show — that's exactly what the error meant. The mission is revenue *per category*, so `region` doesn't belong in the result. Removing it leaves a clean, correct one-row-per-category report."
+    },
+    {
+      "key": "b",
+      "label": "Add region to the GROUP BY",
+      "patchCode": "-- Total revenue per product category\nSELECT category, region, SUM(amount) AS revenue\nFROM sales\nGROUP BY category, region;",
+      "isCorrect": false,
+      "resultLog": "category | region | revenue\n---------+--------+--------\nBooks    | East   |    3000\nBooks    | West   |    2400\nGames    | East   |    8900\nToys     | West   |    3200\n(4 rows)",
+      "rationale": "Adding `region` to the `GROUP BY` removes the error, but it changes the question: now each row is one category-and-region combination, so Books is split into East and West and no longer shows its total of 5400. That's revenue per category *and region*, not per category."
+    },
+    {
+      "key": "c",
+      "label": "Wrap region in MAX() to satisfy the rule",
+      "patchCode": "-- Total revenue per product category\nSELECT category, MAX(region) AS region, SUM(amount) AS revenue\nFROM sales\nGROUP BY category;",
+      "isCorrect": false,
+      "resultLog": "category | region | revenue\n---------+--------+--------\nBooks    | West   |    5400\nGames    | East   |    8900\nToys     | West   |    3200\n(3 rows)",
+      "rationale": "`MAX(region)` makes the query run, but the region it prints is meaningless — it's just the alphabetically-last region that happened to appear in each category, presented as if it were *the* region. That's misleading. If you don't actually need region in a per-category report, drop it rather than papering over the rule with an arbitrary aggregate."
+    }
+  ],
+  "hints": [
+    "When you GROUP BY category, all the rows for 'Books' (which may span several regions) become one row. So which single region should that one row show? The database can't guess — that's the error.",
+    "Every non-aggregated column in the SELECT must be in the GROUP BY. Since the report is per category, the simplest fix is to not select `region` at all."
+  ],
+  "explanationMd": "### Why the bug occurs\n`GROUP BY category` tells the database to fold all rows sharing a category into a single output row. An aggregate like `SUM(amount)` knows how to combine many values into one. But `region` is a plain column with potentially many different values inside one category, and the database has no rule for which one to display — so it refuses, with `column \"sales.region\" must appear in the GROUP BY clause or be used in an aggregate function`.\n\n### Why the fix is correct\nThe SQL rule is simple: in a grouped query, every column in the `SELECT` must either appear in the `GROUP BY` or be inside an aggregate function. Because the mission is revenue *per category*, `region` has no place in the output, so the cleanest fix is to remove it — leaving `category` (grouped) and `SUM(amount)` (aggregated), both of which are well-defined per group. Adding `region` to the `GROUP BY` would answer a different question; wrapping it in `MAX()` would print an arbitrary, misleading value.",
+  "recruiterReview": "Good — you understood *why* the rule exists rather than just silencing the error. Grouping collapses rows, so a bare non-grouped column is genuinely ambiguous, and the right move was to drop the column that didn't belong in a per-category report. Resisting the `MAX(region)` shortcut (which would have shipped a meaningless value) shows good judgment. Worth knowing: some databases (older MySQL) let this slide and return an arbitrary value, which is exactly the silent-wrong behavior PostgreSQL protects you from. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## The GROUP BY Rule\n\nGrouping is how SQL answers 'per category / per region / per day' questions, and it comes with one rule that trips up nearly every beginner.\n\n### What GROUP BY does\n`GROUP BY category` folds all rows that share a category into a **single** output row. To produce one value per group from many input rows, you use an **aggregate function**: `SUM`, `COUNT`, `AVG`, `MIN`, `MAX`.\n\n### The rule\n> Every column in the `SELECT` must either be in the `GROUP BY` **or** wrapped in an aggregate.\n\nThe reason is intuitive once you see it: after grouping, a column you didn't group by may hold many different values inside one group, and SQL won't pick one for you.\n```sql\nSELECT category, region, SUM(amount)  -- region is neither grouped nor aggregated → ERROR\nFROM sales\nGROUP BY category;\n```\n\n### Three ways to comply\n1. **Group by it too** — `GROUP BY category, region`. Now each row is one category+region; that's a *finer* report.\n2. **Aggregate it** — `MAX(region)`, `COUNT(DISTINCT region)`. Only meaningful if that statistic answers your question.\n3. **Drop it** — if it doesn't belong in a per-category report, remove it from the `SELECT`. Often the right call.\n\n### A tiny worked example\n```sql\nSELECT category, SUM(amount) AS revenue\nFROM sales\nGROUP BY category;\n-- Books 5400, Games 8900, Toys 3200\n```\nOne clean row per category.\n\n### A warning about lenient databases\nOlder MySQL configurations let you select a non-grouped column and silently return an *arbitrary* value for it. That 'works' but is misleading — PostgreSQL's error is protecting you from shipping a meaningless number.\n\n### How to spot it\nThe error `must appear in the GROUP BY clause or be used in an aggregate function` always means a selected column is neither grouped nor aggregated.\n\n### Common beginner mistakes\n- Selecting extra columns that aren't grouped or aggregated.\n- Adding a column to `GROUP BY` to silence the error, accidentally changing the granularity.\n- Wrapping a column in `MAX()`/`MIN()` to comply, then trusting the meaningless result.\n- Forgetting that `GROUP BY` happens before `SELECT` aliases exist.\n\nYou'll hit this the first time you write a 'total per category' query.",
+    "videos": [
+      {
+        "title": "SQL GROUP BY and aggregate functions explained",
+        "searchQuery": "sql group by aggregate functions sum count rule tutorial"
+      },
+      {
+        "title": "Why must a column be in GROUP BY?",
+        "searchQuery": "sql column must appear in group by clause error explained"
+      }
+    ]
+  },
+  "estMinutes": 6,
+  "version": 1
+}

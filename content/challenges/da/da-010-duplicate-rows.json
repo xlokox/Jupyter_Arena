@@ -1,0 +1,62 @@
+{
+  "id": "da-010-duplicate-rows",
+  "sector": "da",
+  "difficulty": "medium",
+  "title": "10_clean_duplicate_orders.ipynb",
+  "language": "python",
+  "icon": "shuffle",
+  "conceptTags": ["duplicates", "drop-duplicates", "nunique"],
+  "descriptionMd": "## Mission: Report Without Double-Counting\n\nYou're reporting how many distinct customers ordered and the month's total revenue. The export was stitched together from two systems, so some orders appear **twice** as exact duplicate rows.\n\nYour numbers look too high: the distinct-customer count equals the row count, and revenue is inflated by the repeats. Remove the duplicate rows before summing, and count *distinct* customers rather than rows, so the report tells the truth.",
+  "initialCode": "import pandas as pd\n\norders = pd.read_csv(\"orders.csv\")\nprint(\"rows loaded:\", len(orders))\n\n# Distinct customers and the month's revenue\ndistinct_customers = orders[\"customer_id\"].count()\nrevenue = orders[\"amount\"].sum()\nprint(\"distinct customers:\", distinct_customers)\nprint(\"total revenue:\", revenue)",
+  "buggyLineStart": 6,
+  "buggyLineEnd": 7,
+  "traceback": "rows loaded: 12\ndistinct customers: 12\ntotal revenue: 3960.0\n\n# 12 rows include 4 exact duplicates; both numbers are inflated.",
+  "correctOutput": "rows loaded: 12\ndistinct customers: 5\ntotal revenue: 2740.0",
+  "options": [
+    {
+      "key": "a",
+      "label": "Drop duplicate rows, then count distinct customers with nunique()",
+      "patchCode": "import pandas as pd\n\norders = pd.read_csv(\"orders.csv\")\nprint(\"rows loaded:\", len(orders))\norders = orders.drop_duplicates()\n\n# Distinct customers and the month's revenue\ndistinct_customers = orders[\"customer_id\"].nunique()\nrevenue = orders[\"amount\"].sum()\nprint(\"distinct customers:\", distinct_customers)\nprint(\"total revenue:\", revenue)",
+      "isCorrect": true,
+      "resultLog": "rows loaded: 12\ndistinct customers: 5\ntotal revenue: 2740.0",
+      "rationale": "`drop_duplicates()` removes the fully-repeated rows so each real order is counted once, fixing the inflated revenue. `nunique()` then counts how many *distinct* customer ids remain, instead of `count()`, which just counts non-missing rows. Together they answer 'how many distinct customers' and 'what is the true revenue'."
+    },
+    {
+      "key": "b",
+      "label": "Use nunique() for customers but leave revenue as-is",
+      "patchCode": "import pandas as pd\n\norders = pd.read_csv(\"orders.csv\")\nprint(\"rows loaded:\", len(orders))\n\n# Distinct customers and the month's revenue\ndistinct_customers = orders[\"customer_id\"].nunique()\nrevenue = orders[\"amount\"].sum()\nprint(\"distinct customers:\", distinct_customers)\nprint(\"total revenue:\", revenue)",
+      "isCorrect": false,
+      "resultLog": "rows loaded: 12\ndistinct customers: 5\ntotal revenue: 3960.0",
+      "rationale": "`nunique()` fixes the customer count (5 distinct ids), but the revenue still sums all 12 rows — including the 4 duplicates — so it stays inflated at 3960. You have to remove the duplicate rows before summing the amounts."
+    },
+    {
+      "key": "c",
+      "label": "Drop duplicates by customer_id before summing",
+      "patchCode": "import pandas as pd\n\norders = pd.read_csv(\"orders.csv\")\nprint(\"rows loaded:\", len(orders))\norders = orders.drop_duplicates(subset=\"customer_id\")\n\n# Distinct customers and the month's revenue\ndistinct_customers = orders[\"customer_id\"].nunique()\nrevenue = orders[\"amount\"].sum()\nprint(\"distinct customers:\", distinct_customers)\nprint(\"total revenue:\", revenue)",
+      "isCorrect": false,
+      "resultLog": "rows loaded: 12\ndistinct customers: 5\ntotal revenue: 1850.0",
+      "rationale": "`drop_duplicates(subset=\"customer_id\")` keeps only the *first* row per customer, throwing away legitimate repeat orders from the same person — so revenue is now too *low* (1850). You only want to drop fully-identical rows, which is `drop_duplicates()` with no subset."
+    }
+  ],
+  "hints": [
+    "Print `orders.duplicated().sum()` to see how many rows are exact repeats. If revenue is inflated, those repeats are being summed twice.",
+    "`drop_duplicates()` with no arguments removes fully-identical rows. For counting *distinct* customers, use `nunique()` rather than `count()` (which counts rows, not distinct values)."
+  ],
+  "explanationMd": "### Why the bug occurs\nWhen data is unioned or joined from multiple sources, the same record can land twice as an exact duplicate row. Two things then go wrong: `orders[\"amount\"].sum()` adds the duplicated amounts again (inflated revenue), and `orders[\"customer_id\"].count()` counts every row rather than distinct customers, so it reports the row count, not the number of people.\n\n### Why the fix is correct\n`drop_duplicates()` (no `subset`) keeps one copy of any fully-identical row, so each genuine order is summed exactly once and revenue is correct. `nunique()` counts distinct values in a column — the right tool for 'how many distinct customers'. The key nuance is `subset`: `drop_duplicates()` with no subset removes only *completely* repeated rows, whereas `drop_duplicates(subset=\"customer_id\")` would discard legitimate second orders from the same customer. Match the dedup scope to what 'duplicate' actually means for your data.",
+  "recruiterReview": "Strong work — you separated the two distinct problems (inflated revenue from repeated rows vs. counting rows instead of distinct customers) and fixed each with the right tool. Importantly, you used `drop_duplicates()` over the whole row rather than by `customer_id`, which would have silently deleted real repeat orders. Good instinct to verify with `duplicated().sum()` first. For pipelines, dedup as close to the source as possible and assert the expected row count so a bad join can't quietly double your numbers. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Removing Duplicates Without Deleting Real Data\n\nDuplicate rows are one of the most common ways a report ends up wrong — and over-aggressive de-duplication is how you quietly delete real data. Here's how to get both right.\n\n### Where duplicates come from\nMerging two exports, re-running an append, or a fan-out join can leave the **same record twice**. Sums then double-count and 'distinct' counts get inflated.\n\n### Spotting them\n```python\norders.duplicated().sum()      # how many rows are exact repeats\norders[orders.duplicated()]     # show the duplicate rows\n```\n`duplicated()` flags every row that is an exact copy of an earlier one.\n\n### drop_duplicates and the subset trap\n```python\norders.drop_duplicates()                    # remove FULLY identical rows\norders.drop_duplicates(subset=\"customer_id\") # keep one row PER customer (dangerous!)\n```\nWith no `subset`, only completely-identical rows go. With `subset=\"customer_id\"`, pandas keeps just the first row for each customer — which **deletes** a customer's legitimate second and third orders. Use a subset only when you truly want one row per key.\n\n### Counting distinct values\n- `df[\"col\"].count()` → number of non-missing **rows**.\n- `df[\"col\"].nunique()` → number of **distinct** values.\nFor 'how many distinct customers', you want `nunique()`.\n\n### A tiny worked example\n```python\ns = pd.DataFrame({\"cust\": [1, 1, 2], \"amt\": [50, 50, 30]})\ns.drop_duplicates()[\"amt\"].sum()   # 80  (the repeated 50 is dropped once)\ns[\"cust\"].nunique()                # 2\n```\n\n### How to spot it\nTotals that look too high, or a 'distinct' count that exactly equals the row count, both point at duplicate rows.\n\n### Common beginner mistakes\n- Summing before removing duplicate rows.\n- Using `count()` when you meant `nunique()`.\n- `drop_duplicates(subset=key)` that throws away real repeat events.\n- Forgetting to verify with `duplicated().sum()` first.\n\nYou'll hit this the first time a report's totals don't reconcile with the source.",
+    "videos": [
+      {
+        "title": "pandas drop_duplicates and duplicated explained",
+        "searchQuery": "pandas drop_duplicates duplicated subset tutorial"
+      },
+      {
+        "title": "count vs nunique for distinct values",
+        "searchQuery": "pandas nunique count distinct values difference beginner"
+      }
+    ]
+  },
+  "estMinutes": 6,
+  "version": 1
+}

@@ -1,0 +1,62 @@
+{
+  "id": "da-012-left-join",
+  "sector": "da",
+  "difficulty": "medium",
+  "title": "12_spend_including_non_buyers.ipynb",
+  "language": "python",
+  "icon": "git-branch",
+  "conceptTags": ["merge", "join-types", "left-join"],
+  "descriptionMd": "## Mission: Spend per Customer — Everyone Included\n\nMarketing wants every customer's total spend, **including people who haven't ordered yet** (they're the re-engagement list). You merged `customers` with `orders` and summed the amounts — but two customers vanished from the report.\n\nThe default merge keeps only rows that match on **both** sides, so customers with no orders are dropped. Keep every customer by choosing the right kind of join, so non-buyers show up with a spend of 0.",
+  "initialCode": "import pandas as pd\n\ncustomers = pd.read_csv(\"customers.csv\")\norders = pd.read_csv(\"orders.csv\")\n\n# Total spend per customer (everyone, even non-buyers)\nreport = customers.merge(orders, on=\"customer_id\")\nspend = report.groupby(\"name\")[\"amount\"].sum()\nprint(spend)\nprint(\"customers shown:\", spend.shape[0])",
+  "buggyLineStart": 7,
+  "buggyLineEnd": 7,
+  "traceback": "name\nAva     300.0\nCara    500.0\nDan      40.0\nEve     240.0\nName: amount, dtype: float64\ncustomers shown: 4\n\n# Ben and Finn have never ordered, so the default (inner) merge dropped them.",
+  "correctOutput": "name\nAva     300.0\nBen       0.0\nCara    500.0\nDan      40.0\nEve     240.0\nFinn      0.0\nName: amount, dtype: float64\ncustomers shown: 6",
+  "options": [
+    {
+      "key": "a",
+      "label": "Use a left join to keep every customer",
+      "patchCode": "import pandas as pd\n\ncustomers = pd.read_csv(\"customers.csv\")\norders = pd.read_csv(\"orders.csv\")\n\n# Total spend per customer (everyone, even non-buyers)\nreport = customers.merge(orders, on=\"customer_id\", how=\"left\")\nspend = report.groupby(\"name\")[\"amount\"].sum()\nprint(spend)\nprint(\"customers shown:\", spend.shape[0])",
+      "isCorrect": true,
+      "resultLog": "name\nAva     300.0\nBen       0.0\nCara    500.0\nDan      40.0\nEve     240.0\nFinn      0.0\nName: amount, dtype: float64\ncustomers shown: 6",
+      "rationale": "`how=\"left\"` keeps every row from the left frame (`customers`) and attaches order data where it exists. Customers with no orders get missing (`NaN`) amounts, and `groupby(...)['amount'].sum()` treats their total as 0.0 — so Ben and Finn appear with a spend of 0. The default `how=\"inner\"` only keeps customers that have at least one matching order, which is why they were dropped."
+    },
+    {
+      "key": "b",
+      "label": "Use a right join instead",
+      "patchCode": "import pandas as pd\n\ncustomers = pd.read_csv(\"customers.csv\")\norders = pd.read_csv(\"orders.csv\")\n\n# Total spend per customer (everyone, even non-buyers)\nreport = customers.merge(orders, on=\"customer_id\", how=\"right\")\nspend = report.groupby(\"name\")[\"amount\"].sum()\nprint(spend)\nprint(\"customers shown:\", spend.shape[0])",
+      "isCorrect": false,
+      "resultLog": "name\nAva     300.0\nCara    500.0\nDan      40.0\nEve     240.0\nName: amount, dtype: float64\ncustomers shown: 4",
+      "rationale": "`how=\"right\"` keeps every row from the right frame (`orders`) and only the customers that match an order. Non-buyers have no order rows, so they still vanish — you're back to 4. You want all *customers*, which is the frame on the left, so the right kind of join is `left`."
+    },
+    {
+      "key": "c",
+      "label": "Left join, but with orders on the left",
+      "patchCode": "import pandas as pd\n\ncustomers = pd.read_csv(\"customers.csv\")\norders = pd.read_csv(\"orders.csv\")\n\n# Total spend per customer (everyone, even non-buyers)\nreport = orders.merge(customers, on=\"customer_id\", how=\"left\")\nspend = report.groupby(\"name\")[\"amount\"].sum()\nprint(spend)\nprint(\"customers shown:\", spend.shape[0])",
+      "isCorrect": false,
+      "resultLog": "name\nAva     300.0\nCara    500.0\nDan      40.0\nEve     240.0\nName: amount, dtype: float64\ncustomers shown: 4",
+      "rationale": "A left join keeps every row of whatever is on the *left* — and here that's `orders`. Since non-buyers have no order rows to start from, they never enter the result. Direction matters: put the frame you want to keep in full (`customers`) on the left."
+    }
+  ],
+  "hints": [
+    "Count the customers before and after the merge. The default merge keeps only customer ids that appear in *both* tables, so anyone with no order silently disappears.",
+    "`merge` takes a `how=` argument: `inner` (default, matches only), `left` (keep all left rows), `right`, `outer`. You want to keep every row of `customers`, and `customers` must be the left frame."
+  ],
+  "explanationMd": "### Why the bug occurs\n`merge` defaults to `how=\"inner\"`, which keeps only rows whose key exists on **both** sides. Customers who have never ordered have no matching row in `orders`, so the inner join discards them. The report then silently under-counts your customer base — a dangerous kind of bug because nothing errors; the numbers just quietly exclude people.\n\n### Why the fix is correct\n`how=\"left\"` keeps every row from the left frame (`customers`) regardless of whether a match exists, filling the order columns with `NaN` where there's no order. When you `groupby(\"name\")[\"amount\"].sum()`, pandas treats those missing amounts as 0, so non-buyers appear with a spend of 0.0 and the report covers all six customers. Two things determine the outcome: the join **type** (`left` keeps unmatched left rows) and the join **direction** (the frame you want to preserve must be on the left). Get both right and nobody is dropped.",
+  "recruiterReview": "Excellent — you caught a *silent* data-loss bug, the most dangerous kind, and reasoned about it correctly: an inner join is a filter in disguise. Choosing `left` with `customers` on the left preserves the full population, and letting the missing amounts sum to 0 is exactly the behavior the re-engagement list needs. Defensive habit worth adopting: after a merge, compare row counts against expectations (an `indicator=True` column shows which rows matched) so an unexpected inner join can't quietly shrink your data. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Joining Tables: Why Rows Disappear\n\nCombining two tables — customers and orders, products and categories — is everyday work, and the default join type silently drops unmatched rows. Knowing the four join types prevents a whole class of quiet bugs.\n\n### What a join does\n`left.merge(right, on=\"key\")` lines up rows from two tables wherever they share the same `key`. The `how=` argument decides what happens to rows that *don't* match:\n- `inner` (**default**) — keep only keys present in **both** tables.\n- `left` — keep **all** rows of the left table; fill unmatched right columns with `NaN`.\n- `right` — keep all rows of the right table.\n- `outer` — keep all rows of both.\n\n### The trap\nBecause `inner` is the default, any key missing on one side is **dropped without warning**. Customers with no orders, products never sold, days with no events — all silently vanish, and your counts come out low.\n\n### A tiny worked example\n```python\ncustomers = pd.DataFrame({\"customer_id\": [1, 2], \"name\": [\"Ava\", \"Ben\"]})\norders    = pd.DataFrame({\"customer_id\": [1], \"amount\": [300]})\n\ncustomers.merge(orders, on=\"customer_id\")              # inner → only Ava\ncustomers.merge(orders, on=\"customer_id\", how=\"left\")  # Ava 300, Ben NaN\n```\nWith a left join, Ben survives with a missing amount, which sums to 0.\n\n### Direction matters too\n`left` keeps everything from whatever is on the **left**. To keep all customers, `customers` must be the left frame: `customers.merge(orders, how=\"left\")`, not `orders.merge(customers, how=\"left\")`.\n\n### Verifying a join\nPass `indicator=True` to add a `_merge` column showing whether each row matched `both`, `left_only`, or `right_only` — a quick way to see what the join kept and dropped.\n\n### How to spot it\nA report that's missing rows you know exist, or a post-merge count lower than the source table, usually means an inner join silently filtered them out.\n\n### Common beginner mistakes\n- Relying on the default `inner` join when you needed `left`.\n- Putting the tables in the wrong order (join direction).\n- Forgetting that unmatched numeric columns become `NaN` (and may need `.fillna(0)`).\n- Joining on a key with mismatched dtypes (e.g. int vs text id), which matches nothing.\n\nYou'll hit this the first time a joined report quietly loses rows.",
+    "videos": [
+      {
+        "title": "pandas merge join types (inner, left, right, outer)",
+        "searchQuery": "pandas merge how inner left right outer join tutorial"
+      },
+      {
+        "title": "Visualizing SQL/pandas joins",
+        "searchQuery": "inner vs left join explained visual beginner"
+      }
+    ]
+  },
+  "estMinutes": 7,
+  "version": 1
+}

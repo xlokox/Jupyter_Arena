@@ -1,0 +1,62 @@
+{
+  "id": "da-011-dates-as-text",
+  "sector": "da",
+  "difficulty": "medium",
+  "title": "11_orders_per_month.ipynb",
+  "language": "python",
+  "icon": "clock",
+  "conceptTags": ["datetime", "to-datetime", "dt-accessor"],
+  "descriptionMd": "## Mission: Orders per Month\n\nYou're plotting how order volume changes month to month. The plan: pull the month out of each `order_date` and count orders per month. But `order_date.dt.month` throws an `AttributeError` about the `.dt` accessor.\n\nThe `order_date dtype: object` line explains it — the dates loaded as plain **text**, not as real dates, so the calendar tools don't apply yet. Convert the column to real datetimes first, then the monthly breakdown works.",
+  "initialCode": "import pandas as pd\n\norders = pd.read_csv(\"orders.csv\")\nprint(\"order_date dtype:\", orders[\"order_date\"].dtype)\n\n# Orders per month\norders[\"month\"] = orders[\"order_date\"].dt.month\nprint(orders.groupby(\"month\").size())",
+  "buggyLineStart": 7,
+  "buggyLineEnd": 7,
+  "traceback": "order_date dtype: object\n---------------------------------------------------------------------------\nAttributeError                            Traceback (most recent call last)\nCell In[1], line 7\n      6 # Orders per month\n----> 7 orders[\"month\"] = orders[\"order_date\"].dt.month\n\nAttributeError: Can only use .dt accessor with datetimelike values",
+  "correctOutput": "order_date dtype: datetime64[ns]\nmonth\n1    4\n2    3\n3    5\ndtype: int64",
+  "options": [
+    {
+      "key": "a",
+      "label": "Convert the column with pd.to_datetime, then use .dt.month",
+      "patchCode": "import pandas as pd\n\norders = pd.read_csv(\"orders.csv\")\norders[\"order_date\"] = pd.to_datetime(orders[\"order_date\"])\nprint(\"order_date dtype:\", orders[\"order_date\"].dtype)\n\n# Orders per month\norders[\"month\"] = orders[\"order_date\"].dt.month\nprint(orders.groupby(\"month\").size())",
+      "isCorrect": true,
+      "resultLog": "order_date dtype: datetime64[ns]\nmonth\n1    4\n2    3\n3    5\ndtype: int64",
+      "rationale": "`read_csv` left the dates as text (`object`), and the `.dt` accessor only works on real datetime values. `pd.to_datetime` parses the strings into a true `datetime64` column, after which `.dt.month` (and `.dt.day`, `.dt.year`, `.dt.weekday`, …) all work, giving an integer month you can group by."
+    },
+    {
+      "key": "b",
+      "label": "Convert the column but read .month directly off the Series",
+      "patchCode": "import pandas as pd\n\norders = pd.read_csv(\"orders.csv\")\nprint(\"order_date dtype:\", orders[\"order_date\"].dtype)\n\n# Orders per month\norders[\"month\"] = pd.to_datetime(orders[\"order_date\"]).month\nprint(orders.groupby(\"month\").size())",
+      "isCorrect": false,
+      "resultLog": "order_date dtype: object\n---------------------------------------------------------------------------\nAttributeError                            Traceback (most recent call last)\nCell In[1], line 7\n----> 7 orders[\"month\"] = pd.to_datetime(orders[\"order_date\"]).month\n\nAttributeError: 'Series' object has no attribute 'month'",
+      "rationale": "The conversion is right, but `.month` lives on individual datetime *values*, not on a whole Series. On a Series you reach the calendar parts through the `.dt` accessor: `pd.to_datetime(orders[\"order_date\"]).dt.month`. Forgetting `.dt` is the most common slip right after converting."
+    },
+    {
+      "key": "c",
+      "label": "Slice the month out of the date text",
+      "patchCode": "import pandas as pd\n\norders = pd.read_csv(\"orders.csv\")\nprint(\"order_date dtype:\", orders[\"order_date\"].dtype)\n\n# Orders per month\norders[\"month\"] = orders[\"order_date\"].str.split(\"-\").str[1]\nprint(orders.groupby(\"month\").size())",
+      "isCorrect": false,
+      "resultLog": "order_date dtype: object\nmonth\n01    4\n02    3\n03    5\ndtype: int64",
+      "rationale": "Splitting the string does pull out a month-like piece, but it's brittle and wrong-typed: the month is text (`'01'`, `'02'`) not a number, it assumes every date is exactly `YYYY-MM-DD`, and it breaks on any other format or a real date object. Convert with `pd.to_datetime` so `.dt.month` gives a real integer month that works regardless of the source format."
+    }
+  ],
+  "hints": [
+    "Read the printed dtype: `object` means the dates are still text. The `.dt` accessor — your gateway to month, day, weekday — only works once the column is a real datetime.",
+    "`pd.to_datetime(orders[\"order_date\"])` parses the text into real dates. Assign it back, then use `.dt.month` (note the `.dt`)."
+  ],
+  "explanationMd": "### Why the bug occurs\n`read_csv` stores anything it isn't sure is numeric as text, so `order_date` arrives with dtype `object` — strings like `\"2024-03-15\"`. pandas exposes date parts (month, day, weekday) through the `.dt` accessor, but `.dt` is only valid on a real `datetime64` column. Calling `.dt.month` on text raises `AttributeError: Can only use .dt accessor with datetimelike values`.\n\n### Why the fix is correct\n`pd.to_datetime(orders[\"order_date\"])` parses the strings into genuine `datetime64` values; assigning it back changes the column's dtype. Now `.dt.month` returns an integer month for each row, and you can group and count. Converting once at load time is far more robust than slicing the text by hand: it handles different formats, gives you the whole `.dt` toolkit (`.dt.year`, `.dt.day_name()`, `.dt.to_period(\"M\")`), and keeps the values typed as real dates for sorting and arithmetic.",
+  "recruiterReview": "Good diagnosis — you read the dtype, recognized the dates were text, and converted them properly instead of hacking the month out of the string. Reaching for `pd.to_datetime` unlocks the entire `.dt` toolkit and keeps the data sortable and arithmetic-friendly. Two pro tips: pass `format=` when you know the layout (it's faster and stricter), and consider `.dt.to_period(\"M\")` when you want year+month together so January 2023 and January 2024 don't collapse into the same bucket. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Working with Dates That Loaded as Text\n\nTime-based analysis — trends by month, day-of-week patterns, gaps between events — all depends on your dates being *real* dates. Most of the time they don't start that way.\n\n### The problem\n`pd.read_csv` doesn't parse dates by default; it leaves them as text (dtype `object`). Text can't do date math. The clue is always the dtype:\n```python\norders[\"order_date\"].dtype   # object  → it's text\n```\n\n### The .dt accessor\npandas keeps date operations behind a special accessor called `.dt`, available only on real `datetime64` columns:\n```python\norders[\"order_date\"].dt.year\norders[\"order_date\"].dt.month\norders[\"order_date\"].dt.day_name()   # 'Monday', ...\n```\nIf the column is still text, `.dt` raises `AttributeError`.\n\n### The fix: pd.to_datetime\n```python\norders[\"order_date\"] = pd.to_datetime(orders[\"order_date\"])\norders[\"order_date\"].dtype   # datetime64[ns]\n```\nNow every `.dt` operation works.\n\n### Series vs single value\nA subtle trap: `.month` exists on a single `Timestamp`, but on a **Series** you must go through `.dt`:\n```python\nts = pd.to_datetime(\"2024-03-15\"); ts.month          # 3   (single value)\norders[\"order_date\"].dt.month                          # Series of months\n```\n\n### A tiny worked example\n```python\ns = pd.Series([\"2024-01-10\", \"2024-02-02\"])\ns = pd.to_datetime(s)\ns.dt.month.tolist()   # [1, 2]\n```\n\n### Don't slice the string\n`order_date.str[5:7]` or `.str.split(\"-\")` looks tempting, but it gives text months, assumes one exact format, and breaks on real date objects. Convert once and use `.dt`.\n\n### How to spot it\n`AttributeError: Can only use .dt accessor with datetimelike values` means the column is still text — convert it.\n\n### Common beginner mistakes\n- Forgetting that `read_csv` doesn't auto-parse dates.\n- Using `.month` on a Series instead of `.dt.month`.\n- Slicing the date string by hand (brittle, text output).\n- Grouping by month alone across multiple years, merging different years together (use `.dt.to_period(\"M\")`).\n\nYou'll hit this the first time you build any trend over time.",
+    "videos": [
+      {
+        "title": "pandas to_datetime and the .dt accessor",
+        "searchQuery": "pandas to_datetime dt accessor month year convert string tutorial"
+      },
+      {
+        "title": "Time series basics in pandas",
+        "searchQuery": "pandas datetime column parse resample period beginner"
+      }
+    ]
+  },
+  "estMinutes": 6,
+  "version": 1
+}

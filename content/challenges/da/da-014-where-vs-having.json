@@ -1,0 +1,62 @@
+{
+  "id": "da-014-where-vs-having",
+  "sector": "da",
+  "difficulty": "medium",
+  "title": "14_high_revenue_categories.sql",
+  "language": "sql",
+  "icon": "filter",
+  "conceptTags": ["having", "where", "aggregate-filtering"],
+  "descriptionMd": "## Mission: Categories Over $5,000\n\nYou want only the product categories whose **total** revenue exceeds $5,000. You grouped by category, summed the amounts, and tried to filter with `WHERE SUM(amount) > 5000` — and the database rejects it, saying aggregates aren't allowed in `WHERE`.\n\n`WHERE` filters individual rows *before* they're grouped, so it can't see a group total yet. There's a different clause for filtering on an aggregate after grouping. Use it so only the high-revenue categories come through.",
+  "initialCode": "-- Categories with more than $5000 in total revenue\nSELECT category, SUM(amount) AS revenue\nFROM sales\nWHERE SUM(amount) > 5000\nGROUP BY category;",
+  "buggyLineStart": 4,
+  "buggyLineEnd": 4,
+  "traceback": "ERROR:  aggregate functions are not allowed in WHERE\nLINE 4: WHERE SUM(amount) > 5000\n              ^",
+  "correctOutput": "category | revenue\n---------+--------\nBooks    |    5400\nGames    |    8900\n(2 rows)",
+  "options": [
+    {
+      "key": "a",
+      "label": "Filter the group totals with HAVING",
+      "patchCode": "-- Categories with more than $5000 in total revenue\nSELECT category, SUM(amount) AS revenue\nFROM sales\nGROUP BY category\nHAVING SUM(amount) > 5000;",
+      "isCorrect": true,
+      "resultLog": "category | revenue\n---------+--------\nBooks    |    5400\nGames    |    8900\n(2 rows)",
+      "rationale": "`HAVING` is the filter that runs *after* grouping, so it can see each group's `SUM(amount)` and keep only the categories whose total exceeds 5000. `WHERE` runs *before* grouping on individual rows, which is why it can't reference an aggregate. Books (5400) and Games (8900) pass; Toys (3200) is filtered out."
+    },
+    {
+      "key": "b",
+      "label": "Filter the rows in WHERE instead",
+      "patchCode": "-- Categories with more than $5000 in total revenue\nSELECT category, SUM(amount) AS revenue\nFROM sales\nWHERE amount > 5000\nGROUP BY category;",
+      "isCorrect": false,
+      "resultLog": "category | revenue\n---------+--------\nGames    |    8900\n(1 row)",
+      "rationale": "`WHERE amount > 5000` keeps only individual sales over 5000 *before* grouping, then sums those survivors. Books reaches 5400 from several smaller sales — none over 5000 — so it's filtered out entirely and lost. You want categories whose *total* exceeds 5000, which is a post-grouping filter: `HAVING`."
+    },
+    {
+      "key": "c",
+      "label": "Use HAVING but reference the revenue alias",
+      "patchCode": "-- Categories with more than $5000 in total revenue\nSELECT category, SUM(amount) AS revenue\nFROM sales\nGROUP BY category\nHAVING revenue > 5000;",
+      "isCorrect": false,
+      "resultLog": "ERROR:  column \"revenue\" does not exist\nLINE 5: HAVING revenue > 5000;\n               ^",
+      "rationale": "`HAVING` is evaluated before the `SELECT` list, so the alias `revenue` doesn't exist yet and PostgreSQL can't resolve it. Repeat the aggregate expression instead: `HAVING SUM(amount) > 5000`. (Some databases tolerate the alias; PostgreSQL does not.)"
+    }
+  ],
+  "hints": [
+    "`WHERE` is applied to each row *before* the rows are grouped, so at that point there is no group total to compare against — that's why aggregates aren't allowed there.",
+    "SQL has a second filter, `HAVING`, that runs *after* `GROUP BY`. Put the aggregate condition there: `GROUP BY category HAVING SUM(amount) > 5000`."
+  ],
+  "explanationMd": "### Why the bug occurs\nSQL applies its clauses in a fixed order: `WHERE` filters individual rows first, *then* `GROUP BY` collapses them into groups, *then* aggregates like `SUM` are computed. So at the moment `WHERE` runs, group totals don't exist yet — which is why `WHERE SUM(amount) > 5000` is rejected with `aggregate functions are not allowed in WHERE`.\n\n### Why the fix is correct\n`HAVING` is the filter designed for the post-grouping stage. It runs after `GROUP BY` and after the aggregates are computed, so it can compare each group's `SUM(amount)` to 5000 and drop the groups that fall short. The rule of thumb: filter **rows** with `WHERE`, filter **groups** with `HAVING`. One detail — because `HAVING` runs before the `SELECT` list is built, you must repeat the aggregate (`SUM(amount)`) rather than its alias (`revenue`) in PostgreSQL.",
+  "recruiterReview": "Nicely reasoned — you didn't just move the condition, you understood the execution order that makes `WHERE` and `HAVING` different, and you saw why filtering raw rows (option B) silently drops a category that qualifies on its total. That row-vs-group distinction is one of the most useful mental models in SQL. The alias gotcha in `HAVING` catches lots of people, so knowing to repeat `SUM(amount)` is a real plus. Tip: you can still use `WHERE` to pre-filter rows (e.g. a date range) *and* `HAVING` to filter the resulting group totals in the same query. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## WHERE vs HAVING: Filtering Rows vs Groups\n\nOnce you start grouping, you'll soon want to keep only certain groups — 'categories over $5k', 'customers with more than 10 orders'. That's `HAVING`, and confusing it with `WHERE` is a rite of passage.\n\n### The execution order is the whole story\nSQL processes a query in this logical order:\n```\nFROM → WHERE → GROUP BY → (aggregates) → HAVING → SELECT → ORDER BY → LIMIT\n```\n- `WHERE` runs **early**, on individual rows, *before* grouping. Group totals don't exist yet, so you can't use `SUM`/`COUNT` here.\n- `HAVING` runs **late**, *after* grouping and after aggregates are computed, so it can filter on `SUM(amount)`, `COUNT(*)`, etc.\n\n### The rule of thumb\n- Filter **rows** → `WHERE`.\n- Filter **groups** (on an aggregate) → `HAVING`.\n\n### A tiny worked example\nSales: Books = 3000 + 2400, Games = 8900, Toys = 3200.\n```sql\nSELECT category, SUM(amount) AS revenue\nFROM sales\nGROUP BY category\nHAVING SUM(amount) > 5000;\n-- Books 5400, Games 8900   (Toys 3200 is dropped)\n```\nNote that `WHERE amount > 5000` would have thrown away Books' two smaller sales and lost the category entirely — a totally different result.\n\n### They work together\nYou can use both: `WHERE order_date >= '2024-01-01'` to limit the rows, then `HAVING SUM(amount) > 5000` to keep only the qualifying group totals.\n\n### The alias gotcha\nBecause `HAVING` runs before the `SELECT` list is built, the column alias isn't available yet in PostgreSQL:\n```sql\nHAVING revenue > 5000        -- ERROR: column \"revenue\" does not exist\nHAVING SUM(amount) > 5000     -- correct: repeat the aggregate\n```\n\n### How to spot it\n`aggregate functions are not allowed in WHERE` means your aggregate condition belongs in `HAVING`. A result missing groups you expected often means you filtered raw rows in `WHERE` when you meant to filter totals.\n\n### Common beginner mistakes\n- Putting `SUM(...)`/`COUNT(...)` conditions in `WHERE`.\n- Filtering rows in `WHERE` when you meant to filter group totals.\n- Referencing the SELECT alias in `HAVING` (repeat the aggregate instead).\n- Forgetting you can combine `WHERE` (rows) and `HAVING` (groups) in one query.\n\nYou'll hit this the first time you filter on a `SUM` or `COUNT`.",
+    "videos": [
+      {
+        "title": "SQL WHERE vs HAVING explained",
+        "searchQuery": "sql where vs having difference group by tutorial"
+      },
+      {
+        "title": "SQL clause execution order",
+        "searchQuery": "sql logical query processing order where group by having select"
+      }
+    ]
+  },
+  "estMinutes": 6,
+  "version": 1
+}

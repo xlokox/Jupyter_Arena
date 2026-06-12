@@ -1,0 +1,62 @@
+{
+  "id": "da-009-like-wildcards",
+  "sector": "da",
+  "difficulty": "easy",
+  "title": "09_search_customer_names.sql",
+  "language": "sql",
+  "icon": "filter",
+  "conceptTags": ["like", "wildcards", "pattern-matching"],
+  "descriptionMd": "## Mission: Find Names Containing \"john\"\n\nSupport wants every customer whose name contains `john` so they can merge some duplicate accounts. You wrote a `WHERE name LIKE 'john'` filter — and the query comes back with zero rows, even though several names clearly contain it.\n\n`LIKE` without wildcards behaves like an exact match. To search for a fragment that can appear *anywhere* in the name, you need wildcards around it. Fix the pattern so the substring search works.",
+  "initialCode": "-- Customers whose name contains \"john\"\nSELECT id, name\nFROM customers\nWHERE name LIKE 'john';",
+  "buggyLineStart": 4,
+  "buggyLineEnd": 4,
+  "traceback": " id | name\n----+------\n(0 rows)\n\n-- No matches, even though 'mike johnson' and others clearly contain \"john\".",
+  "correctOutput": " id | name\n----+--------------\n  1 | mike johnson\n  3 | johnny ray\n  4 | al johnston\n(3 rows)",
+  "options": [
+    {
+      "key": "a",
+      "label": "Wrap the term in % wildcards: '%john%'",
+      "patchCode": "-- Customers whose name contains \"john\"\nSELECT id, name\nFROM customers\nWHERE name LIKE '%john%';",
+      "isCorrect": true,
+      "resultLog": " id | name\n----+--------------\n  1 | mike johnson\n  3 | johnny ray\n  4 | al johnston\n(3 rows)",
+      "rationale": "In `LIKE`, `%` means 'any run of characters (including none)'. Wrapping the term as `'%john%'` matches any name that has `john` anywhere — at the start (`johnny`), the middle (`mike johnson`), or as part of a longer word (`johnston`). Without the wildcards, `LIKE 'john'` matches only the exact string `john`, which no row equals, so you get zero rows."
+    },
+    {
+      "key": "b",
+      "label": "Anchor it to the start: 'john%'",
+      "patchCode": "-- Customers whose name contains \"john\"\nSELECT id, name\nFROM customers\nWHERE name LIKE 'john%';",
+      "isCorrect": false,
+      "resultLog": " id | name\n----+------------\n  3 | johnny ray\n(1 row)",
+      "rationale": "`'john%'` matches names that *begin* with `john`, so it finds `johnny ray` but misses `mike johnson` and `al johnston`, where the fragment sits later in the string. A leading wildcard is needed too — use `'%john%'` to match the term anywhere."
+    },
+    {
+      "key": "c",
+      "label": "Match the capitalised form: '%John%'",
+      "patchCode": "-- Customers whose name contains \"john\"\nSELECT id, name\nFROM customers\nWHERE name LIKE '%John%';",
+      "isCorrect": false,
+      "resultLog": " id | name\n----+------\n(0 rows)",
+      "rationale": "`LIKE` is case-sensitive in PostgreSQL, and these names are stored in lowercase, so `'%John%'` (capital J) matches nothing. Either match the real case with `'%john%'`, or do a case-insensitive search with `ILIKE` or `LOWER(name) LIKE '%john%'`."
+    }
+  ],
+  "hints": [
+    "`LIKE 'john'` looks for a value that *equals* john exactly — none of your names are literally just 'john'. How do you tell SQL 'john can appear anywhere in the text'?",
+    "The `%` symbol is a wildcard meaning 'any characters'. Put one on each side of the term: `'%john%'`. (And watch the letter case — LIKE is case-sensitive here.)"
+  ],
+  "explanationMd": "### Why the bug occurs\n`LIKE` compares against a *pattern*, but a pattern with no wildcard characters is just a literal string. So `name LIKE 'john'` is effectively `name = 'john'` and only matches a value that is exactly the four letters `john`. Since every real name is longer (`mike johnson`, `johnny ray`), none match and the result is empty.\n\n### Why the fix is correct\nThe `%` wildcard stands for any sequence of characters, including an empty one. Surrounding the term as `'%john%'` says 'anything, then john, then anything', which matches the fragment wherever it appears. One detail to keep in mind: in PostgreSQL `LIKE` is case-sensitive, so `'%john%'` and `'%John%'` are different searches — use `ILIKE` or `LOWER(name)` when case shouldn't matter. (The other wildcard, `_`, matches exactly one character.)",
+  "recruiterReview": "Good — you understood that `LIKE` is pattern matching, not a contains-by-default function, and that wildcards are what turn an exact match into a substring search. The case-sensitivity nuance trips up a lot of people, so knowing to reach for `ILIKE` is a real plus. One performance note for later: leading-wildcard searches (`'%term%'`) can't use a normal index, so on big tables a full-text search or a trigram index is the scalable path. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Searching Text with LIKE and Wildcards\n\n'Find every name/email/SKU that contains X' is a daily request, and `LIKE` is the basic tool — once you know its wildcards.\n\n### LIKE matches a pattern\n`WHERE column LIKE pattern` keeps rows where the text matches the pattern. The pattern can contain two special characters:\n- `%` — matches **any** run of characters, including none.\n- `_` — matches exactly **one** character.\n\nA pattern with no wildcards is just a literal, so `LIKE 'john'` behaves like `= 'john'`.\n\n### The three positions\n```sql\nWHERE name LIKE 'john%'    -- starts with john\nWHERE name LIKE '%john'    -- ends with john\nWHERE name LIKE '%john%'   -- contains john anywhere\n```\nFor a 'contains' search you need a `%` on **both** sides.\n\n### A tiny worked example\nGiven names `mike johnson`, `johnny ray`, `sara lee`:\n```sql\nSELECT name FROM customers WHERE name LIKE '%john%';\n-- mike johnson, johnny ray\n```\n`sara lee` has no `john`, so it's excluded.\n\n### Case sensitivity\nIn PostgreSQL, `LIKE` is **case-sensitive**: `'%john%'` won't match `John`. To ignore case use `ILIKE` (`WHERE name ILIKE '%john%'`) or normalize both sides with `LOWER(name) LIKE '%john%'`. (Different databases differ here — MySQL's default is case-insensitive.)\n\n### How to spot it\nA substring search that returns **zero** rows usually means you forgot the `%` wildcards. A search that returns **too few** rows often means you anchored it (`'john%'`) or got the case wrong.\n\n### Common beginner mistakes\n- Writing `LIKE 'term'` with no `%` and expecting a 'contains' search.\n- Putting `%` on only one side when the fragment can be anywhere.\n- Forgetting `LIKE` is case-sensitive (use `ILIKE`).\n- Reaching for `LIKE` when you need a real full-text or fuzzy search.\n\nYou'll hit this the first time you build a search box over a text column.",
+    "videos": [
+      {
+        "title": "SQL LIKE and wildcards (% and _) tutorial",
+        "searchQuery": "sql like wildcard percent underscore pattern matching tutorial"
+      },
+      {
+        "title": "LIKE vs ILIKE case sensitivity",
+        "searchQuery": "sql like ilike case insensitive search postgresql"
+      }
+    ]
+  },
+  "estMinutes": 4,
+  "version": 1
+}
