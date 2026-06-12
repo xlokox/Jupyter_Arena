@@ -56,25 +56,27 @@ export interface BadgeContext {
 export interface BadgeDef {
   id: BadgeId;
   tier: BadgeTier;
+  /** A challenge-icon.tsx registry key; mirrors badge_definitions.icon. */
+  icon: string;
   /** Display order; mirrors badge_definitions.sort. */
   sort: number;
 }
 
-/** Ordered to match the badge_definitions seed (011). */
+/** Ordered + iconed to match the badge_definitions seed (011). */
 export const BADGE_DEFS: readonly BadgeDef[] = [
-  { id: "first_blood", tier: "bronze", sort: 10 },
-  { id: "streak_keeper_3", tier: "bronze", sort: 20 },
-  { id: "flawless_five", tier: "silver", sort: 30 },
-  { id: "no_hints_needed", tier: "silver", sort: 40 },
-  { id: "polyglot", tier: "silver", sort: 50 },
-  { id: "streak_keeper_7", tier: "silver", sort: 60 },
-  { id: "traceback_hunter", tier: "gold", sort: 70 },
-  { id: "sector_sweep_ml", tier: "gold", sort: 80 },
-  { id: "sector_sweep_dl", tier: "gold", sort: 90 },
-  { id: "sector_sweep_fullstack", tier: "gold", sort: 100 },
-  { id: "sector_sweep_db", tier: "gold", sort: 110 },
-  { id: "streak_keeper_30", tier: "gold", sort: 120 },
-  { id: "daily_devoted", tier: "gold", sort: 130 },
+  { id: "first_blood", tier: "bronze", icon: "zap", sort: 10 },
+  { id: "streak_keeper_3", tier: "bronze", icon: "flame", sort: 20 },
+  { id: "flawless_five", tier: "silver", icon: "sparkles", sort: 30 },
+  { id: "no_hints_needed", tier: "silver", icon: "shield-check", sort: 40 },
+  { id: "polyglot", tier: "silver", icon: "languages", sort: 50 },
+  { id: "streak_keeper_7", tier: "silver", icon: "flame", sort: 60 },
+  { id: "traceback_hunter", tier: "gold", icon: "target", sort: 70 },
+  { id: "sector_sweep_ml", tier: "gold", icon: "brain", sort: 80 },
+  { id: "sector_sweep_dl", tier: "gold", icon: "layers", sort: 90 },
+  { id: "sector_sweep_fullstack", tier: "gold", icon: "server", sort: 100 },
+  { id: "sector_sweep_db", tier: "gold", icon: "database", sort: 110 },
+  { id: "streak_keeper_30", tier: "gold", icon: "flame", sort: 120 },
+  { id: "daily_devoted", tier: "gold", icon: "crown", sort: 130 },
 ] as const;
 
 const SECTOR_SWEEP: Record<SectorId, BadgeId> = {

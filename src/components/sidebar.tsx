@@ -1,10 +1,11 @@
 "use client";
 
 import { BookOpen, CheckCircle2, FileCode2, Lock, Search, X } from "lucide-react";
-import type { ChallengeMeta } from "@/lib/content/schema";
-import { DIFFICULTIES } from "@/lib/content/schema";
+import type { ChallengeMeta, SectorId } from "@/lib/content/schema";
+import { DIFFICULTIES, SECTOR_IDS } from "@/lib/content/schema";
 import { ChallengeIcon } from "@/components/challenge-icon";
 import { DifficultyBadge } from "@/components/difficulty-badge";
+import { ProgressRing } from "@/components/progress-ring";
 import {
   filterChallenges,
   getAttempt,
@@ -20,6 +21,47 @@ const TABS: Array<{ id: SidebarTab; label: string; icon: typeof FileCode2 }> = [
   { id: "missions", label: en.sidebar.missions, icon: FileCode2 },
   { id: "tutorials", label: en.sidebar.tutorials, icon: BookOpen },
 ];
+
+const SECTOR_SHORT: Record<SectorId, string> = { ml: "ML", dl: "DL", fullstack: "FS", db: "DB" };
+
+/** Compact per-sector completion rings (missions tab). */
+function SectorRings({
+  challenges,
+  attempts,
+}: {
+  challenges: ChallengeMeta[];
+  attempts: ReturnType<typeof useWorkspaceStore.getState>["attempts"];
+}) {
+  return (
+    <div
+      aria-label={en.portfolio.sectorProgress}
+      className="grid grid-cols-4 gap-2 border-b border-border p-3"
+    >
+      {SECTOR_IDS.map((sector) => {
+        const inSector = challenges.filter((c) => c.sector === sector);
+        const solved = inSector.filter((c) => getAttempt(attempts, c.id).solved).length;
+        const total = inSector.length;
+        const complete = total > 0 && solved >= total;
+        return (
+          <div key={sector} className="flex flex-col items-center gap-1">
+            <ProgressRing
+              value={solved}
+              max={total}
+              size={30}
+              ariaLabel={`${en.sectors[sector]}: ${solved}/${total}`}
+              fillClassName={complete ? "stroke-success" : "stroke-accent"}
+            >
+              <span className="font-mono text-[9px] text-muted">{solved}</span>
+            </ProgressRing>
+            <span className="font-mono text-[9px] uppercase tracking-wide text-muted">
+              {SECTOR_SHORT[sector]}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 function SidebarContent({ challenges }: { challenges: ChallengeMeta[] }) {
   const sidebarTab = useWorkspaceStore((s) => s.sidebarTab);
@@ -110,6 +152,8 @@ function SidebarContent({ challenges }: { challenges: ChallengeMeta[] }) {
           })}
         </div>
       </div>
+
+      {sidebarTab === "missions" && <SectorRings challenges={challenges} attempts={attempts} />}
 
       <div
         role="tabpanel"

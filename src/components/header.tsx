@@ -9,13 +9,23 @@ import {
   LogIn,
   LogOut,
   Menu,
+  Snowflake,
+  Trophy,
   Volume2,
   VolumeX,
 } from "lucide-react";
 import { publicSupabaseEnv } from "@/lib/supabase/env";
 import { useAuthStore } from "@/store/auth";
-import { displayStreak, levelForXp, rankForLevel, XP_PER_LEVEL, xpIntoLevel } from "@/lib/game/xp";
+import {
+  displayStreak,
+  levelForXp,
+  rankForLevel,
+  utcDayOf,
+  XP_PER_LEVEL,
+  xpIntoLevel,
+} from "@/lib/game/xp";
 import { useWorkspaceStore, type SectorFilter } from "@/store/workspace";
+import { ProgressRing } from "@/components/progress-ring";
 import { en } from "@/i18n/en";
 
 /**
@@ -53,7 +63,13 @@ export function Header() {
   const soundEnabled = useWorkspaceStore((s) => s.soundEnabled);
   const toggleSound = useWorkspaceStore((s) => s.toggleSound);
   const lastReward = useWorkspaceStore((s) => s.lastReward);
+  const freezeTokens = useWorkspaceStore((s) => s.freezeTokens);
+  const dailyGoal = useWorkspaceStore((s) => s.dailyGoal);
   const completed = Object.values(attempts).filter((a) => a.solved).length;
+
+  const today = utcDayOf(new Date());
+  const goalProgress = dailyGoal.date === today ? dailyGoal.progress : 0;
+  const goalComplete = goalProgress >= dailyGoal.target;
 
   const level = levelForXp(stats.xp);
   const rank = en.ranks[rankForLevel(level)];
@@ -158,6 +174,33 @@ export function Header() {
               {en.header.completedLabel}
             </span>
           </div>
+
+          <div
+            className="flex items-center gap-1.5"
+            title={goalComplete ? en.dailyGoal.complete : en.dailyGoal.label}
+          >
+            <ProgressRing
+              value={goalProgress}
+              max={dailyGoal.target}
+              ariaLabel={`${en.dailyGoal.ariaLabel}: ${goalProgress}/${dailyGoal.target}`}
+              fillClassName={goalComplete ? "stroke-success" : "stroke-accent"}
+            />
+            <span className="hidden font-mono text-xs text-muted sm:inline">
+              {goalProgress}/{dailyGoal.target}
+            </span>
+          </div>
+
+          {freezeTokens > 0 && (
+            <div className="flex items-center gap-1.5" title={en.streakFreeze.tooltip}>
+              <Snowflake aria-hidden className="size-4 text-accent" />
+              <span
+                aria-label={`${en.streakFreeze.ariaLabel}: ${freezeTokens}`}
+                className="font-mono text-xs text-muted"
+              >
+                {freezeTokens}
+              </span>
+            </div>
+          )}
         </div>
 
         <nav
@@ -199,6 +242,14 @@ export function Header() {
               <VolumeX className="size-4" aria-hidden />
             )}
           </button>
+
+          <Link
+            href="/ranks"
+            className="flex min-h-[44px] items-center gap-1.5 rounded-md border border-border bg-panel-2 px-3 text-sm text-muted transition-colors hover:border-accent-hover hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            <Trophy className="size-4 text-accent" aria-hidden />
+            <span className="hidden sm:inline">{en.rankLadder.link}</span>
+          </Link>
 
           <Link
             href="/daily"
