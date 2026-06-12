@@ -72,7 +72,7 @@ export function rankForLevel(level: number): RankKey {
 
 export const utcDayOf = (date: Date): string => date.toISOString().slice(0, 10);
 
-function previousUtcDay(day: string): string {
+export function previousUtcDay(day: string): string {
   const date = new Date(`${day}T00:00:00Z`);
   date.setUTCDate(date.getUTCDate() - 1);
   return utcDayOf(date);
