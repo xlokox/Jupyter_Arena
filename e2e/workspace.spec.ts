@@ -83,7 +83,7 @@ test.describe("notebook flows", () => {
       .getByRole("button", { name: "Databases" })
       .click();
     const explorer = page.getByRole("list", { name: "Notebook file explorer" });
-    await expect(explorer.getByRole("button")).toHaveCount(2);
+    await expect(explorer.getByRole("button")).toHaveCount(15);
     await page
       .getByRole("group", { name: "Filter by difficulty" })
       .getByRole("button", { name: "Very Hard" })

@@ -57,6 +57,14 @@ body {
   color: var(--text);
 }
 
+/* Global focus-visible safety net — ensures every keyboard-focusable element
+   has a visible ring even when an explicit Tailwind focus-visible: class is
+   absent. Individual components override this with their own styling. */
+*:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 /* Code blocks remain LTR always, regardless of UI locale direction. */
 pre,
 code {

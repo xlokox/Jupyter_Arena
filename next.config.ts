@@ -3,7 +3,9 @@ import type { NextConfig } from "next";
 // Security headers — MASTER_BRIEF.md Section 11. connect-src includes the
 // Supabase origin (http + ws) when configured. script-src needs
 // 'unsafe-inline' for Next.js inline bootstrap scripts; style-src for the
-// inline width styles the XP bars use.
+// inline width styles the XP bars use. 'unsafe-eval' is required in
+// development only (webpack eval-source-map devtool); it is NOT present in
+// the production CSP.
 const supabaseOrigin = (() => {
   try {
     return process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -14,9 +16,11 @@ const supabaseOrigin = (() => {
   }
 })();
 
+const isDev = process.env.NODE_ENV === "development";
+
 const csp = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'",
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data:",
   "font-src 'self'",

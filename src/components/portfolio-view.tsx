@@ -43,7 +43,7 @@ export function PortfolioView({ challenges }: { challenges: ChallengeMeta[] }) {
   const streak = displayStreak(stats, new Date());
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 p-4 md:p-8">
+    <main className="mx-auto max-w-3xl space-y-6 p-4 md:p-8">
       <Link
         href="/"
         className="inline-flex min-h-[44px] items-center gap-1.5 text-sm text-muted transition-colors hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
@@ -128,6 +128,6 @@ export function PortfolioView({ challenges }: { challenges: ChallengeMeta[] }) {
         <Flame className="size-4 text-accent" aria-hidden />
         {en.app.name} — {en.app.tagline}
       </footer>
-    </div>
+    </main>
   );
 }
