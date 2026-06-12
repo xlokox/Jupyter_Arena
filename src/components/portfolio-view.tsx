@@ -13,6 +13,7 @@ import {
   xpIntoLevel,
 } from "@/lib/game/xp";
 import { getAttempt, useWorkspaceStore } from "@/store/workspace";
+import { TrophyCase } from "@/components/trophy-case";
 import { en } from "@/i18n/en";
 
 const SECTORS: SectorId[] = ["ml", "dl", "fullstack", "db"];
@@ -123,6 +124,8 @@ export function PortfolioView({ challenges }: { challenges: ChallengeMeta[] }) {
           );
         })}
       </section>
+
+      <TrophyCase />
 
       <footer className="flex items-center gap-2 text-xs text-muted">
         <Flame className="size-4 text-accent" aria-hidden />

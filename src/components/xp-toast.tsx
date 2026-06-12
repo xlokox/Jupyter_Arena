@@ -3,12 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 import { Sparkles, TrendingDown, TrendingUp } from "lucide-react";
 import { rankForLevel } from "@/lib/game/xp";
+import { BADGE_DEFS } from "@/lib/game/badges";
+import { ChallengeIcon } from "@/components/challenge-icon";
 import { useWorkspaceStore } from "@/store/workspace";
 import type { ChallengeMeta } from "@/lib/content/schema";
-import { playCorrect, playLevelUp, playWrong } from "@/lib/sound/engine";
+import { playBadge, playCorrect, playLevelUp, playWrong } from "@/lib/sound/engine";
 import { en } from "@/i18n/en";
 
 const TOAST_MS = 4000;
+const BADGE_ICON = Object.fromEntries(BADGE_DEFS.map((d) => [d.id, d.icon]));
 
 /**
  * XP toast + level-up moment (MASTER_BRIEF.md Section 8): one celebratory
@@ -18,8 +21,12 @@ const TOAST_MS = 4000;
 export function XpToast({ challenges }: { challenges: ChallengeMeta[] }) {
   const reward = useWorkspaceStore((s) => s.lastReward);
   const dismissReward = useWorkspaceStore((s) => s.dismissReward);
+  const lastBadge = useWorkspaceStore((s) => s.lastBadge);
+  const dismissBadge = useWorkspaceStore((s) => s.dismissBadge);
   const [visibleId, setVisibleId] = useState<number | null>(null);
+  const [visibleBadge, setVisibleBadge] = useState<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const badgeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!reward) return;
@@ -41,6 +48,22 @@ export function XpToast({ challenges }: { challenges: ChallengeMeta[] }) {
     };
   }, [reward, dismissReward]);
 
+  // Badge-earned moment — its own timer so it doesn't fight the XP toast.
+  useEffect(() => {
+    if (!lastBadge) return;
+    setVisibleBadge(lastBadge.n);
+    if (useWorkspaceStore.getState().soundEnabled) playBadge();
+    if (badgeTimerRef.current) clearTimeout(badgeTimerRef.current);
+    badgeTimerRef.current = setTimeout(() => {
+      setVisibleBadge(null);
+      dismissBadge();
+    }, TOAST_MS);
+    return () => {
+      if (badgeTimerRef.current) clearTimeout(badgeTimerRef.current);
+    };
+  }, [lastBadge, dismissBadge]);
+
+  const showBadge = lastBadge !== null && visibleBadge === lastBadge.n;
   const show = reward !== null && visibleId === reward.id;
   const positive = (reward?.total ?? 0) > 0;
   const unlockedCount =
@@ -55,8 +78,28 @@ export function XpToast({ challenges }: { challenges: ChallengeMeta[] }) {
       role="status"
       aria-live="polite"
       aria-label={en.toast.rewardAria}
-      className="pointer-events-none fixed inset-x-0 bottom-4 z-50 flex justify-center px-4"
+      className="pointer-events-none fixed inset-x-0 bottom-4 z-50 flex flex-col items-center gap-2 px-4"
     >
+      {showBadge && lastBadge && (
+        <div
+          key={`badge-${lastBadge.n}`}
+          className="flex w-full max-w-sm items-center gap-3 rounded-lg border border-accent bg-panel-2 p-3 shadow-lg motion-safe:animate-[toast-in_0.25s_ease-out]"
+        >
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-full border border-accent bg-accent/10 motion-safe:animate-[level-pulse_0.6s_ease-in-out]">
+            <ChallengeIcon name={BADGE_ICON[lastBadge.id] ?? "trophy"} className="size-5 text-accent" />
+          </span>
+          <div className="min-w-0">
+            <p className="flex items-center gap-1.5 font-mono text-xs font-bold text-accent">
+              <Sparkles
+                className="size-3.5 motion-safe:animate-[sparkle-spin_0.6s_ease-in-out]"
+                aria-hidden
+              />
+              {en.badges.unlockedToast}
+            </p>
+            <p className="truncate font-mono text-sm text-text">{en.badges[lastBadge.id].name}</p>
+          </div>
+        </div>
+      )}
       {show && reward && (
         <div
           key={reward.id}
