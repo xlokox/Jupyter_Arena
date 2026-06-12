@@ -56,6 +56,13 @@ export const ChallengeSchema = z.object({
   estMinutes: z.number().int().min(2).max(20),
   version: z.number().int().min(1),
   unlockLevelOverride: z.number().int().positive().optional(),
+  // Learn-first layer (beginner sectors). All optional in the schema; the
+  // validator requires conceptCard + lineNotes for py/da only.
+  conceptCard: z.string().optional(),
+  lineNotes: z
+    .array(z.object({ line: z.number().int().positive(), noteMd: z.string().min(1) }))
+    .optional(),
+  takeaway: z.string().optional(),
 });
 
 export type Sector = z.infer<typeof SectorSchema>;

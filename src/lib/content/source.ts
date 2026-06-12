@@ -36,6 +36,9 @@ interface ChallengeRow {
   explanation_md: string;
   est_minutes: number;
   version: number;
+  concept_card?: string | null;
+  line_notes?: Array<{ line: number; noteMd: string }> | null;
+  takeaway?: string | null;
   challenge_options: Array<{
     option_key: string;
     label: string;
@@ -104,6 +107,9 @@ export function mapChallengeRow(row: ChallengeRow): Challenge {
     },
     estMinutes: row.est_minutes,
     version: row.version,
+    conceptCard: row.concept_card ?? undefined,
+    lineNotes: row.line_notes ?? undefined,
+    takeaway: row.takeaway ?? undefined,
   });
 }
 
