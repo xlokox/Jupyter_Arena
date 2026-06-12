@@ -1,0 +1,62 @@
+{
+  "id": "db-012-count-vs-count-star",
+  "sector": "db",
+  "difficulty": "easy",
+  "title": "db_012_count_vs_count_star.sql",
+  "language": "sql",
+  "icon": "list-todo",
+  "conceptTags": ["sql", "count", "null-handling", "aggregation", "distinct"],
+  "descriptionMd": "## Mission: Count the Right Thing — Rows vs. Non-NULL Values\n\nThe analytics query counts the number of users who have set a profile photo. The `profile_photo_url` column is NULL for users who have not uploaded a photo and contains a URL string for those who have. The query uses `COUNT(*)`, which counts all rows — including those where `profile_photo_url` is NULL.\n\nThe query returns 5,000 (all users), but the actual number of users with a photo is 1,847.\n\nChange the query to count only rows where `profile_photo_url` is not NULL.",
+  "initialCode": "SELECT COUNT(*) AS users_with_photo\nFROM users;",
+  "buggyLineStart": 1,
+  "buggyLineEnd": 2,
+  "traceback": "Expected: 1847 (users where profile_photo_url IS NOT NULL)\nActual:   5000 (all users, including those with NULL profile_photo_url)\n\nCOUNT(*) counts all rows regardless of column values.\nCOUNT(column) counts only rows where the column is NOT NULL.",
+  "correctOutput": "users_with_photo\n----------------\n1847",
+  "options": [
+    {
+      "key": "a",
+      "label": "Use COUNT(profile_photo_url) — it skips NULL values automatically",
+      "patchCode": "SELECT COUNT(profile_photo_url) AS users_with_photo\nFROM users;",
+      "isCorrect": true,
+      "resultLog": "users_with_photo\n----------------\n1847",
+      "rationale": "`COUNT(expression)` counts the number of rows where `expression` is NOT NULL. For `COUNT(profile_photo_url)`, every row where `profile_photo_url` is NULL is skipped. The result is exactly the count of users who have a non-NULL profile photo URL. This is a fundamental property of `COUNT` with a column argument versus `COUNT(*)`: the latter counts all rows, the former counts non-NULL values."
+    },
+    {
+      "key": "b",
+      "label": "Add a WHERE filter: WHERE profile_photo_url IS NOT NULL",
+      "patchCode": "SELECT COUNT(*) AS users_with_photo\nFROM users\nWHERE profile_photo_url IS NOT NULL;",
+      "isCorrect": false,
+      "resultLog": "users_with_photo\n----------------\n1847\n\nCorrect result. But the WHERE clause filters rows before COUNT(*) runs.\nFor a simple count of non-NULL values, COUNT(column) is more idiomatic\nand does the same thing in one clause without filtering the dataset.",
+      "rationale": "Adding `WHERE profile_photo_url IS NOT NULL` produces the correct count by pre-filtering to only rows with a photo. The result is 1,847. This approach is valid but adds an extra WHERE clause for a task that `COUNT(column)` handles natively. It also prevents counting other columns in the same query without additional subqueries — e.g., counting both users with a photo and total users in one pass requires keeping `COUNT(*)` (for total) and adding `COUNT(profile_photo_url)` (for with-photo) without a WHERE filter. `COUNT(column)` is the idiomatic and flexible choice."
+    },
+    {
+      "key": "c",
+      "label": "Use COUNT(DISTINCT profile_photo_url) to count unique photo URLs",
+      "patchCode": "SELECT COUNT(DISTINCT profile_photo_url) AS users_with_photo\nFROM users;",
+      "isCorrect": false,
+      "resultLog": "users_with_photo\n----------------\n312\n\nCOUNT(DISTINCT) counts unique non-NULL values.\nBut many users may share the same default avatar URL — they are counted as 1.\n1847 users have a photo, but only 312 unique photo URLs exist in the system.\nThe question was 'how many users have a photo', not 'how many unique photos'.",
+      "rationale": "`COUNT(DISTINCT column)` counts the number of distinct non-NULL values. It correctly excludes NULLs, but it also deduplicates identical URLs. If multiple users have the same default avatar URL, those users are counted as 1. The question was how many users have a photo URL, not how many distinct URLs exist. `COUNT(profile_photo_url)` counts rows with a non-NULL value; `COUNT(DISTINCT profile_photo_url)` counts unique non-NULL values — a different question."
+    }
+  ],
+  "hints": [
+    "`COUNT(*)` counts all rows including those where every column is NULL. `COUNT(column)` has a different behavior for NULL values. How does `COUNT` treat NULL arguments?",
+    "Line 1: change `COUNT(*)` to `COUNT(profile_photo_url)`. SQL's `COUNT` with a column argument automatically skips rows where the column value is NULL — returning the count of rows that have a photo URL."
+  ],
+  "explanationMd": "### Why the bug occurs\n`COUNT(*)` counts all rows in the result set, regardless of column values. Every row — including those where `profile_photo_url` is NULL — is counted. The result is 5,000 (all users), not 1,847 (users with a photo).\n\n### Why the fix is correct\n`COUNT(expression)` follows SQL's general rule for aggregate functions with NULL arguments: NULL values are excluded from the computation. `COUNT(profile_photo_url)` counts only rows where `profile_photo_url IS NOT NULL`. The result is exactly the count of users who have uploaded a profile photo.",
+  "recruiterReview": "Correct fix and a concise explanation of the COUNT(*) vs COUNT(column) distinction. The WHERE clause distractor produces the right answer and is a valid approach, but it prevents multi-metric queries in one pass — a practical limitation worth knowing. The DISTINCT distractor is a subtle gotcha: it excludes NULLs (good) but also deduplicates (wrong for 'how many users') — confusing 'unique URLs' with 'users who have a URL' is a common analytics error that produces confidently wrong numbers. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## COUNT(*) vs COUNT(column) vs COUNT(DISTINCT column)\n\nThese three forms of `COUNT` answer different questions:\n\n### COUNT(*)\nCounts all rows, including those where every column is NULL. Use for: total row count, number of items in a group, number of events.\n```sql\nSELECT COUNT(*) FROM orders;  -- total orders (including cancelled)\n```\n\n### COUNT(column)\nCounts rows where `column` is NOT NULL. NULL values are automatically excluded. Use for: how many rows have a value in this column.\n```sql\nSELECT COUNT(shipped_at) FROM orders;  -- orders that have been shipped\n```\n\n### COUNT(DISTINCT column)\nCounts unique non-NULL values of `column`. Use for: cardinality, how many distinct values exist.\n```sql\nSELECT COUNT(DISTINCT customer_id) FROM orders;  -- number of unique customers who ordered\n```\n\n### Side-by-side comparison\n```sql\nSELECT\n  COUNT(*)                        AS total_orders,\n  COUNT(shipped_at)               AS shipped_orders,\n  COUNT(DISTINCT customer_id)     AS unique_customers,\n  COUNT(coupon_code)              AS orders_with_coupon\nFROM orders;\n```\n\n### NULL in other aggregate functions\n- `SUM(column)` — NULLs ignored; sum of all-NULL group is NULL\n- `AVG(column)` — NULLs excluded from both numerator and denominator\n- `MAX(column)` / `MIN(column)` — NULLs ignored\n- `STRING_AGG(column, ',')` — NULLs excluded from concatenation\n\n### FILTER clause (PostgreSQL 9.4+)\nConditional aggregation without a WHERE clause:\n```sql\nSELECT\n  COUNT(*) AS total,\n  COUNT(*) FILTER (WHERE shipped_at IS NOT NULL) AS shipped,\n  COUNT(*) FILTER (WHERE cancelled_at IS NOT NULL) AS cancelled\nFROM orders;\n```\nThis is equivalent to `COUNT(CASE WHEN ... THEN 1 END)` but more readable.",
+    "videos": [
+      {
+        "title": "SQL COUNT star vs COUNT column — NULL handling difference",
+        "searchQuery": "SQL COUNT star vs COUNT column NULL handling difference explained"
+      },
+      {
+        "title": "SQL aggregation NULL values — SUM AVG COUNT MAX MIN null behavior",
+        "searchQuery": "SQL aggregation NULL values SUM AVG COUNT MAX MIN null behavior aggregate"
+      }
+    ]
+  },
+  "estMinutes": 3,
+  "version": 1
+}

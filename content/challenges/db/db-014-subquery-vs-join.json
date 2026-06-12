@@ -1,0 +1,62 @@
+{
+  "id": "db-014-subquery-vs-join",
+  "sector": "db",
+  "difficulty": "medium",
+  "title": "db_014_subquery_vs_join.sql",
+  "language": "sql",
+  "icon": "network",
+  "conceptTags": ["sql", "subquery", "correlated-subquery", "join", "query-optimization"],
+  "descriptionMd": "## Mission: Replace the Correlated Subquery With a JOIN\n\nThe report shows each product alongside its category name. The query uses a correlated subquery in the `SELECT` list: for each product row, a sub-SELECT looks up the category name by `category_id`. This executes once per product row — 50,000 products means 50,000 separate inner queries.\n\n`EXPLAIN ANALYZE` shows: `SubPlan (actual loops=50000)`. Total query time is 12 seconds.\n\nA `JOIN` fetches the same data in one operation. The database can choose a hash join, merge join, or nested-loop join over the entire dataset — far more efficient than 50,000 individual lookups.",
+  "initialCode": "SELECT\n  p.id,\n  p.name,\n  p.price,\n  (SELECT c.name FROM categories c WHERE c.id = p.category_id) AS category_name\nFROM products p;",
+  "buggyLineStart": 4,
+  "buggyLineEnd": 4,
+  "traceback": "EXPLAIN ANALYZE:\n  Seq Scan on products p  (actual time=0.020..12147.332 rows=50000 loops=1)\n    SubPlan 1\n      ->  Index Scan on categories c\n          (actual time=0.238..0.239 rows=1 loops=50000)\n  Planning Time: 0.8 ms\n  Execution Time: 12147.4 ms\n\nSubPlan loops=50000 — inner query executed once per product row.",
+  "correctOutput": "EXPLAIN ANALYZE:\n  Hash Join  (cost=...)\n    Hash Cond: (p.category_id = c.id)\n    -> Seq Scan on products p  (rows=50000)\n    -> Hash on categories c    (rows=200, built once)\n  Execution Time: 48ms (was 12147ms)",
+  "options": [
+    {
+      "key": "a",
+      "label": "Replace the correlated subquery with a JOIN to categories",
+      "patchCode": "SELECT\n  p.id,\n  p.name,\n  p.price,\n  c.name AS category_name\nFROM products p\nJOIN categories c ON c.id = p.category_id;",
+      "isCorrect": true,
+      "resultLog": "EXPLAIN ANALYZE:\n  Hash Join  (cost=5.28..1256.28 rows=50000 width=80)\n    Hash Cond: (p.category_id = c.id)\n    -> Seq Scan on products p  (rows=50000 loops=1)\n    -> Hash on categories c    (rows=200 loops=1)\n  Execution Time: 48ms (was 12147ms)",
+      "rationale": "A `JOIN` lets the query planner choose the most efficient strategy for combining the two tables. For 50,000 products and 200 categories, the planner chooses a hash join: it scans `categories` once (200 rows) to build a hash table, then probes it for each product row. Total work: O(50,000 + 200) instead of O(50,000 × 1 index lookup). The correlated subquery was forcing O(50,000 × index_lookup) — the same asymptotic complexity but with 50,000 round-trips through the subplan machinery."
+    },
+    {
+      "key": "b",
+      "label": "Cache the subquery result in a CTE and join to it",
+      "patchCode": "WITH category_names AS (\n  SELECT id, name FROM categories\n)\nSELECT\n  p.id,\n  p.name,\n  p.price,\n  cn.name AS category_name\nFROM products p\nJOIN category_names cn ON cn.id = p.category_id;",
+      "isCorrect": false,
+      "resultLog": "EXPLAIN ANALYZE (PostgreSQL 12+):\n  Hash Join\n    -> Seq Scan on products p  (rows=50000)\n    -> CTE Scan on category_names  (rows=200)\n  Execution Time: 52ms ✓\n\nPerformance fix: ✓ — CTE is joined rather than correlated.\n\nNote: In PostgreSQL 12+, CTEs are inlined by default unless they have\nside effects or MATERIALIZED is specified. The planner treats this\nidentically to the direct JOIN for simple non-recursive CTEs.",
+      "rationale": "In PostgreSQL 12+, simple `WITH` CTEs (non-recursive, no side effects) are inlined by the planner and treated identically to a subquery or direct JOIN — the execution plan is the same as option A. In PostgreSQL 11 and earlier, CTEs were always materialized (executed once and stored), which could improve or hurt performance. For this query, the CTE approach works but adds indirection without benefit: a direct `JOIN` is clearer and unambiguously efficient."
+    },
+    {
+      "key": "c",
+      "label": "Use a subquery in FROM (derived table) instead of a correlated scalar subquery",
+      "patchCode": "SELECT\n  p.id,\n  p.name,\n  p.price,\n  cats.name AS category_name\nFROM products p\nJOIN (SELECT id, name FROM categories) cats ON cats.id = p.category_id;",
+      "isCorrect": false,
+      "resultLog": "EXPLAIN ANALYZE:\n  Hash Join\n    -> Seq Scan on products p  (rows=50000)\n    -> Hash on subquery (categories scan, rows=200)\n  Execution Time: 50ms ✓\n\nPerformance fix: ✓ — derived table is joined, not correlated.\n\nBut the subquery in FROM adds unnecessary nesting.\nFor a simple case with no derived columns, joining the base table directly\nis cleaner: `JOIN categories c ON c.id = p.category_id`.",
+      "rationale": "A derived table (subquery in `FROM`) is not correlated — it executes once and its result is joined to the outer query. The planner handles this the same way as a direct join for simple cases. The performance problem is solved. However, the `(SELECT id, name FROM categories)` subquery adds a layer of indirection with no benefit: `JOIN categories c` is shorter, clearer, and semantically identical. The direct JOIN is the canonical form."
+    }
+  ],
+  "hints": [
+    "A correlated subquery in the `SELECT` list runs once per row of the outer query. For 50,000 product rows, that is 50,000 executions of the inner SELECT. What SQL construct evaluates the same join condition once across the entire dataset rather than once per row?",
+    "Line 4: replace `(SELECT c.name FROM categories c WHERE c.id = p.category_id) AS category_name` with a `JOIN`: add `JOIN categories c ON c.id = p.category_id` after `FROM products p` and change line 4 to `c.name AS category_name`."
+  ],
+  "explanationMd": "### Why the bug occurs\nA correlated subquery in the `SELECT` list is re-executed for every row of the outer query. For 50,000 product rows, the inner `SELECT c.name FROM categories WHERE c.id = p.category_id` runs 50,000 times. Even though each inner query is fast (index scan, ~0.24ms), the total is 50,000 × 0.24ms ≈ 12 seconds. The query planner cannot hoist a correlated subquery out of the per-row execution loop.\n\n### Why the fix is correct\nA `JOIN` gives the query planner freedom to choose its execution strategy across the entire dataset. With 50,000 products and 200 categories, the planner chooses a hash join: build a hash table of all 200 category rows once, then probe it for each product. Total lookups: 50,000 probes into a 200-entry hash table, each O(1). The categories table is read once, not 50,000 times.",
+  "recruiterReview": "Correct fix and the loops=50000 in EXPLAIN output is the smoking gun — any query with a SubPlan where loops equals the outer row count is a correlated subquery that should be a JOIN. The CTE distractor is interesting: in modern PostgreSQL it's effectively equivalent (CTEs are inlined), but in older versions it was actually a different execution strategy. The derived-table distractor solves the performance problem but adds unnecessary nesting — recognizing that `JOIN categories c` is the canonical, clean form shows you prefer clarity over demonstrating subquery knowledge. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Correlated Subqueries vs JOINs: When to Use Each\n\nA correlated subquery references columns from the outer query. This forces it to execute once per outer row — O(N × inner_cost) instead of the planner-optimized O(N + M) of a JOIN.\n\n### When a subquery is correlated\n```sql\n-- CORRELATED: p.category_id references the outer query\nSELECT p.name,\n  (SELECT c.name FROM categories c WHERE c.id = p.category_id)\nFROM products p;\n```\n\n### Equivalent JOIN\n```sql\n-- JOIN: planner chooses hash join, nested loop, or merge join globally\nSELECT p.name, c.name\nFROM products p\nJOIN categories c ON c.id = p.category_id;\n```\n\n### EXPLAIN: detecting correlated subqueries\nLook for in the EXPLAIN output:\n- `SubPlan` with `loops=N` where N equals the outer row count\n- `InitPlan` with `loops=N` (scalar correlated subquery)\n\n### When correlated subqueries ARE appropriate\n- **Existence checks**: `WHERE EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = c.id)` — this is often compiled to a semi-join by the planner anyway\n- **Lateral joins** (PostgreSQL): `FROM products p, LATERAL (SELECT ... LIMIT 3) top` — explicit correlated subquery with controlled cardinality\n- **Complex filtering** that cannot easily be expressed as a join condition\n\nThe key signal for replacing a correlated subquery with a JOIN: the subquery is in the `SELECT` list and returns a scalar value. This is almost always more efficient as a `JOIN` or `LEFT JOIN`.\n\n### CTEs: WITH clauses\nA CTE (`WITH name AS (...)`) is a named subquery. In PostgreSQL 12+, simple CTEs are inlined and treated like a derived table or direct reference — the planner optimizes through them. Use CTEs for:\n- Readability: breaking a complex query into named steps\n- Recursive queries (`WITH RECURSIVE`)\n- Multiple references to the same subquery (inline once, reference multiple times)\n\n### Common variations of the correlated-subquery performance bug\n- Scalar subquery in SELECT list returning a single column value\n- Correlated subquery in WHERE: `WHERE (SELECT COUNT(*) ...) > 5` — often better as a JOIN + HAVING\n- Correlated UPDATE: `UPDATE t SET col = (SELECT ... FROM other WHERE ...)` — use a JOIN-based update instead",
+    "videos": [
+      {
+        "title": "SQL correlated subquery vs JOIN — performance and EXPLAIN analysis",
+        "searchQuery": "SQL correlated subquery vs JOIN performance EXPLAIN loops optimization"
+      },
+      {
+        "title": "SQL subqueries in SELECT list — when to use a JOIN instead",
+        "searchQuery": "SQL scalar subquery SELECT list replace with JOIN performance"
+      }
+    ]
+  },
+  "estMinutes": 6,
+  "version": 1
+}

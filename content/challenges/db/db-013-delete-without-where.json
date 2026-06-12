@@ -1,0 +1,62 @@
+{
+  "id": "db-013-delete-without-where",
+  "sector": "db",
+  "difficulty": "hard",
+  "title": "db_013_delete_without_where.sql",
+  "language": "sql",
+  "icon": "hard-drive",
+  "conceptTags": ["sql", "delete", "where-clause", "data-safety", "truncate"],
+  "descriptionMd": "## Mission: Add the WHERE Clause Before DELETE Wipes the Table\n\nA maintenance script is supposed to delete only expired session tokens — those where `expires_at` is in the past. The script runs `DELETE FROM sessions`, without a `WHERE` clause. Without a `WHERE`, `DELETE` removes every row in the table — including active sessions for currently logged-in users.\n\nThe table has 2.3 million rows. Only 840,000 are expired (`expires_at < NOW()`). The remaining 1.46 million are active sessions. Running this `DELETE` without a `WHERE` clause logs out every user simultaneously.\n\nAdd the `WHERE` clause that limits the deletion to expired tokens only. Also add an explicit `BEGIN`/`COMMIT` so the deletion is transactional and can be verified before committing.",
+  "initialCode": "-- Meant to delete only expired sessions, but deletes everything:\nDELETE FROM sessions;",
+  "buggyLineStart": 2,
+  "buggyLineEnd": 2,
+  "traceback": "Production incident:\n  DELETE FROM sessions; — no WHERE clause\n  All 2,300,000 rows deleted in 3.4 seconds.\n  1,460,000 active session tokens deleted.\n  All logged-in users immediately logged out.\n  Auth service errors spiked to 100% for 8 minutes during restore.\n\nRoot cause: missing WHERE clause — DELETE without WHERE is TRUNCATE.",
+  "correctOutput": "BEGIN;\nDELETE FROM sessions WHERE expires_at < NOW();\n-- Verify before committing:\n-- SELECT COUNT(*) FROM sessions;  -- should be ~1,460,000\nCOMMIT;\n\nRows deleted: 840,000 (expired only)\nRows remaining: 1,460,000 (active sessions preserved)",
+  "options": [
+    {
+      "key": "a",
+      "label": "Add WHERE expires_at < NOW() and wrap in BEGIN/COMMIT for a transactional, verifiable delete",
+      "patchCode": "BEGIN;\nDELETE FROM sessions\nWHERE expires_at < NOW();\n-- Optionally verify row count before committing:\n-- SELECT COUNT(*) FROM sessions;\nCOMMIT;",
+      "isCorrect": true,
+      "resultLog": "BEGIN;\nDELETE FROM sessions WHERE expires_at < NOW();\n\nRows deleted: 840,000 (expired only)\nRows remaining: 1,460,000 (active sessions preserved)\nCOMMIT;\n\nActive users remain logged in. No production incident.",
+      "rationale": "`WHERE expires_at < NOW()` limits the deletion to rows where the expiration timestamp is in the past — exactly the expired sessions. The `BEGIN`/`COMMIT` block wraps the operation in a transaction: after the `DELETE` runs but before `COMMIT`, you can run a `SELECT COUNT(*)` to verify the remaining row count looks correct. If the count is wrong, `ROLLBACK` undoes the deletion with no data loss. The transaction also ensures the deletion is atomic — the table is never in a partial state visible to other queries."
+    },
+    {
+      "key": "b",
+      "label": "Use TRUNCATE TABLE sessions instead of DELETE to clear the table faster",
+      "patchCode": "TRUNCATE TABLE sessions;",
+      "isCorrect": false,
+      "resultLog": "All 2,300,000 rows deleted instantly.\n\nTRUNCATE is faster than DELETE (no row-by-row logging) but it:\n  1. Deletes ALL rows — same as DELETE without WHERE\n  2. Cannot have a WHERE clause — cannot be selective\n  3. In PostgreSQL, TRUNCATE is transactional but acquires an\n     ACCESS EXCLUSIVE lock that blocks all reads and writes\n\nThis is not the right operation for selective deletion of expired rows.",
+      "rationale": "`TRUNCATE TABLE` removes all rows from a table instantly by deallocating the table's data pages rather than scanning and deleting individual rows. It is much faster than `DELETE` for clearing an entire table, but it has no `WHERE` clause — it always deletes everything. For the maintenance task of deleting only expired sessions, `TRUNCATE` is the wrong tool. `DELETE FROM sessions WHERE expires_at < NOW()` is the correct selective deletion."
+    },
+    {
+      "key": "c",
+      "label": "Create a new table with only the active sessions and replace the original",
+      "patchCode": "BEGIN;\n-- Copy active sessions to a new table\nCREATE TABLE sessions_active AS\nSELECT * FROM sessions WHERE expires_at >= NOW();\n\n-- Swap tables\nDROP TABLE sessions;\nALTER TABLE sessions_active RENAME TO sessions;\nCOMMIT;",
+      "isCorrect": false,
+      "resultLog": "BEGIN;\nCREATE TABLE sessions_active AS SELECT ...\n  → 1,460,000 rows copied ✓\nDROP TABLE sessions;\n  → All original data gone — no rollback possible after DROP\nALTER TABLE sessions_active RENAME TO sessions;\nCOMMIT;\n\nIssues:\n  DROP TABLE inside a transaction still drops the table immediately.\n  Indexes, constraints, and triggers on the original table are NOT preserved.\n  During the swap window, queries on sessions return 'table not found'.",
+      "rationale": "The create-new-table-and-swap pattern (sometimes called 'online table rebuild') is a real technique used when `DELETE` is too slow or generates too much WAL. But it has significant hazards here: `DROP TABLE` removes the original table and all its indexes and constraints; `RENAME` creates a new table without them. The swap window between `DROP` and `RENAME` briefly makes the table unavailable. The `DELETE WHERE expires_at < NOW()` is the correct, direct, safe operation. The swap pattern is appropriate for schema changes, not for routine data purges."
+    }
+  ],
+  "hints": [
+    "`DELETE FROM sessions` without a `WHERE` clause deletes every row in the table — equivalent to `TRUNCATE`. What clause do you add to limit `DELETE` to only the rows you want to remove?",
+    "Line 2: add `WHERE expires_at < NOW()` to limit the delete to expired sessions. Also add `BEGIN;` before and `COMMIT;` after so you can run `SELECT COUNT(*) FROM sessions` to verify the row count looks correct before committing."
+  ],
+  "explanationMd": "### Why the bug occurs\n`DELETE FROM table` without a `WHERE` clause is valid SQL that deletes every row in the table. The database does not require a `WHERE` clause. A missing condition — due to a typo, forgotten clause, or copy-paste error — silently becomes a table-clearing operation.\n\n### Why the fix is correct\n`WHERE expires_at < NOW()` filters the deletion to rows where the expiration timestamp is before the current time — exactly the expired session tokens. The `BEGIN`/`COMMIT` block adds a safety layer: the deletion runs inside a transaction that can be inspected (via `SELECT COUNT(*)`) and rolled back (`ROLLBACK`) if the row counts look wrong, before `COMMIT` makes the change permanent. This is standard safe practice for any destructive bulk operation.",
+  "recruiterReview": "Correct fix and the right lesson: `DELETE` without `WHERE` is one of the most dangerous mistakes in SQL, and the mitigation — wrapping destructive operations in a transaction with a count check before committing — is standard production database hygiene. The TRUNCATE distractor is good because developers often reach for TRUNCATE when they mean DELETE (it's 'faster'), not realizing it's unconditional. The table-swap distractor represents a real advanced technique being misapplied — the lack of index/constraint preservation and the unavailability window are real hazards that a senior engineer would flag in a review. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Safe Bulk DELETE: WHERE Clauses and Transactional Verification\n\n`DELETE` is one of the most dangerous SQL operations because it is irreversible once committed and scales from 'delete one row' to 'delete the entire table' with the sole difference being the presence of a `WHERE` clause.\n\n### The rule: always write WHERE before DELETE\nBefore pressing enter on any `DELETE` statement in production:\n1. Write the `WHERE` clause first, before the `DELETE` keyword\n2. Run a `SELECT COUNT(*) ... WHERE [same condition]` to see how many rows will be affected\n3. Wrap in `BEGIN` / `COMMIT` and verify the count after the `DELETE` but before committing\n\n### Transaction pattern for safe deletion\n```sql\nBEGIN;\n\n-- 1. Check how many rows qualify:\nSELECT COUNT(*) FROM sessions WHERE expires_at < NOW();\n-- expected: ~840,000\n\n-- 2. Delete them:\nDELETE FROM sessions WHERE expires_at < NOW();\n-- DELETE 840000\n\n-- 3. Verify the remaining count looks right:\nSELECT COUNT(*) FROM sessions;\n-- expected: ~1,460,000 active sessions\n\n-- 4. If counts look correct:\nCOMMIT;\n-- or ROLLBACK to undo everything\n```\n\n### TRUNCATE vs DELETE\n- `TRUNCATE` removes all rows instantly by deallocating pages — no WHERE, no row-by-row logging. Faster for clearing an entire table.\n- `DELETE` scans and removes rows one-by-one (or in batches), respects WHERE, can be rolled back, fires triggers.\n- Use `TRUNCATE` to empty a table completely. Use `DELETE WHERE` to remove specific rows.\n\n### Batching large deletes\nDeleting millions of rows in a single transaction can:\n- Hold locks for a long time, blocking other queries\n- Generate large amounts of WAL (write-ahead log)\n- Cause table bloat (dead rows not yet vacuumed)\n\nBatch the deletion:\n```sql\nDO $$\nDECLARE deleted INT;\nBEGIN\n  LOOP\n    DELETE FROM sessions\n    WHERE expires_at < NOW()\n      AND ctid IN (\n        SELECT ctid FROM sessions WHERE expires_at < NOW() LIMIT 10000\n      );\n    GET DIAGNOSTICS deleted = ROW_COUNT;\n    EXIT WHEN deleted = 0;\n    PERFORM pg_sleep(0.1);  -- brief pause between batches\n  END LOOP;\nEND;\n$$;\n```\n\n### Soft delete pattern\nFor data that may need to be recovered, consider soft deletes:\n```sql\n-- Instead of DELETE:\nUPDATE items SET deleted_at = NOW() WHERE id = $1;\n\n-- Query active records:\nSELECT * FROM items WHERE deleted_at IS NULL;\n```\nThis trades storage for recoverability.",
+    "videos": [
+      {
+        "title": "SQL DELETE safety — WHERE clause, transactions, and batch deletion",
+        "searchQuery": "SQL DELETE safely WHERE clause transaction verify batch delete production"
+      },
+      {
+        "title": "SQL TRUNCATE vs DELETE — differences and when to use each",
+        "searchQuery": "SQL TRUNCATE vs DELETE difference WHERE clause rollback performance"
+      }
+    ]
+  },
+  "estMinutes": 5,
+  "version": 1
+}

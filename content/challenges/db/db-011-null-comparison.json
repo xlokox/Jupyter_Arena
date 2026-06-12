@@ -1,0 +1,62 @@
+{
+  "id": "db-011-null-comparison",
+  "sector": "db",
+  "difficulty": "easy",
+  "title": "db_011_null_comparison.sql",
+  "language": "sql",
+  "icon": "filter",
+  "conceptTags": ["sql", "null", "is-null", "three-value-logic", "filtering"],
+  "descriptionMd": "## Mission: Find Records Where a Column Is Null\n\nThe admin query should find all users who have not yet confirmed their email — those with a NULL value in the `confirmed_at` column. The query uses `WHERE confirmed_at = NULL`, which returns zero rows even though many users have `confirmed_at IS NULL`.\n\nIn SQL, `NULL` means \"unknown\". Comparing anything to an unknown value produces UNKNOWN, not TRUE or FALSE. `NULL = NULL` evaluates to UNKNOWN, and UNKNOWN rows are excluded from the result. The equality operator `=` cannot test for NULL — only the special predicate `IS NULL` (or `IS NOT NULL`) can.\n\nFix the WHERE clause to correctly identify rows where `confirmed_at` has no value.",
+  "initialCode": "SELECT id, email, created_at\nFROM users\nWHERE confirmed_at = NULL;",
+  "buggyLineStart": 3,
+  "buggyLineEnd": 3,
+  "traceback": "Query returned 0 rows.\n\nExpected: 847 rows (users with confirmed_at IS NULL).\nActual:   0 rows.\n\nReason: NULL = NULL evaluates to UNKNOWN in SQL three-value logic.\nUNKNOWN rows are excluded by WHERE. No row ever matches `column = NULL`.",
+  "correctOutput": "id    | email                  | created_at\n------|------------------------|------------\n42    | pending@example.com    | 2024-01-15\n...\n(847 rows — all users with confirmed_at IS NULL)",
+  "options": [
+    {
+      "key": "a",
+      "label": "Use IS NULL instead of = NULL to check for missing values",
+      "patchCode": "SELECT id, email, created_at\nFROM users\nWHERE confirmed_at IS NULL;",
+      "isCorrect": true,
+      "resultLog": "id    | email                  | created_at\n------|------------------------|------------\n42    | pending@example.com    | 2024-01-15\n...\n(847 rows — all users with confirmed_at IS NULL)",
+      "rationale": "`IS NULL` is a special predicate — not an operator — that tests whether a value is NULL. Unlike `= NULL`, `IS NULL` returns TRUE when the value is NULL and FALSE otherwise. It is the only way to test for NULL in SQL. Similarly, `IS NOT NULL` tests for the absence of NULL. The `= NULL` comparison always evaluates to UNKNOWN because NULL represents an unknown value, and comparing any value (even another NULL) to an unknown is itself unknown."
+    },
+    {
+      "key": "b",
+      "label": "Use COALESCE to convert NULL to a sentinel value and compare to that: WHERE COALESCE(confirmed_at, '1970-01-01') = '1970-01-01'",
+      "patchCode": "SELECT id, email, created_at\nFROM users\nWHERE COALESCE(confirmed_at, '1970-01-01') = '1970-01-01';",
+      "isCorrect": false,
+      "resultLog": "id    | email                  | created_at\n------|------------------------|------------\n42    | pending@example.com    | 2024-01-15\n...\n(847 rows) ✓ — technically correct result.\n\nBut: this approach is fragile — any user who confirmed on 1970-01-01\nwould also be included. Also: the COALESCE prevents index use on confirmed_at.",
+      "rationale": "`COALESCE(confirmed_at, '1970-01-01') = '1970-01-01'` correctly identifies rows where `confirmed_at` is NULL (because `COALESCE` substitutes the sentinel), but it also incorrectly includes rows where `confirmed_at` actually equals `'1970-01-01'`. More importantly, wrapping the column in `COALESCE` prevents the query planner from using an index on `confirmed_at`. `IS NULL` is the correct, concise, index-aware predicate."
+    },
+    {
+      "key": "c",
+      "label": "Use NOT (confirmed_at IS NOT NULL) to find rows that are not confirmed",
+      "patchCode": "SELECT id, email, created_at\nFROM users\nWHERE NOT (confirmed_at IS NOT NULL);",
+      "isCorrect": false,
+      "resultLog": "id    | email                  | created_at\n------|------------------------|------------\n42    | pending@example.com    | 2024-01-15\n...\n(847 rows) ✓ — logically correct.\n\nBut: double negation is unnecessarily complex. `IS NULL` is the direct,\nreadable predicate. `NOT (x IS NOT NULL)` is equivalent but harder to read.",
+      "rationale": "`NOT (confirmed_at IS NOT NULL)` is logically equivalent to `confirmed_at IS NULL` — in SQL three-value logic, NOT TRUE = FALSE, NOT FALSE = TRUE, NOT UNKNOWN = UNKNOWN — and the result is correct. But it is double negation: two logical inversions where one direct test suffices. Code that uses `IS NULL` is clearer, more idiomatic, and immediately communicates the intent to every reader."
+    }
+  ],
+  "hints": [
+    "In SQL, `NULL` means 'unknown'. Comparing anything to an unknown value (`= NULL`) produces UNKNOWN — not TRUE — so the row is excluded. SQL provides a special predicate for testing whether a value is absent. What is it?",
+    "Line 3: `WHERE confirmed_at = NULL` compares the column to NULL using the equality operator, which always produces UNKNOWN. Replace `= NULL` with `IS NULL`. No other change needed."
+  ],
+  "explanationMd": "### Why the bug occurs\nSQL uses three-value logic: TRUE, FALSE, and UNKNOWN. Any comparison involving NULL evaluates to UNKNOWN — including `NULL = NULL`. The `WHERE` clause includes only rows where the predicate evaluates to TRUE; UNKNOWN rows are excluded. `WHERE confirmed_at = NULL` evaluates to UNKNOWN for every row — including rows where `confirmed_at` is NULL — so zero rows are returned.\n\n### Why the fix is correct\n`IS NULL` is a SQL predicate (not an operator) specifically designed to test for the absence of a value. It returns TRUE when the value is NULL and FALSE otherwise. `IS NOT NULL` is its inverse. These are the only constructs in SQL that can reliably detect NULL values.",
+  "recruiterReview": "Correct fix. The `= NULL` bug is one of the most common SQL mistakes and one of the most disorienting for developers coming from languages where `== null` works normally. Zero rows returned with no error is particularly insidious — the query 'works', it just silently returns nothing. The COALESCE distractor demonstrates real thinking (convert NULL to something comparable) but has a false-match edge case and defeats the index. The double-negation distractor is correct but unreadable — recognizing that `IS NULL` is the idiomatic form shows attention to code clarity. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## NULL in SQL: Three-Value Logic and IS NULL\n\nNULL in SQL does not mean zero, empty string, or false. It means *unknown* — the value is absent or not applicable. This leads to three-value logic: every comparison returns TRUE, FALSE, or UNKNOWN.\n\n### Comparisons with NULL always produce UNKNOWN\n```sql\nNULL = NULL     -- UNKNOWN (not TRUE)\nNULL = 1        -- UNKNOWN\n1 = NULL        -- UNKNOWN\nNULL <> NULL    -- UNKNOWN\nNULL > 1        -- UNKNOWN\n```\n\nThe `WHERE` clause, `HAVING`, and `CHECK` constraints include only rows where the predicate is TRUE. UNKNOWN is treated as FALSE for row selection purposes.\n\n### IS NULL and IS NOT NULL\nThese are the only predicates that test for NULL:\n```sql\nWHERE confirmed_at IS NULL       -- TRUE when confirmed_at is NULL\nWHERE confirmed_at IS NOT NULL   -- TRUE when confirmed_at has a value\n```\n\n### NULL in aggregate functions\n- `COUNT(*)` counts all rows including NULLs\n- `COUNT(column)` counts only non-NULL values\n- `SUM(column)`, `AVG(column)`, `MAX(column)` ignore NULL values\n- `SUM` of all NULLs returns NULL (not 0)\n\n### NULL in IN and NOT IN\n`NOT IN` with a subquery that can return NULL has a dangerous behavior:\n```sql\n-- If subquery returns (1, 2, NULL):\nWHERE id NOT IN (1, 2, NULL)\n-- Expands to: WHERE id <> 1 AND id <> 2 AND id <> NULL\n-- The third condition is UNKNOWN for all rows\n-- Result: ZERO ROWS (UNKNOWN AND anything = UNKNOWN or FALSE)\n```\nAlways filter NULL from `NOT IN` subqueries: `WHERE id NOT IN (SELECT id FROM t WHERE id IS NOT NULL)`.\n\n### NULL in ORDER BY\nNULLs sort to the end with `ORDER BY col ASC` (PostgreSQL default) and to the beginning with `ORDER BY col DESC`. Control explicitly with `NULLS FIRST` / `NULLS LAST`.\n\n### COALESCE and NULLIF\n- `COALESCE(a, b, c)` returns the first non-NULL argument. Use for default values.\n- `NULLIF(a, b)` returns NULL if `a = b`, else returns `a`. Use to convert sentinel values to NULL.\n\n### Common NULL bugs\n- `WHERE col <> 'active'` — excludes rows where `col IS NULL` (UNKNOWN, not TRUE)\n- `WHERE NOT (col = 'value')` — also excludes NULLs\n- String concatenation: `'Hello' || NULL` → NULL\n- Arithmetic: `10 + NULL` → NULL",
+    "videos": [
+      {
+        "title": "SQL NULL explained — three-value logic, IS NULL, IS NOT NULL",
+        "searchQuery": "SQL NULL explained three-value logic IS NULL IS NOT NULL comparison"
+      },
+      {
+        "title": "SQL NULL traps — NOT IN subquery NULL bug and COALESCE",
+        "searchQuery": "SQL NULL traps NOT IN subquery NULL bug COALESCE NULLIF explained"
+      }
+    ]
+  },
+  "estMinutes": 4,
+  "version": 1
+}

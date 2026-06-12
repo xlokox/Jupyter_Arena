@@ -1,0 +1,62 @@
+{
+  "id": "db-010-group-by-without-aggregate",
+  "sector": "db",
+  "difficulty": "easy",
+  "title": "db_010_group_by_without_aggregate.sql",
+  "language": "sql",
+  "icon": "list-todo",
+  "conceptTags": ["sql", "group-by", "aggregation", "select-list", "non-grouped-column"],
+  "descriptionMd": "## Mission: Fix the Non-Aggregated Column in GROUP BY\n\nThe sales query groups orders by `customer_id` and sums the `amount`. But the `SELECT` list also includes `order_date`, which is neither in the `GROUP BY` clause nor wrapped in an aggregate function. In standard SQL (and PostgreSQL), every column in the `SELECT` list must either appear in `GROUP BY` or be inside an aggregate function.\n\nThe query fails with an error in PostgreSQL. MySQL's permissive mode silently picks an arbitrary `order_date` value per group — hiding the bug behind incorrect data.\n\nDecide what you want `order_date` to represent per group (the most recent order date, for example) and apply the appropriate aggregate function.",
+  "initialCode": "SELECT\n  customer_id,\n  order_date,\n  SUM(amount) AS total\nFROM orders\nGROUP BY customer_id;",
+  "buggyLineStart": 3,
+  "buggyLineEnd": 3,
+  "traceback": "ERROR:  column \"orders.order_date\" must appear in the GROUP BY clause\n        or be used in an aggregate function\nLINE 3:   order_date,\n          ^\n\nPostgreSQL strict mode: rejects the ambiguous column.\nMySQL with sql_mode='': silently picks an arbitrary order_date per group,\nreturning non-deterministic results without any warning.",
+  "correctOutput": "customer_id | most_recent_order  | total\n------------|--------------------|---------\n1           | 2024-03-15         | 4200.00\n2           | 2024-02-28         | 1850.00\n(rows grouped by customer, most recent order date shown per group)",
+  "options": [
+    {
+      "key": "a",
+      "label": "Wrap order_date in MAX() to show the most recent order date per customer",
+      "patchCode": "SELECT\n  customer_id,\n  MAX(order_date) AS most_recent_order,\n  SUM(amount) AS total\nFROM orders\nGROUP BY customer_id;",
+      "isCorrect": true,
+      "resultLog": "customer_id | most_recent_order  | total\n------------|--------------------|---------\n1           | 2024-03-15         | 4200.00\n2           | 2024-02-28         | 1850.00\n(rows grouped by customer, most recent order date shown per group)",
+      "rationale": "When grouping rows, each `SELECT` column must represent a single value for the group. `order_date` varies across a customer's orders — there is no single unambiguous date to show. `MAX(order_date)` resolves this by defining exactly which value to show: the latest order date per customer group. This is deterministic, meaningful, and satisfies the SQL standard's requirement that all non-GROUP-BY columns be inside aggregate functions."
+    },
+    {
+      "key": "b",
+      "label": "Add order_date to the GROUP BY clause so each unique (customer_id, order_date) is its own group",
+      "patchCode": "SELECT\n  customer_id,\n  order_date,\n  SUM(amount) AS total\nFROM orders\nGROUP BY customer_id, order_date;",
+      "isCorrect": false,
+      "resultLog": "customer_id | order_date | total\n------------|------------|--------\n1           | 2024-01-10 | 150.00\n1           | 2024-02-20 | 800.00\n1           | 2024-03-15 | 3250.00\n2           | 2024-02-28 | 1850.00\n\nNow grouped by (customer_id, order_date) — each order date is a separate group.\nThis is NOT the same as grouping by customer — customer 1 now has 3 rows\ninstead of 1. If the intent was one row per customer, the GROUP BY is wrong.",
+      "rationale": "Adding `order_date` to `GROUP BY` fixes the SQL error, but it changes the semantics: now rows are grouped by every unique `(customer_id, order_date)` pair, producing one result row per customer per day. Customer 1 has 3 orders on 3 different dates — the query returns 3 rows for customer 1 instead of 1. If the goal was a per-customer summary with total amount, this produces incorrect cardinality. The right fix is to aggregate `order_date` — `MAX(order_date)` to show the latest, `MIN(order_date)` for the first, etc."
+    },
+    {
+      "key": "c",
+      "label": "Remove order_date from the SELECT list entirely",
+      "patchCode": "SELECT\n  customer_id,\n  SUM(amount) AS total\nFROM orders\nGROUP BY customer_id;",
+      "isCorrect": false,
+      "resultLog": "customer_id | total\n------------|--------\n1           | 4200.00\n2           | 1850.00\n\nQuery runs. But order_date is now completely absent from the result —\nthe report no longer includes any date information.\nIf the business needs the date, this silently removes a required column.",
+      "rationale": "Removing `order_date` from the `SELECT` list fixes the SQL error. The query is valid and produces a per-customer total. But the original intent was to show an order date in the report — removing it satisfies the query engine while potentially breaking the business requirement. If `order_date` was in the `SELECT` for a reason (the report shows it), the correct approach is to define which date to show with an aggregate (`MAX`, `MIN`, `ANY_VALUE`), not to silently drop the column."
+    }
+  ],
+  "hints": [
+    "When you `GROUP BY customer_id`, each group may contain multiple orders with different `order_date` values. SQL requires every column in `SELECT` to either be in `GROUP BY` (to identify the group) or wrapped in an aggregate function that reduces many values to one. Which aggregate function would give you the most recent date per group?",
+    "Line 3: `order_date` is in the `SELECT` list but not in `GROUP BY` and not aggregated. Wrap it: `MAX(order_date) AS most_recent_order` to show the latest order date per customer group."
+  ],
+  "explanationMd": "### Why the bug occurs\nA `GROUP BY` query collapses multiple rows into one per group. Each group contains many rows with potentially different values in non-grouped columns. SQL requires that every column in the `SELECT` list either identifies the group (appears in `GROUP BY`) or reduces the group's multiple values to one (appears inside an aggregate function). `order_date` varies across a customer's orders — the query engine cannot determine which date to return without explicit instruction.\n\n### Why the fix is correct\n`MAX(order_date)` is an aggregate function that reduces the group's multiple date values to a single value — the maximum (most recent). It satisfies SQL's requirement and produces a deterministic, meaningful result: the date of the customer's most recent order. Other choices (`MIN`, `AVG`, `COUNT`) are valid depending on what the report needs.",
+  "recruiterReview": "Correct fix. The GROUP BY addition distractor is the one I see most often from developers who 'fix the error' without asking whether the result is correct — adding the non-grouped column to GROUP BY silences the error while fundamentally changing the query's semantics (one row per customer-day instead of one row per customer). The remove-column distractor is the lazy fix that works syntactically but may silently break the report. Understanding that `GROUP BY` is a semantic statement about what a 'group' means — not just a list of columns to suppress errors — is what this challenge tests. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## GROUP BY: Every SELECT Column Must Be Grouped or Aggregated\n\nThe SQL standard is strict: in a `GROUP BY` query, every column in the `SELECT` list must either:\n1. Appear in the `GROUP BY` clause (it identifies the group), or\n2. Be the argument to an aggregate function (`SUM`, `MAX`, `MIN`, `COUNT`, `AVG`, etc.) that reduces multiple rows to one value.\n\n### Why the rule exists\nWhen you group rows, each group contains multiple rows. A non-aggregated, non-grouped column has multiple different values per group — there is no single correct value to return. The rule forces you to be explicit: do you want the maximum? The minimum? A count?\n\n### Aggregate functions for common cases\n```sql\nSELECT\n  customer_id,\n  COUNT(*)            AS order_count,\n  SUM(amount)         AS total_amount,\n  MAX(order_date)     AS most_recent_order,\n  MIN(order_date)     AS first_order,\n  AVG(amount)         AS avg_order_value\nFROM orders\nGROUP BY customer_id;\n```\n\n### MySQL's permissive GROUP BY\nMySQL with default settings (`sql_mode` not including `ONLY_FULL_GROUP_BY`) silently picks an arbitrary row's value for non-grouped columns. The result is non-deterministic and produces incorrect reports without any error. Enabling `ONLY_FULL_GROUP_BY` makes MySQL enforce the SQL standard. Always enable it in production.\n\n### PostgreSQL's ANY_VALUE (PostgreSQL 16+)\nPostgreSQL 16 added `ANY_VALUE(col)` — an aggregate that explicitly acknowledges \"I know this column varies per group; just give me any value.\" This is useful for columns that are functionally dependent on the grouped column but the planner can't prove it.\n\n### HAVING vs WHERE\n- `WHERE` filters rows BEFORE grouping\n- `HAVING` filters groups AFTER aggregation\n\n```sql\n-- Customers with more than 5 orders AND total > $1000:\nSELECT customer_id, COUNT(*), SUM(amount)\nFROM orders\nWHERE status = 'completed'     -- filter rows first\nGROUP BY customer_id\nHAVING COUNT(*) > 5            -- filter groups after aggregation\n  AND SUM(amount) > 1000;\n```\n\n### Common variations of this bug\n- Selecting a non-grouped column in a subquery that aggregates — same rule applies.\n- Window functions (`ROW_NUMBER() OVER (PARTITION BY ...)`) allow per-row access to non-grouped columns alongside aggregates — a different tool for different use cases.\n- ORMs that auto-generate `GROUP BY` with all `SELECT` columns to avoid the error — this silently changes the query semantics.",
+    "videos": [
+      {
+        "title": "SQL GROUP BY rules — aggregate functions and non-grouped columns",
+        "searchQuery": "SQL GROUP BY rules aggregate functions non-grouped column error explained"
+      },
+      {
+        "title": "SQL aggregation — SUM MAX MIN COUNT AVG GROUP BY HAVING",
+        "searchQuery": "SQL aggregation SUM MAX MIN COUNT AVG GROUP BY HAVING tutorial examples"
+      }
+    ]
+  },
+  "estMinutes": 4,
+  "version": 1
+}
