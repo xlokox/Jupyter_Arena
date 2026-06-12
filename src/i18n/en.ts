@@ -177,6 +177,13 @@ export const en = {
     recruiterHeading: "Senior Tech Lead — Code Review",
     recruiterRole: "Staff Engineer, reviewing your patch",
     approvedStamp: "APPROVED",
+    conceptCardHeading: "Learn first",
+    conceptCardProceed: "Begin challenge",
+    conceptCardViewLesson: "Read the full lesson →",
+    lineNotesToggle: "What does this code do?",
+    lineNotesHide: "Hide line notes",
+    lineLabel: "Line",
+    takeawayHeading: "Key takeaway",
   },
   landing: {
     navAria: "Main navigation",

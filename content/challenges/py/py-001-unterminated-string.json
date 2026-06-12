@@ -58,5 +58,21 @@
     ]
   },
   "estMinutes": 3,
-  "version": 1
+  "version": 1,
+  "conceptCard": "In this mission you'll meet three building blocks of Python:\n\n- **Strings** — text wrapped in matching quotes, like `\"hello\"`.\n- **Variables** — labels that hold a value, set with `=`.\n- **print()** — shows a value on the screen.\n\nThe code below stores a greeting and prints it, but one quote is missing. Read it, then fix it.",
+  "lineNotes": [
+    {
+      "line": 1,
+      "noteMd": "A line starting with `#` is a **comment** — a note for humans that Python ignores when it runs."
+    },
+    {
+      "line": 2,
+      "noteMd": "This stores some **text** (a *string*) in a label called `message`. Text must sit between matching quotes — notice the opening `\"` but no closing one."
+    },
+    {
+      "line": 3,
+      "noteMd": "`print(...)` shows a value on the screen. Here it should display whatever `message` holds."
+    }
+  ],
+  "takeaway": "A string is text wrapped in matching quotes — open and close with the same quote character."
 }

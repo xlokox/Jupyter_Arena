@@ -115,6 +115,9 @@ test("the daily challenge is always playable for a fresh anonymous player", asyn
   // panel (5.6b: exemption in notebook-view + submit_attempt).
   await page.goto("/daily");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  // If today's pick is a beginner-sector mission, the learn-first card gates it.
+  const begin = page.getByRole("button", { name: "Begin challenge" });
+  if (await begin.isVisible().catch(() => false)) await begin.click();
   await expect(page.locator("[data-run-cell]")).toBeVisible();
   await expect(page.getByRole("region", { name: "This mission is locked" })).toHaveCount(0);
 });

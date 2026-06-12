@@ -58,5 +58,25 @@
     ]
   },
   "estMinutes": 4,
-  "version": 1
+  "version": 1,
+  "conceptCard": "This mission is about **loading data correctly**. Two ideas to know:\n\n- A **CSV** is a text table, and a **delimiter** (a comma, a semicolon, …) separates the values on each line.\n- pandas reads a CSV into a **DataFrame** — a table with named columns you pick out like `df[\"amount\"]`.\n\nThe code loads a sales file and tries to total a column, but the file isn't comma-separated. Find the problem and fix the load.",
+  "lineNotes": [
+    {
+      "line": 1,
+      "noteMd": "Loads the **pandas** library and nicknames it `pd` — the standard toolkit for working with tables of data."
+    },
+    {
+      "line": 4,
+      "noteMd": "`pd.read_csv(...)` reads a CSV file into a **DataFrame** (a table). By default it assumes **commas** separate the values — which is exactly the bug here."
+    },
+    {
+      "line": 6,
+      "noteMd": "`sales.columns` is the list of column names. Printing it is how you check the file loaded into the columns you expect."
+    },
+    {
+      "line": 10,
+      "noteMd": "`sales[\"amount\"]` picks out the amount column, and `.sum()` adds all its values together."
+    }
+  ],
+  "takeaway": "read_csv assumes commas — when columns come through merged, tell it the real delimiter with sep=."
 }

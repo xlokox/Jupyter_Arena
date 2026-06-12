@@ -1,4 +1,4 @@
-import { BadgeCheck, GraduationCap, UserRound } from "lucide-react";
+import { BadgeCheck, GraduationCap, Sparkles, UserRound } from "lucide-react";
 import type { Challenge } from "@/lib/content/schema";
 import { Markdown } from "@/components/markdown";
 import { en } from "@/i18n/en";
@@ -41,6 +41,21 @@ export function SolvePanel({ challenge }: { challenge: Challenge }) {
           {challenge.recruiterReview}
         </p>
       </section>
+
+      {challenge.takeaway && (
+        <section
+          aria-label={en.workspace.takeawayHeading}
+          className="flex items-start gap-3 rounded-md border border-accent/40 bg-accent/5 p-4 motion-safe:animate-[toast-in_0.4s_ease-out_0.24s_both]"
+        >
+          <Sparkles className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden />
+          <div>
+            <p className="font-mono text-[10px] uppercase tracking-wide text-accent">
+              {en.workspace.takeawayHeading}
+            </p>
+            <p className="mt-0.5 text-sm text-text">{challenge.takeaway}</p>
+          </div>
+        </section>
+      )}
     </div>
   );
 }
