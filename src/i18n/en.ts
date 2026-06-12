@@ -151,6 +151,8 @@ export const en = {
     emptyTitle: "Select a notebook to begin",
     emptyBody:
       "Pick a mission from the file explorer. Read the briefing, study the broken cell, choose your fix, and run it.",
+    startBeginner: "New here? Start with Data Analyst",
+    startBeginnerHint: "The Data Analyst sector is open to everyone — no level required.",
     briefingAria: "Mission briefing",
     inLabel: "In",
     outLabel: "Out",
@@ -182,9 +184,12 @@ export const en = {
     heroEyebrow: "The debugging arena for engineers",
     heroHeadline: "Debug like a senior engineer.",
     heroSubheadline:
-      "Debugging is the most common skill in every interview and the least-taught. Jupyter Arena gives you 60 realistic broken notebooks — read the traceback, choose the fix, watch it run. Earn XP, rank up, unlock harder missions.",
+      "Debugging is the most common skill in every interview and the least-taught. Jupyter Arena gives you 75 realistic broken notebooks — read the traceback, choose the fix, watch it run. Earn XP, rank up, unlock harder missions.",
     heroPrimaryCta: "Enter the Arena",
     heroSecondaryCta: "See how it works",
+    beginnerCuePrefix: "Brand new to data?",
+    beginnerCueLink: "Start with the Data Analyst sector",
+    beginnerCueSuffix: "— no experience needed, nothing locked.",
     heroAria: "Hero: notebook cell showing red traceback transitioning to green pass",
     problemHeading: "The skill everyone needs but nobody teaches",
     problemBody:
@@ -216,8 +221,8 @@ export const en = {
     unlockTableDiff: "Difficulty",
     unlockTableUnlocks: "Unlocks at",
     statsHeading: "Built honestly",
-    statChallenges: "60 real debugging challenges",
-    statSectors: "4 technical sectors",
+    statChallenges: "75 real debugging challenges",
+    statSectors: "5 technical sectors",
     statFree: "Free forever — no paywall",
     dailyHeading: "Daily Challenge",
     dailyBody:

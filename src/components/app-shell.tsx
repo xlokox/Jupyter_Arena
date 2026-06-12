@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo } from "react";
-import { FlaskConical } from "lucide-react";
+import { BarChart3, FlaskConical } from "lucide-react";
 import type { Challenge, ChallengeMeta, Sector } from "@/lib/content/schema";
 import { Header } from "@/components/header";
 import { Sidebar } from "@/components/sidebar";
@@ -33,6 +33,7 @@ export function AppShell({ challenges, initialChallengeId, initialChallenge }: A
   const searchQuery = useWorkspaceStore((s) => s.searchQuery);
   const sidebarOpen = useWorkspaceStore((s) => s.sidebarOpen);
   const setSidebarOpen = useWorkspaceStore((s) => s.setSidebarOpen);
+  const setSectorFilter = useWorkspaceStore((s) => s.setSectorFilter);
   const openMission = useWorkspaceStore((s) => s.openMission);
   const attempts = useWorkspaceStore((s) => s.attempts);
   const longestStreak = useWorkspaceStore((s) => s.stats.longestStreak);
@@ -42,6 +43,8 @@ export function AppShell({ challenges, initialChallengeId, initialChallenge }: A
   const isAuthed = useAuthStore((s) => s.status === "signedIn");
 
   const active = challenges.find((c) => c.id === activeChallengeId) ?? null;
+  // First Data Analyst mission — the ungated on-ramp the empty state nudges toward.
+  const firstBeginnerId = challenges.find((c) => c.sector === "da")?.id ?? null;
 
   // Anonymous badge evaluation lives here (not the content-agnostic store):
   // AppShell holds the metadata badges need (sector/language/difficulty). For
@@ -150,6 +153,22 @@ export function AppShell({ challenges, initialChallengeId, initialChallenge }: A
               <FlaskConical className="size-10 text-accent/60" aria-hidden />
               <h1 className="text-lg font-semibold text-text">{en.workspace.emptyTitle}</h1>
               <p className="max-w-md text-sm text-muted">{en.workspace.emptyBody}</p>
+              {firstBeginnerId && (
+                <div className="mt-2 flex flex-col items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSectorFilter("da");
+                      openMission(firstBeginnerId);
+                    }}
+                    className="flex min-h-[44px] items-center gap-2 rounded-md border border-accent/50 bg-accent/10 px-4 text-sm font-medium text-accent transition-colors hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  >
+                    <BarChart3 className="size-4" aria-hidden />
+                    {en.workspace.startBeginner}
+                  </button>
+                  <p className="text-xs text-muted">{en.workspace.startBeginnerHint}</p>
+                </div>
+              )}
             </div>
           ) : view === "tutorial" ? (
             <TutorialView meta={active} />

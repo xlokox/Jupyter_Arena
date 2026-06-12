@@ -72,7 +72,7 @@ test("portfolio reflects earned stats and sector progress", async ({ page }) => 
     page.getByText("Perfect for your LinkedIn or resume to prove your debugging speed!"),
   ).toBeVisible();
   await expect(page.getByText("Total XP")).toBeVisible();
-  await expect(page.getByText("1/60")).toBeVisible();
+  await expect(page.getByText("1/75")).toBeVisible();
   await expect(page.getByText("100%")).toBeVisible();
   await expect(page.getByRole("progressbar", { name: "Machine Learning" })).toHaveAttribute(
     "aria-valuenow",
@@ -89,16 +89,19 @@ test("portfolio reflects earned stats and sector progress", async ({ page }) => 
 });
 
 test("the daily challenge route opens the same mission on every visit", async ({ page }) => {
-  // Determinism is the contract here (same UTC day → same pick).
-  await page.goto("/daily");
+  // Determinism is the contract here (same UTC day → same pick). Wait for the
+  // mission heading to settle (not the empty-state title) before comparing,
+  // so a slow open under load can't read a transient heading.
   const heading = page.getByRole("heading", { level: 1 });
-  await expect(heading).toBeVisible();
+
+  await page.goto("/daily");
+  await expect(heading).not.toHaveText("Select a notebook to begin");
   const firstTitle = await heading.textContent();
   expect(firstTitle).toBeTruthy();
 
   await page.goto("/daily");
-  await expect(heading).toBeVisible();
-  expect(await heading.textContent()).toBe(firstTitle);
+  await expect(heading).not.toHaveText("Select a notebook to begin");
+  await expect(heading).toHaveText(firstTitle!);
 });
 
 test("the daily challenge is always playable for a fresh anonymous player", async ({ page }) => {

@@ -1,0 +1,62 @@
+{
+  "id": "da-015-report-pipeline",
+  "sector": "da",
+  "difficulty": "hard",
+  "title": "15_top_categories_report.ipynb",
+  "language": "python",
+  "icon": "bar-chart-3",
+  "conceptTags": ["data-cleaning", "groupby", "pipeline-order"],
+  "descriptionMd": "## Capstone: Top Categories by Revenue\n\nTime to put it together: clean the data, total revenue per category, and report the top three. The `amount` column came in as text with dollar signs and thousands commas, so you cleaned it before aggregating — but the final ranking looks wrong. Electronics and Furniture, your obvious big sellers, have collapsed to almost nothing.\n\nThe pipeline order is right (clean → group → sort), but the cleaning step is **incomplete**, and it's silently destroying your largest sales. Find the gap in the cleaning and restore the true ranking.",
+  "initialCode": "import pandas as pd\n\nsales = pd.read_csv(\"sales.csv\")\n\n# Clean the amount column, then rank categories by total revenue\nsales[\"amount\"] = pd.to_numeric(sales[\"amount\"].str.replace(\"$\", \"\", regex=False), errors=\"coerce\")\ntotals = sales.groupby(\"category\")[\"amount\"].sum()\ntop = totals.sort_values(ascending=False).head(3)\nprint(top)",
+  "buggyLineStart": 6,
+  "buggyLineEnd": 6,
+  "traceback": "category\nBooks        3200.0\nToys         2100.0\nFurniture     800.0\nName: amount, dtype: float64\n\n# Big-ticket sales like \"$1,234.50\" became NaN (the comma wasn't removed), so\n# Electronics and Furniture lost their largest orders and fell down the ranking.",
+  "correctOutput": "category\nElectronics    12450.0\nFurniture       9800.0\nBooks           3200.0\nName: amount, dtype: float64",
+  "options": [
+    {
+      "key": "a",
+      "label": "Remove the comma as well as the $, then convert and aggregate",
+      "patchCode": "import pandas as pd\n\nsales = pd.read_csv(\"sales.csv\")\n\n# Clean the amount column, then rank categories by total revenue\nclean = sales[\"amount\"].str.replace(\"$\", \"\", regex=False).str.replace(\",\", \"\", regex=False)\nsales[\"amount\"] = clean.astype(float)\ntotals = sales.groupby(\"category\")[\"amount\"].sum()\ntop = totals.sort_values(ascending=False).head(3)\nprint(top)",
+      "isCorrect": true,
+      "resultLog": "category\nElectronics    12450.0\nFurniture       9800.0\nBooks           3200.0\nName: amount, dtype: float64",
+      "rationale": "The original cleaning stripped the `$` but left the thousands comma, so a value like `\"1,234.50\"` still wasn't a valid number — `errors=\"coerce\"` then quietly turned every big-ticket sale into `NaN`, which `sum()` skips. Removing **both** the `$` and the `,` lets every amount parse, so the large Electronics and Furniture orders are counted and the ranking is correct. Order stays clean → convert → group → sort."
+    },
+    {
+      "key": "b",
+      "label": "Keep the cleaning, but fill the missing amounts with 0",
+      "patchCode": "import pandas as pd\n\nsales = pd.read_csv(\"sales.csv\")\n\n# Clean the amount column, then rank categories by total revenue\nsales[\"amount\"] = pd.to_numeric(sales[\"amount\"].str.replace(\"$\", \"\", regex=False), errors=\"coerce\")\nsales[\"amount\"] = sales[\"amount\"].fillna(0)\ntotals = sales.groupby(\"category\")[\"amount\"].sum()\ntop = totals.sort_values(ascending=False).head(3)\nprint(top)",
+      "isCorrect": false,
+      "resultLog": "category\nBooks        3200.0\nToys         2100.0\nFurniture     800.0\nName: amount, dtype: float64",
+      "rationale": "`fillna(0)` only hides the symptom. The big-ticket amounts were already destroyed when the still-formatted `\"1,234.50\"` coerced to `NaN`; replacing those `NaN`s with 0 just makes the loss permanent and quiet. The ranking is still wrong. You have to remove the comma so the values parse in the first place — don't zero them out."
+    },
+    {
+      "key": "c",
+      "label": "Total each category first, then clean the summed text",
+      "patchCode": "import pandas as pd\n\nsales = pd.read_csv(\"sales.csv\")\n\n# Clean the amount column, then rank categories by total revenue\ntotals = sales.groupby(\"category\")[\"amount\"].sum()\ntotals = pd.to_numeric(totals.str.replace(\"$\", \"\", regex=False).str.replace(\",\", \"\", regex=False), errors=\"coerce\")\ntop = totals.sort_values(ascending=False).head(3)\nprint(top)",
+      "isCorrect": false,
+      "resultLog": "category\nBooks          NaN\nElectronics    NaN\nFurniture      NaN\nName: amount, dtype: float64",
+      "rationale": "Aggregating before converting is the trap. `sum()` on a text column doesn't add — it glues the strings end to end, so each category becomes one long nonsense string like `\"$1,200.00$450.00...\"`. Cleaning and parsing that concatenation yields `NaN`. You must convert to real numbers **before** you group and sum."
+    }
+  ],
+  "hints": [
+    "The pipeline order is fine — the cleaning is the problem. Look closely at what `.str.replace(\"$\", \"\", regex=False)` removes, and what it leaves behind, for a value like `\"$1,234.50\"`. What's still in there that stops it being a number?",
+    "`errors=\"coerce\"` turns anything it can't parse into `NaN`, which `sum()` then skips — so partially-cleaned big values silently vanish. Strip the thousands comma too before converting."
+  ],
+  "explanationMd": "### Why the bug occurs\nThe pipeline is structured correctly (clean, then group, then sort), but the cleaning is incomplete: it removes the `$` and forgets the thousands comma. So a small value like `\"450.00\"` parses fine, while a large one like `\"1,234.50\"` is still not a valid number. With `errors=\"coerce\"`, every one of those large values becomes `NaN`, and `sum()` skips `NaN` — so each category quietly loses its biggest orders. Categories dominated by large sales (Electronics, Furniture) collapse, and the top-three ranking is wrong even though nothing errored.\n\n### Why the fix is correct\nRemoving **both** the `$` and the `,` leaves clean numeric text for every row, so `.astype(float)` parses all amounts — large and small — into real numbers. Now `groupby(\"category\")[\"amount\"].sum()` totals the genuine revenue, and the ranking reflects reality. The capstone lesson is twofold: clean data *completely* (every formatting character that blocks parsing), and respect the order — convert to numbers **before** you aggregate, because summing text concatenates rather than adds. Using `astype(float)` over a silent `coerce` here is also safer: it would have *raised* on a bad value instead of hiding it as `NaN`.",
+  "recruiterReview": "Excellent capstone work. The hard part wasn't the pipeline shape — it was noticing that an *incomplete* clean plus `errors=\"coerce\"` was silently deleting your most important rows. You traced collapsed totals back to NaN'd big-ticket values and fixed the root cause (the leftover comma) rather than masking it with `fillna(0)`. Two senior habits to carry forward: prefer a strict conversion that errors on bad input over `coerce` that hides it, and add a sanity check (row counts, `isna().sum()`, a known total) after cleaning so a partial parse can't quietly skew a report. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Building a Small Report End to End\n\nThis capstone ties together everything in the sector: load, clean, group, sort. The danger in a multi-step pipeline isn't any single step — it's a quiet flaw early on that corrupts everything downstream without raising an error.\n\n### The standard report pipeline\nMost 'top N by metric' reports follow the same shape:\n1. **Load** the data.\n2. **Clean** the columns you'll compute on (fix dtypes, strip formatting).\n3. **Group** by the category and **aggregate** the metric.\n4. **Sort** and take the top N.\n\nGet the *order* right and each step feeds clean input to the next.\n\n### Why order matters\nYou must convert text to real numbers **before** aggregating. `sum()` on a numeric column adds; `sum()` on a *text* column concatenates the strings (`\"12\" + \"30\" → \"1230\"`). So aggregating first, then cleaning, produces nonsense.\n\n### Clean completely\nMoney often carries several formatting characters at once: a currency symbol *and* a thousands separator, e.g. `\"$1,234.50\"`. Removing only one leaves an unparseable value. Strip them all:\n```python\nclean = s.str.replace(\"$\", \"\", regex=False).str.replace(\",\", \"\", regex=False)\nvalues = clean.astype(float)\n```\n\n### The silent-NaN trap\n`pd.to_numeric(x, errors=\"coerce\")` turns anything it can't parse into `NaN`, and aggregations skip `NaN`. That's convenient for a rare bad cell — but if a whole *class* of values (every amount over $999, with its comma) fails to parse, they all vanish and your totals are quietly wrong. Prefer `astype(float)` after a complete clean: it raises on a leftover bad value instead of hiding it.\n\n### A tiny worked example\n```python\nsales = pd.DataFrame({\n    \"category\": [\"Elec\", \"Elec\", \"Books\"],\n    \"amount\":   [\"$1,200.00\", \"$450.00\", \"$300.00\"],\n})\nclean = sales[\"amount\"].str.replace(\"$\", \"\", regex=False).str.replace(\",\", \"\", regex=False)\nsales[\"amount\"] = clean.astype(float)\nsales.groupby(\"category\")[\"amount\"].sum().sort_values(ascending=False)\n# Elec     1650.0\n# Books     300.0\n```\nDrop the comma-strip and Elec's 1,200 sale becomes NaN — Elec would collapse to 450 and lose the top spot.\n\n### How to spot it\nTotals that look implausibly low, or a ranking that contradicts what you know about the business, after a clean-and-aggregate step. Check `df[\"col\"].isna().sum()` right after converting — a surprising number of `NaN`s means your cleaning missed something.\n\n### Common beginner mistakes\n- Aggregating a text column (concatenation instead of addition).\n- Cleaning only some of the formatting characters.\n- Trusting `errors=\"coerce\"` and never checking how many values it nulled.\n- Masking lost values with `fillna(0)` instead of parsing them correctly.\n- Sorting ascending, or forgetting `.head(n)`, when you wanted the top N.\n\nYou'll hit this the first time you build a real report and the numbers don't match the business's intuition.",
+    "videos": [
+      {
+        "title": "Building a clean-group-sort report in pandas",
+        "searchQuery": "pandas data cleaning groupby sort top categories report tutorial"
+      },
+      {
+        "title": "to_numeric errors=coerce and the silent NaN trap",
+        "searchQuery": "pandas to_numeric errors coerce nan data cleaning pitfalls"
+      }
+    ]
+  },
+  "estMinutes": 9,
+  "version": 1
+}

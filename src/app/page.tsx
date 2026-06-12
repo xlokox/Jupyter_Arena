@@ -15,11 +15,11 @@ export const dynamic = "force-static";
 export const metadata: Metadata = {
   title: en.app.name,
   description:
-    "60 realistic broken notebooks across ML, Deep Learning, Full Stack, and Databases. Read the traceback, pick the fix, watch it run. Free forever.",
+    "75 realistic broken notebooks across Data Analyst, ML, Deep Learning, Full Stack, and Databases. Read the traceback, pick the fix, watch it run. Free forever.",
   openGraph: {
     title: en.app.name,
     description:
-      "Master debugging — the untaught interview skill. 60 real broken notebooks, recruiter code reviews, XP progression. Free forever.",
+      "Master debugging — the untaught interview skill. 75 real broken notebooks, recruiter code reviews, XP progression. Free forever.",
   },
 };
 
@@ -91,6 +91,16 @@ export default function LandingPage() {
                   <ArrowDown className="size-4" aria-hidden />
                 </a>
               </div>
+              <p className="mt-4 text-sm text-muted">
+                {en.landing.beginnerCuePrefix}{" "}
+                <Link
+                  href="/app"
+                  className="text-accent underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                >
+                  {en.landing.beginnerCueLink}
+                </Link>{" "}
+                {en.landing.beginnerCueSuffix}
+              </p>
             </div>
 
             {/* Animated hero cell */}

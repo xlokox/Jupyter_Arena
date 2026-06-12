@@ -42,6 +42,22 @@ test("the trophy case on /portfolio shows earned and locked badges", async ({ pa
   await expect(tracebackHunter.getByText("Locked")).toBeVisible();
 });
 
+test("the Data Analyst sector is ungated — a level-1 user opens a medium mission", async ({
+  page,
+}) => {
+  await page.goto("/app");
+  // Filter to the ungated on-ramp and open a medium DA mission.
+  await page.getByRole("button", { name: "Data Analyst", exact: true }).click();
+  await page
+    .getByRole("button", { name: /10_clean_duplicate_orders\.ipynb/ })
+    .first()
+    .click();
+
+  // No lock for a fresh level-1 player: the Run cell renders, not the locked panel.
+  await expect(page.locator("[data-run-cell]")).toBeVisible();
+  await expect(page.getByRole("region", { name: "This mission is locked" })).toHaveCount(0);
+});
+
 test("the rank ladder highlights the current rank", async ({ page }) => {
   await page.goto("/ranks");
   await expect(page.getByRole("heading", { name: "Rank ladder" })).toBeVisible();
