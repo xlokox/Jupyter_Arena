@@ -1,0 +1,62 @@
+{
+  "id": "py-014-compare-types",
+  "sector": "py",
+  "difficulty": "medium",
+  "title": "14_pass_mark.ipynb",
+  "language": "python",
+  "icon": "scale",
+  "conceptTags": ["comparison", "types", "type-error"],
+  "descriptionMd": "## Mission: Did the Student Pass?\n\nA student scored 72 and you want to print a pass message if the score is above 50. You wrote `if score > \"50\":` — and Python raises a `TypeError` about comparing an int with a str.\n\nYou're comparing a **number** (`score`) with **text** (`\"50\"`), and Python won't order a number against text. Compare a number with a number — drop the quotes — so the check works.",
+  "initialCode": "# Pass students who scored above 50\nscore = 72\nif score > \"50\":\n    print(\"Result: Pass - above the threshold\")",
+  "buggyLineStart": 3,
+  "buggyLineEnd": 3,
+  "traceback": "---------------------------------------------------------------------------\nTypeError                                 Traceback (most recent call last)\nCell In[1], line 3\n      2 score = 72\n----> 3 if score > \"50\":\n\nTypeError: '>' not supported between instances of 'int' and 'str'",
+  "correctOutput": "Result: Pass - above the threshold",
+  "options": [
+    {
+      "key": "a",
+      "label": "Compare against the number 50, no quotes",
+      "patchCode": "# Pass students who scored above 50\nscore = 72\nif score > 50:\n    print(\"Result: Pass - above the threshold\")",
+      "isCorrect": true,
+      "resultLog": "Result: Pass - above the threshold",
+      "rationale": "`score` is the number 72 and `\"50\"` is text, and Python won't decide whether a number is greater than a piece of text — that's the `TypeError`. Writing `50` without quotes makes it a number too, so `72 > 50` is a sensible numeric comparison, evaluates to True, and the message prints."
+    },
+    {
+      "key": "b",
+      "label": "Convert score to text to match the \"50\"",
+      "patchCode": "# Pass students who scored above 50\nscore = 72\nif str(score) > \"50\":\n    print(\"Result: Pass - above the threshold\")",
+      "isCorrect": false,
+      "resultLog": "Result: Pass - above the threshold",
+      "rationale": "This runs and even prints here, but it's a trap: comparing text compares character by character, not by value. `\"72\" > \"50\"` is true only because '7' comes after '5'. With a score of 100 it would *fail* — `\"100\" > \"50\"` is False because '1' comes before '5'. Never compare numbers as text; compare numbers as numbers."
+    },
+    {
+      "key": "c",
+      "label": "Convert the score but leave the threshold as text",
+      "patchCode": "# Pass students who scored above 50\nscore = 72\nif int(score) > \"50\":\n    print(\"Result: Pass - above the threshold\")",
+      "isCorrect": false,
+      "resultLog": "---------------------------------------------------------------------------\nTypeError                                 Traceback (most recent call last)\nCell In[1], line 3\n----> 3 if int(score) > \"50\":\n\nTypeError: '>' not supported between instances of 'int' and 'str'",
+      "rationale": "`int(score)` is still a number (72 was already a number), and the threshold is still the text `\"50\"`, so you're back to comparing int with str — the same `TypeError`. The fix isn't converting the score; it's making the threshold a number too: `> 50`."
+    }
+  ],
+  "hints": [
+    "Read the error: `'>' not supported between instances of 'int' and 'str'`. You're asking 'is this number bigger than this text?' — which Python can't answer. What surrounds the 50 that makes it text?",
+    "Remove the quotes around 50 so you compare a number with a number: `if score > 50:`."
+  ],
+  "explanationMd": "### Why the bug occurs\nComparisons like `>` need two things of the *same kind*. `score` is an `int` (72) and `\"50\"` is a `str` (text). Python has no meaningful way to decide whether a number is greater than a piece of text, so it refuses with `TypeError: '>' not supported between instances of 'int' and 'str'`. The quotes around `50` are what made it text instead of a number.\n\n### Why the fix is correct\nWriting `50` without quotes makes it a number, so `score > 50` compares two numbers — `72 > 50` is True and the message prints. The dangerous near-miss is converting the score to text (`str(score) > \"50\"`): that *runs*, but it compares strings character by character, so `\"100\"` would count as *less than* `\"50\"`. Always compare values of the same type, and for quantities that means numbers vs numbers.",
+  "recruiterReview": "Strong — you not only fixed the `TypeError` but avoided the seductive wrong answer (comparing as text), which is exactly the kind of bug that passes a quick test and then fails in production on a value like 100. Recognizing that string comparison is lexicographic, not numeric, is a real step up in understanding. When data arrives as text (from input or a CSV), convert to numbers *once*, early, and compare cleanly thereafter. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Comparing Values — Mind the Types\n\nComparisons drive every decision your program makes. They work cleanly only when both sides are the same kind of value.\n\n### Comparison operators\nThese ask a yes/no question and give back True or False:\n```python\n>   greater than      <   less than\n>=  greater or equal  <=  less or equal\n==  equal             !=  not equal\n```\n\n### The rule: compare like with like\nPython will compare two numbers, or two strings, but it won't *order* a number against text:\n```python\n72 > 50        # True   (number vs number)\n\"b\" > \"a\"      # True   (text vs text)\n72 > \"50\"      # TypeError! number vs text\n```\nThe error is `'>' not supported between instances of 'int' and 'str'`.\n\n### Why quotes change everything\n`50` is the number fifty. `\"50\"` is two characters of text. They look alike but behave completely differently — and you can't order one against the other.\n\n### The dangerous look-alike: comparing numbers as text\nIf you force both sides to be text, the comparison *runs* but compares **character by character**, not by value:\n```python\n\"72\" > \"50\"    # True  (because '7' > '5')\n\"100\" > \"50\"   # False (because '1' < '5')  ← surprise!\n```\nThat's almost never what you want for quantities. Convert to numbers instead.\n\n### Convert once, early\nData from `input()` or a file arrives as text. Turn it into numbers as soon as you read it:\n```python\nscore = int(input(\"Score: \"))   # now numeric\nif score > 50:\n    print(\"Pass\")\n```\n\n### A tiny worked example\n```python\nage = 20\nif age >= 18:\n    print(\"Adult\")\n# Adult\n```\nBoth sides are numbers, so the comparison is straightforward.\n\n### How to spot it\n`TypeError: '>' not supported between instances of 'int' and 'str'` means one side is a number and the other is text. A comparison that 'works' but gives odd results on larger numbers may be comparing text lexicographically.\n\n### Common beginner mistakes\n- Putting quotes around a number you mean to compare (`> \"50\"`).\n- 'Fixing' it by making both sides text, which compares character-by-character.\n- Forgetting to convert `input()` (text) to a number before comparing.\n\n### You just learned…\nComparisons need **matching types** — compare numbers with numbers and text with text. Quotes turn a number into text, and comparing numbers as text gives wrong answers, so convert with `int()`/`float()` early and compare cleanly.",
+    "videos": [
+      {
+        "title": "Python comparison operators and TypeError for beginners",
+        "searchQuery": "python comparison operators typeerror int str beginner tutorial"
+      },
+      {
+        "title": "Why comparing numbers as strings is wrong",
+        "searchQuery": "python string vs number comparison lexicographic beginner"
+      }
+    ]
+  },
+  "estMinutes": 5,
+  "version": 1
+}

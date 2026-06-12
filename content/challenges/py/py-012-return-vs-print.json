@@ -1,0 +1,62 @@
+{
+  "id": "py-012-return-vs-print",
+  "sector": "py",
+  "difficulty": "easy",
+  "title": "12_add_function.ipynb",
+  "language": "python",
+  "icon": "target",
+  "conceptTags": ["functions", "return", "print"],
+  "descriptionMd": "## Mission: Get a Value Back from a Function\n\nYou wrote a small function to add two numbers, then tried to store its answer in `result` and print it. But `result` comes out as `None` — the answer didn't come back.\n\nA function `print`s to the screen, but to hand a value *back* to the code that called it, it must `return`. Right now the function prints the sum but returns nothing. Make it return the value so `result` holds it.",
+  "initialCode": "# A function that adds two numbers, then use its answer\ndef add(a, b):\n    print(a + b)\n\nresult = add(3, 4)\nprint(\"The computed total is:\", result)",
+  "buggyLineStart": 3,
+  "buggyLineEnd": 3,
+  "traceback": "7\nThe computed total is: None\n\n# The function printed 7 but returned nothing, so result holds None.",
+  "correctOutput": "The computed total is: 7",
+  "options": [
+    {
+      "key": "a",
+      "label": "Return the sum instead of printing it",
+      "patchCode": "# A function that adds two numbers, then use its answer\ndef add(a, b):\n    return a + b\n\nresult = add(3, 4)\nprint(\"The computed total is:\", result)",
+      "isCorrect": true,
+      "resultLog": "The computed total is: 7",
+      "rationale": "`print` only displays a value on screen; it doesn't give it back to the caller. A function that ends without `return` hands back `None`, which is why `result` was `None`. `return a + b` sends the value out of the function, so `result` becomes 7 and the caller prints it."
+    },
+    {
+      "key": "b",
+      "label": "Keep the print and also return the sum",
+      "patchCode": "# A function that adds two numbers, then use its answer\ndef add(a, b):\n    print(a + b)\n    return a + b\n\nresult = add(3, 4)\nprint(\"The computed total is:\", result)",
+      "isCorrect": false,
+      "resultLog": "7\nThe computed total is: 7",
+      "rationale": "Adding `return` does fix the value — `result` is now 7 — but you left the `print` in, so the number is shown twice: once by the function, once by the caller. A reusable function should `return` its result and let the *caller* decide whether to print it. Remove the inner print."
+    },
+    {
+      "key": "c",
+      "label": "Compute the total into a variable inside the function",
+      "patchCode": "# A function that adds two numbers, then use its answer\ndef add(a, b):\n    total = a + b\n\nresult = add(3, 4)\nprint(\"The computed total is:\", result)",
+      "isCorrect": false,
+      "resultLog": "The computed total is: None",
+      "rationale": "Storing the sum in a variable *inside* the function doesn't share it with the outside — that variable disappears when the function ends, and with no `return` the function still hands back `None`. You must `return total` (or `return a + b`) to pass the value out."
+    }
+  ],
+  "hints": [
+    "`result` is `None`. A function that never says `return` automatically returns `None`. The function shows the answer with `print`, but does it ever *give it back*?",
+    "Swap `print(a + b)` for `return a + b`. `print` displays; `return` hands the value back to whoever called the function."
+  ],
+  "explanationMd": "### Why the bug occurs\n`print` and `return` do different jobs. `print` shows a value on the screen and produces nothing usable. `return` sends a value *back* to the code that called the function so it can be stored or used. The function here only printed, so when `result = add(3, 4)` ran, `add` handed back its default — `None` — and that's what `result` held.\n\n### Why the fix is correct\n`return a + b` makes the function pass the sum out to the caller, so `result` becomes 7 and the caller can print it. The distinction matters because a function that only prints can't be reused — you can't add its answer to something else or save it. Returning the value keeps the function flexible: the caller decides what to do with it (print it, store it, combine it). A variable created inside a function is also local and vanishes when the function ends, so `return` is the only way to share it.",
+  "recruiterReview": "Good — you saw that `None` meant 'nothing came back' and reached for `return`. The print-vs-return distinction is foundational: functions that `return` are composable building blocks, while functions that only `print` are dead ends. Letting the caller decide whether to display the result (rather than printing inside) is exactly the right separation of concerns. You'll lean on this every time you write a helper. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Functions: print vs return\n\nFunctions let you name a piece of work and reuse it. The make-or-break idea for beginners is the difference between *showing* a value and *giving it back*.\n\n### What is a function?\nA **function** is a named block of code you can run on demand. You define it with `def` and call it by name:\n```python\ndef greet(name):\n    print(\"Hello,\", name)\n\ngreet(\"Ada\")   # Hello, Ada\n```\nValues you pass in (`name`) are **arguments**.\n\n### print shows; return gives back\nTwo very different things:\n- `print(x)` displays `x` on the screen and produces nothing you can reuse.\n- `return x` sends `x` **back to the caller**, so it can be stored or combined.\n```python\ndef add(a, b):\n    return a + b\n\ntotal = add(3, 4)     # total is 7 — usable!\nprint(total * 10)     # 70\n```\nIf a function never `return`s, calling it gives back `None`:\n```python\ndef add(a, b):\n    print(a + b)       # shows it, but returns nothing\n\nx = add(3, 4)          # prints 7, but x is None\n```\n\n### Why return matters\nA function that only prints is a dead end — you can't do anything with its result. A function that `return`s is a reusable building block. As a rule: **functions compute and return; the caller decides whether to print.**\n\n### Local variables vanish\nA variable made inside a function only exists there; it's gone once the function ends. The single way to share a value with the outside is to `return` it.\n\n### A tiny worked example\n```python\ndef square(n):\n    return n * n\n\nprint(square(5))       # 25\nprint(square(5) + 1)   # 26  ← only possible because it returns\n```\n\n### How to spot it\nIf a variable that holds a function's result is `None`, the function probably printed instead of returning (or returned nothing).\n\n### Common beginner mistakes\n- Printing inside a function instead of returning, then trying to use the result.\n- Expecting a local variable to be visible outside the function.\n- Forgetting that no `return` means the function gives back `None`.\n\n### You just learned…\nA **function** (`def`) packages reusable work; `print` only *shows* a value while `return` *gives it back* to the caller. Return your results and let the caller decide what to do with them — that's how functions become reusable.",
+    "videos": [
+      {
+        "title": "Python functions: return vs print for beginners",
+        "searchQuery": "python function return vs print beginner tutorial"
+      },
+      {
+        "title": "Defining and calling functions in Python",
+        "searchQuery": "python def function arguments return beginner explained"
+      }
+    ]
+  },
+  "estMinutes": 5,
+  "version": 1
+}

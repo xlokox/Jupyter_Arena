@@ -15,11 +15,11 @@ export const dynamic = "force-static";
 export const metadata: Metadata = {
   title: en.app.name,
   description:
-    "75 realistic broken notebooks across Data Analyst, ML, Deep Learning, Full Stack, and Databases. Read the traceback, pick the fix, watch it run. Free forever.",
+    "90 realistic broken notebooks across Python Fundamentals, Data Analyst, ML, Deep Learning, Full Stack, and Databases. Read the traceback, pick the fix, watch it run. Free forever.",
   openGraph: {
     title: en.app.name,
     description:
-      "Master debugging — the untaught interview skill. 75 real broken notebooks, recruiter code reviews, XP progression. Free forever.",
+      "Master debugging — the untaught interview skill. 90 real broken notebooks, recruiter code reviews, XP progression. Free forever.",
   },
 };
 

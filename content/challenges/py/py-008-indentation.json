@@ -1,0 +1,62 @@
+{
+  "id": "py-008-indentation",
+  "sector": "py",
+  "difficulty": "easy",
+  "title": "08_adult_check.ipynb",
+  "language": "python",
+  "icon": "layers",
+  "conceptTags": ["indentation", "if-statements", "blocks"],
+  "descriptionMd": "## Mission: Indent the Block\n\nYou wrote an `if` that should print a welcome when the user is an adult. Python stops with an `IndentationError` before it even runs.\n\nUnlike most languages, Python uses **spacing** to know which lines belong inside an `if`, a loop, or a function. The line that should run when the condition is true has to be indented underneath it. Right now it sits flush against the left edge. Indent it so Python sees it as the body of the `if`.",
+  "initialCode": "# Greet the user if they are an adult\nage = 20\nif age >= 18:\nprint(\"You are an adult. Welcome!\")",
+  "buggyLineStart": 4,
+  "buggyLineEnd": 4,
+  "traceback": "  Cell In[1], line 4\n    print(\"You are an adult. Welcome!\")\n    ^\nIndentationError: expected an indented block after 'if' statement on line 3",
+  "correctOutput": "You are an adult. Welcome!",
+  "options": [
+    {
+      "key": "a",
+      "label": "Indent the print so it's inside the if",
+      "patchCode": "# Greet the user if they are an adult\nage = 20\nif age >= 18:\n    print(\"You are an adult. Welcome!\")",
+      "isCorrect": true,
+      "resultLog": "You are an adult. Welcome!",
+      "rationale": "Python reads structure from indentation. After an `if ...:` line, the lines that should run when the condition is true must be indented (4 spaces is standard). With the `print` indented, Python knows it's the body of the `if`, the condition `age >= 18` is true, and the welcome prints."
+    },
+    {
+      "key": "b",
+      "label": "Indent the if line as well",
+      "patchCode": "# Greet the user if they are an adult\nage = 20\n  if age >= 18:\n    print(\"You are an adult. Welcome!\")",
+      "isCorrect": false,
+      "resultLog": "  Cell In[1], line 3\n    if age >= 18:\n    ^\nIndentationError: unexpected indent",
+      "rationale": "Only the *body* of the `if` should be indented — not the `if` line itself. At the top level, code starts at the left margin, so indenting the `if` gives `unexpected indent`. Put the `if` flush-left and indent just the line beneath it."
+    },
+    {
+      "key": "c",
+      "label": "Indent the print but drop the colon",
+      "patchCode": "# Greet the user if they are an adult\nage = 20\nif age >= 18\n    print(\"You are an adult. Welcome!\")",
+      "isCorrect": false,
+      "resultLog": "  Cell In[1], line 3\n    if age >= 18\n                ^\nSyntaxError: expected ':'",
+      "rationale": "Indentation alone isn't enough — an `if` also needs a colon `:` at the end of its condition line to announce that a block follows. Without it you get `SyntaxError: expected ':'`. You need both: the colon *and* the indented body."
+    }
+  ],
+  "hints": [
+    "Read the error: `expected an indented block after 'if' statement`. Python is telling you the line that should run inside the `if` isn't set in from the left. How does Python know which lines are 'inside'?",
+    "Add spaces (4 is standard) at the start of the `print` line so it sits underneath and to the right of the `if`. Keep the `if` line itself flush-left."
+  ],
+  "explanationMd": "### Why the bug occurs\nPython doesn't use braces `{ }` to group code — it uses **indentation**. The lines that belong inside an `if`, a `for`, a `while`, or a function are the ones indented beneath the header line. After `if age >= 18:`, Python expected an indented line to form the body, but the `print` was flush-left, so it raised `IndentationError: expected an indented block`.\n\n### Why the fix is correct\nIndenting the `print` (by 4 spaces, the convention) tells Python it is the body of the `if` — the code to run when the condition is true. Two rules travel together here: the header line ends with a colon `:`, and the block beneath it is indented consistently. Mixing indentation widths or forgetting the colon both raise errors, so keep blocks tidy and uniform.",
+  "recruiterReview": "Good — you treated indentation as meaningful code, not just style, which is the mental shift Python asks for. Because whitespace *is* structure here, consistent indenting (pick 4 spaces, never mix tabs and spaces) prevents a whole class of confusing errors, and every good editor will do it for you automatically. You also kept the `if` flush-left and only indented its body. Solid grasp of blocks. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Indentation: How Python Sees Structure\n\nThis is the idea that makes Python look different from other languages — and it's simpler than it first seems.\n\n### Blocks are made by indentation\nMany lines in Python introduce a **block** — a group of lines that belong together — and they end with a colon `:`. The block itself is the indented lines beneath:\n```python\nif age >= 18:\n    print(\"Adult\")      # indented → inside the if\n    print(\"Welcome\")    # also inside the if\nprint(\"Done\")           # flush-left → outside, always runs\n```\nThe indentation is how Python knows which lines run only when the condition is true.\n\n### The two rules\n1. The header line (an `if`, `for`, `while`, `def`, …) ends with a colon `:`.\n2. The lines inside are **indented** — 4 spaces is the standard.\n\nMiss the colon and you get `SyntaxError: expected ':'`. Miss the indentation and you get `IndentationError: expected an indented block`.\n\n### Be consistent\nEvery line in the same block must be indented the **same amount**. Don't mix tabs and spaces — pick spaces (4 of them) and stick to it. Good editors insert them for you when you press Tab after a colon.\n\n### A tiny worked example\n```python\ntemperature = 30\nif temperature > 25:\n    print(\"It's warm\")\n    print(\"Wear shorts\")\n```\nprints:\n```\nIt's warm\nWear shorts\n```\nBoth indented lines run because the condition is true.\n\n### How to spot it\n`IndentationError: expected an indented block` → the body of your `if`/loop/function isn't indented. `unexpected indent` → a line is indented that shouldn't be. `expected ':'` → you forgot the colon on the header line.\n\n### Common beginner mistakes\n- Forgetting to indent the body of an `if`/loop/function.\n- Indenting the header line itself.\n- Forgetting the colon `:` at the end of the header.\n- Mixing tabs and spaces, so lines that look aligned aren't.\n\n### You just learned…\nPython uses **indentation** to group code into blocks: a header line ends with `:`, and the indented lines beneath it are the block. Consistent 4-space indents keep your structure clear and error-free.",
+    "videos": [
+      {
+        "title": "Python indentation and code blocks for beginners",
+        "searchQuery": "python indentation blocks if statement beginner tutorial"
+      },
+      {
+        "title": "IndentationError explained",
+        "searchQuery": "python indentationerror expected indented block fix beginner"
+      }
+    ]
+  },
+  "estMinutes": 4,
+  "version": 1
+}

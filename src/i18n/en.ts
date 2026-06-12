@@ -185,7 +185,7 @@ export const en = {
     heroEyebrow: "The debugging arena for engineers",
     heroHeadline: "Debug like a senior engineer.",
     heroSubheadline:
-      "Debugging is the most common skill in every interview and the least-taught. Jupyter Arena gives you 75 realistic broken notebooks — read the traceback, choose the fix, watch it run. Earn XP, rank up, unlock harder missions.",
+      "Debugging is the most common skill in every interview and the least-taught. Jupyter Arena gives you 90 realistic broken notebooks — read the traceback, choose the fix, watch it run. Earn XP, rank up, unlock harder missions.",
     heroPrimaryCta: "Enter the Arena",
     heroSecondaryCta: "See how it works",
     beginnerCuePrefix: "Brand new to code?",
@@ -222,8 +222,8 @@ export const en = {
     unlockTableDiff: "Difficulty",
     unlockTableUnlocks: "Unlocks at",
     statsHeading: "Built honestly",
-    statChallenges: "75 real debugging challenges",
-    statSectors: "5 technical sectors",
+    statChallenges: "90 real debugging challenges",
+    statSectors: "6 technical sectors",
     statFree: "Free forever — no paywall",
     dailyHeading: "Daily Challenge",
     dailyBody:
