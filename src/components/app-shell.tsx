@@ -10,7 +10,10 @@ import { NotebookView } from "@/components/notebook/notebook-view";
 import { TutorialView } from "@/components/tutorial-view";
 import { dailyChallengeId } from "@/lib/game/daily";
 import { utcDayOf } from "@/lib/game/xp";
+import { evaluateBadges, languageFamily, type SolvedFact } from "@/lib/game/badges";
+import type { SectorId } from "@/lib/content/schema";
 import { filterChallenges, getAttempt, useWorkspaceStore } from "@/store/workspace";
+import { useAuthStore } from "@/store/auth";
 import { en } from "@/i18n/en";
 
 interface AppShellProps {
@@ -31,8 +34,39 @@ export function AppShell({ challenges, initialChallengeId, initialChallenge }: A
   const sidebarOpen = useWorkspaceStore((s) => s.sidebarOpen);
   const setSidebarOpen = useWorkspaceStore((s) => s.setSidebarOpen);
   const openMission = useWorkspaceStore((s) => s.openMission);
+  const attempts = useWorkspaceStore((s) => s.attempts);
+  const longestStreak = useWorkspaceStore((s) => s.stats.longestStreak);
+  const dailyGoalsCompleted = useWorkspaceStore((s) => s.dailyGoal.completedDates.length);
+  const earnedBadges = useWorkspaceStore((s) => s.earnedBadges);
+  const awardBadges = useWorkspaceStore((s) => s.awardBadges);
+  const isAuthed = useAuthStore((s) => s.status === "signedIn");
 
   const active = challenges.find((c) => c.id === activeChallengeId) ?? null;
+
+  // Anonymous badge evaluation lives here (not the content-agnostic store):
+  // AppShell holds the metadata badges need (sector/language/difficulty). For
+  // authed users the server returns awards via submit_attempt, so we skip.
+  useEffect(() => {
+    if (isAuthed) return;
+    const sectorTotals = { ml: 0, dl: 0, fullstack: 0, db: 0 } as Record<SectorId, number>;
+    const solved: SolvedFact[] = [];
+    for (const c of challenges) {
+      sectorTotals[c.sector] += 1;
+      const attempt = getAttempt(attempts, c.id);
+      if (attempt.solved) {
+        solved.push({
+          sector: c.sector,
+          difficulty: c.difficulty,
+          language: languageFamily(c.language),
+          flawless: attempt.wrongAttempts === 0 && attempt.hintsRevealed <= 1,
+          hintsUsed: attempt.hintsRevealed,
+        });
+      }
+    }
+    const full = [...evaluateBadges({ solved, sectorTotals, longestStreak, dailyGoalsCompleted })];
+    const newly = full.filter((id) => !earnedBadges.includes(id));
+    if (newly.length > 0) awardBadges(full, newly);
+  }, [isAuthed, challenges, attempts, longestStreak, dailyGoalsCompleted, earnedBadges, awardBadges]);
 
   // Today's featured pick is exempt from level-gating everywhere it can be
   // opened (kept in lockstep with submit_attempt on the server). Computed once

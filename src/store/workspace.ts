@@ -10,6 +10,13 @@ import {
   type GameStats,
   type XpEvent,
 } from "@/lib/game/xp";
+import {
+  applyDailyStreakTick,
+  DAILY_GOAL_TARGET,
+  tickDailyGoal,
+  type DailyGoalState,
+} from "@/lib/game/streak";
+import type { BadgeId } from "@/lib/game/badges";
 
 /**
  * Session/game state — Zustand with localStorage persistence for anonymous
@@ -57,6 +64,20 @@ export interface Reward {
   prevLevel: number;
 }
 
+/** A just-earned badge for the toast layer; `n` retriggers the animation. */
+export interface BadgeReward {
+  id: BadgeId;
+  n: number;
+}
+
+/** A fresh daily goal carrying no day yet — rolls over on the first solve. */
+export const EMPTY_DAILY_GOAL: DailyGoalState = {
+  date: "",
+  progress: 0,
+  target: DAILY_GOAL_TARGET,
+  completedDates: [],
+};
+
 interface WorkspaceStore {
   activeChallengeId: string | null;
   view: WorkspaceView;
@@ -68,6 +89,14 @@ interface WorkspaceStore {
   attempts: Record<string, AttemptState>;
   stats: GameStats;
   lastReward: Reward | null;
+  /** Streak-protection tokens (5.6b); persisted; server-authoritative when authed. */
+  freezeTokens: number;
+  /** Today's solve goal; `completedDates` drives the Daily Devoted badge. */
+  dailyGoal: DailyGoalState;
+  /** Badge ids earned so far; persisted; the diff baseline for new awards. */
+  earnedBadges: BadgeId[];
+  /** Most recent badge earned — drives a toast; session-only. */
+  lastBadge: BadgeReward | null;
   /** Opt-in audio cues — off by default, persisted, toggled by the user. */
   soundEnabled: boolean;
 
@@ -86,13 +115,27 @@ interface WorkspaceStore {
   /** Authed path: the server decided; apply its outcome verbatim. */
   applyServerOutcome: (challengeId: string, result: ServerOutcome) => void;
   /** Sign-in hydration: replace local progress with the account's. */
-  hydrateFromServer: (stats: GameStats, solved: ServerSolvedEntry[]) => void;
+  hydrateFromServer: (
+    stats: GameStats,
+    solved: ServerSolvedEntry[],
+    extras?: AccountExtras,
+  ) => void;
+  /** Anonymous badge eval (AppShell): replace the set and surface new earns. */
+  awardBadges: (fullSet: BadgeId[], newly: BadgeId[]) => void;
   /** Sign-out: clear in-memory account progress back to a fresh state. */
   resetProgress: () => void;
   revealHint: (challengeId: string) => void;
   dismissReward: () => void;
+  dismissBadge: () => void;
   /** Flip the opt-in sound preference (this click also unlocks the AudioContext). */
   toggleSound: () => void;
+}
+
+/** Server-derived achievement state applied at sign-in hydration. */
+export interface AccountExtras {
+  freezeTokens: number;
+  earnedBadges: BadgeId[];
+  dailyGoal: DailyGoalState;
 }
 
 /** Shape of the submit_attempt RPC response the store consumes. */
@@ -104,6 +147,11 @@ export interface ServerOutcome {
   streak: number;
   already_solved: boolean;
   events: XpEvent[];
+  // 5.6b additive fields (older callers/tests may omit them).
+  streak_freeze_tokens?: number;
+  streak_freeze_spent?: boolean;
+  daily_goal?: { progress: number; target: number; completed: boolean } | null;
+  newly_awarded?: BadgeId[];
 }
 
 export interface ServerSolvedEntry {
@@ -134,6 +182,7 @@ export function sanitizeAttempts(
 }
 
 let rewardCounter = 0;
+let badgeCounter = 0;
 
 export const useWorkspaceStore = create<WorkspaceStore>()(
   persist(
@@ -148,6 +197,10 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       attempts: {},
       stats: INITIAL_STATS,
       lastReward: null,
+      freezeTokens: 0,
+      dailyGoal: EMPTY_DAILY_GOAL,
+      earnedBadges: [],
+      lastBadge: null,
       soundEnabled: false,
 
       openMission: (challengeId) =>
@@ -198,14 +251,41 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           const attempt = getAttempt(state.attempts, challengeId);
           if (attempt.runState !== "running" || !attempt.selectedOption) return state;
 
+          const now = new Date();
+          const isFirstSolve = wasCorrect && !attempt.solved;
           const outcome = wasCorrect
             ? applyCorrectSolve(state.stats, {
                 alreadySolved: attempt.solved,
                 wrongAttempts: attempt.wrongAttempts,
                 hintsUsed: attempt.hintsRevealed,
-                now: new Date(),
+                now,
               })
             : applyWrongAttempt(state.stats);
+
+          // A genuine first solve also ticks the freeze-aware streak (the single
+          // streak truth) and today's daily goal. Badges are evaluated in
+          // AppShell, which has the challenge metadata the store must not import.
+          let stats = outcome.stats;
+          let freezeTokens = state.freezeTokens;
+          let dailyGoal = state.dailyGoal;
+          if (isFirstSolve) {
+            const today = utcDayOf(now);
+            const tick = applyDailyStreakTick({
+              currentStreak: state.stats.currentStreak,
+              longestStreak: state.stats.longestStreak,
+              lastActiveDay: state.stats.lastActiveDay,
+              freezeTokens: state.freezeTokens,
+              today,
+            });
+            stats = {
+              ...outcome.stats,
+              currentStreak: tick.currentStreak,
+              longestStreak: tick.longestStreak,
+              lastActiveDay: tick.lastActiveDay,
+            };
+            freezeTokens = tick.freezeTokens;
+            dailyGoal = tickDailyGoal(state.dailyGoal, today);
+          }
 
           rewardCounter += 1;
           return {
@@ -219,13 +299,15 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
                 wrongAttempts: attempt.wrongAttempts + (wasCorrect ? 0 : 1),
               },
             },
-            stats: outcome.stats,
+            stats,
+            freezeTokens,
+            dailyGoal,
             lastReward: {
               id: rewardCounter,
               events: outcome.events,
               total: outcome.events.reduce((sum, e) => sum + e.delta, 0),
               leveledUp: outcome.leveledUp,
-              newLevel: levelForXp(outcome.stats.xp),
+              newLevel: levelForXp(stats.xp),
               prevLevel: levelForXp(state.stats.xp),
             },
           };
@@ -250,6 +332,32 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
 
           const dailyTicked = result.events.some((e) => e.reason === "daily_first_solve");
           const counted = !(result.is_correct && result.already_solved);
+          const today = utcDayOf(new Date());
+
+          let dailyGoal = state.dailyGoal;
+          if (result.daily_goal) {
+            const completedDates =
+              result.daily_goal.completed && !state.dailyGoal.completedDates.includes(today)
+                ? [...state.dailyGoal.completedDates, today]
+                : state.dailyGoal.completedDates;
+            dailyGoal = {
+              date: today,
+              progress: result.daily_goal.progress,
+              target: result.daily_goal.target,
+              completedDates,
+            };
+          }
+
+          const newly = result.newly_awarded ?? [];
+          const earnedBadges = newly.length
+            ? (Array.from(new Set([...state.earnedBadges, ...newly])) as BadgeId[])
+            : state.earnedBadges;
+          let lastBadge = state.lastBadge;
+          if (newly.length > 0) {
+            badgeCounter += 1;
+            lastBadge = { id: newly[newly.length - 1]!, n: badgeCounter };
+          }
+
           rewardCounter += 1;
           return {
             attempts: {
@@ -267,10 +375,14 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
               xp: result.new_xp,
               currentStreak: result.streak,
               longestStreak: Math.max(state.stats.longestStreak, result.streak),
-              lastActiveDay: dailyTicked ? utcDayOf(new Date()) : state.stats.lastActiveDay,
+              lastActiveDay: dailyTicked ? today : state.stats.lastActiveDay,
               totalAttempts: state.stats.totalAttempts + (counted ? 1 : 0),
               correctAttempts: state.stats.correctAttempts + (counted && result.is_correct ? 1 : 0),
             },
+            freezeTokens: result.streak_freeze_tokens ?? state.freezeTokens,
+            dailyGoal,
+            earnedBadges,
+            lastBadge,
             lastReward:
               result.events.length === 0
                 ? state.lastReward
@@ -285,7 +397,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           };
         }),
 
-      hydrateFromServer: (stats, solved) =>
+      hydrateFromServer: (stats, solved, extras) =>
         set(() => ({
           stats,
           attempts: Object.fromEntries(
@@ -301,10 +413,33 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
             ]),
           ),
           lastReward: null,
+          freezeTokens: extras?.freezeTokens ?? 0,
+          earnedBadges: extras?.earnedBadges ?? [],
+          dailyGoal: extras?.dailyGoal ?? EMPTY_DAILY_GOAL,
+          lastBadge: null,
         })),
 
+      awardBadges: (fullSet, newly) =>
+        set(() => {
+          if (newly.length === 0) return { earnedBadges: fullSet };
+          badgeCounter += 1;
+          return {
+            earnedBadges: fullSet,
+            lastBadge: { id: newly[newly.length - 1]!, n: badgeCounter },
+          };
+        }),
+
       resetProgress: () =>
-        set({ attempts: {}, stats: INITIAL_STATS, lastReward: null, activeChallengeId: null }),
+        set({
+          attempts: {},
+          stats: INITIAL_STATS,
+          lastReward: null,
+          activeChallengeId: null,
+          freezeTokens: 0,
+          dailyGoal: EMPTY_DAILY_GOAL,
+          earnedBadges: [],
+          lastBadge: null,
+        }),
 
       revealHint: (challengeId) =>
         set((state) => {
@@ -320,6 +455,8 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
 
       dismissReward: () => set({ lastReward: null }),
 
+      dismissBadge: () => set({ lastBadge: null }),
+
       toggleSound: () => set((state) => ({ soundEnabled: !state.soundEnabled })),
     }),
     {
@@ -328,6 +465,9 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       partialize: (state) => ({
         attempts: state.attempts,
         stats: state.stats,
+        freezeTokens: state.freezeTokens,
+        dailyGoal: state.dailyGoal,
+        earnedBadges: state.earnedBadges,
         soundEnabled: state.soundEnabled,
       }),
       // SSR-safe: AppShell calls persist.rehydrate() in an effect.
@@ -338,6 +478,9 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           ...current,
           stats: { ...INITIAL_STATS, ...(incoming.stats ?? {}) },
           attempts: sanitizeAttempts(incoming.attempts ?? {}),
+          freezeTokens: incoming.freezeTokens ?? 0,
+          dailyGoal: incoming.dailyGoal ?? EMPTY_DAILY_GOAL,
+          earnedBadges: incoming.earnedBadges ?? [],
           soundEnabled: incoming.soundEnabled ?? false,
         };
       },

@@ -1,5 +1,7 @@
 import type { GameStats, XpEvent } from "@/lib/game/xp";
-import type { AttemptState } from "@/store/workspace";
+import type { BadgeId } from "@/lib/game/badges";
+import { DAILY_GOAL_TARGET } from "@/lib/game/streak";
+import type { AccountExtras, AttemptState } from "@/store/workspace";
 
 /**
  * Authed progress service — wraps the Supabase RPCs. The supabase client is
@@ -17,6 +19,10 @@ export interface ServerSubmitResult {
   streak: number;
   already_solved: boolean;
   events: XpEvent[];
+  streak_freeze_tokens: number;
+  streak_freeze_spent: boolean;
+  daily_goal: { progress: number; target: number; completed: boolean } | null;
+  newly_awarded: BadgeId[];
 }
 
 export interface ServerProgressRow {
@@ -30,6 +36,7 @@ export interface AccountState {
   merged: boolean;
   stats: GameStats;
   progress: ServerProgressRow[];
+  extras: AccountExtras;
 }
 
 async function requireClient() {
@@ -81,15 +88,26 @@ export async function mergeLocalProgress(items: MergeItem[]): Promise<void> {
 
 export async function fetchAccountState(): Promise<AccountState> {
   const client = await requireClient();
-  const [profileRes, statsRes, progressRes, totalRes, correctRes] = await Promise.all([
-    client.from("profiles").select("local_merged_at").maybeSingle(),
-    client.from("user_stats").select("*").maybeSingle(),
-    client.from("user_challenge_progress").select("challenge_id, solved_at, attempts, hints_used"),
-    client.from("attempts").select("*", { count: "exact", head: true }),
-    client.from("attempts").select("*", { count: "exact", head: true }).eq("is_correct", true),
-  ]);
+  const today = new Date().toISOString().slice(0, 10);
+  const [profileRes, statsRes, progressRes, totalRes, correctRes, badgesRes, goalRes] =
+    await Promise.all([
+      client.from("profiles").select("local_merged_at").maybeSingle(),
+      client.from("user_stats").select("*").maybeSingle(),
+      client
+        .from("user_challenge_progress")
+        .select("challenge_id, solved_at, attempts, hints_used"),
+      client.from("attempts").select("*", { count: "exact", head: true }),
+      client.from("attempts").select("*", { count: "exact", head: true }).eq("is_correct", true),
+      client.from("user_badges").select("badge_id"),
+      client
+        .from("user_daily_goals")
+        .select("progress_solves, target_solves")
+        .eq("goal_date", today)
+        .maybeSingle(),
+    ]);
 
   const stats = statsRes.data;
+  const goal = goalRes.data;
   return {
     merged: Boolean(profileRes.data?.local_merged_at),
     stats: {
@@ -101,6 +119,17 @@ export async function fetchAccountState(): Promise<AccountState> {
       correctAttempts: correctRes.count ?? 0,
     },
     progress: (progressRes.data ?? []) as ServerProgressRow[],
+    extras: {
+      freezeTokens: stats?.streak_freeze_tokens ?? 0,
+      earnedBadges: (badgesRes.data ?? []).map((r) => (r as { badge_id: string }).badge_id as BadgeId),
+      dailyGoal: {
+        date: today,
+        progress: goal?.progress_solves ?? 0,
+        target: goal?.target_solves ?? DAILY_GOAL_TARGET,
+        // Authed Daily Devoted is server-owned; client completion history is unused.
+        completedDates: [],
+      },
+    },
   };
 }
 

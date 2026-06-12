@@ -396,3 +396,87 @@ describe("server-backed outcomes (authed path)", () => {
     expect(state.activeChallengeId).toBeNull();
   });
 });
+
+describe("achievements (5.6b)", () => {
+  const id = "ml-001-kmeans-scaling";
+  const utcDay = (daysAgo = 0) => {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() - daysAgo);
+    return d.toISOString().slice(0, 10);
+  };
+  const solve = (challenge: string) => {
+    const store = useWorkspaceStore.getState();
+    store.selectOption(challenge, "a");
+    store.startRun(challenge);
+    store.completeRun(challenge, true);
+  };
+
+  it("a first solve advances today's daily goal (anonymous)", () => {
+    solve(id);
+    const goal = useWorkspaceStore.getState().dailyGoal;
+    expect(goal.date).toBe(utcDay(0));
+    expect(goal.progress).toBe(1);
+  });
+
+  it("earns a freeze token when a solve reaches a 7-day streak", () => {
+    useWorkspaceStore.setState({
+      stats: {
+        ...useWorkspaceStore.getState().stats,
+        currentStreak: 6,
+        longestStreak: 6,
+        lastActiveDay: utcDay(1),
+      },
+    });
+    solve(id);
+    const state = useWorkspaceStore.getState();
+    expect(state.stats.currentStreak).toBe(7);
+    expect(state.freezeTokens).toBe(1);
+  });
+
+  it("applyServerOutcome adopts freeze tokens, the daily goal, and new badges", () => {
+    const store = useWorkspaceStore.getState();
+    store.selectOption(id, "a");
+    store.startRun(id);
+    store.applyServerOutcome(id, {
+      is_correct: true,
+      xp_delta: 20,
+      new_xp: 20,
+      level: 1,
+      streak: 1,
+      already_solved: false,
+      events: [{ reason: "correct_fix", delta: 10 }],
+      streak_freeze_tokens: 1,
+      streak_freeze_spent: false,
+      daily_goal: { progress: 3, target: 3, completed: true },
+      newly_awarded: ["first_blood", "flawless_five"],
+    });
+    const state = useWorkspaceStore.getState();
+    expect(state.freezeTokens).toBe(1);
+    expect(state.dailyGoal).toMatchObject({ progress: 3, target: 3 });
+    expect(state.dailyGoal.completedDates).toContain(utcDay(0));
+    expect(state.earnedBadges).toEqual(["first_blood", "flawless_five"]);
+    expect(state.lastBadge?.id).toBe("flawless_five");
+  });
+
+  it("awardBadges replaces the set and surfaces only the newest for the toast", () => {
+    useWorkspaceStore.setState({ earnedBadges: ["first_blood"], lastBadge: null });
+    useWorkspaceStore
+      .getState()
+      .awardBadges(["first_blood", "polyglot"], ["polyglot"]);
+    const state = useWorkspaceStore.getState();
+    expect(state.earnedBadges).toEqual(["first_blood", "polyglot"]);
+    expect(state.lastBadge?.id).toBe("polyglot");
+  });
+
+  it("persists freeze tokens, the daily goal, and earned badges", () => {
+    const partialize = useWorkspaceStore.persist.getOptions().partialize!;
+    const slice = partialize({
+      ...useWorkspaceStore.getState(),
+      freezeTokens: 2,
+      earnedBadges: ["first_blood"],
+    });
+    expect(slice).toHaveProperty("freezeTokens", 2);
+    expect(slice).toHaveProperty("earnedBadges");
+    expect(slice).toHaveProperty("dailyGoal");
+  });
+});

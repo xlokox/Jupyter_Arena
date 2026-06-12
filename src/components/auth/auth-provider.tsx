@@ -59,6 +59,7 @@ export function AuthProvider() {
           hintsUsed: row.hints_used,
           solved: row.solved_at !== null,
         })),
+        account.extras,
       );
     }
 
