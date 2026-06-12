@@ -182,6 +182,43 @@ describe("validateChallengeFile", () => {
     const result = validateObject(challenge);
     expect(result.errors.some((e) => e.startsWith("schema: tutorial.bodyMd"))).toBe(true);
   });
+
+  it("requires conceptCard + lineNotes in beginner sectors (py/da)", () => {
+    const challenge = { ...makeValidChallenge(), id: "py-099-fixture", sector: "py" as const };
+    const result = validateObject(challenge, { sectorDir: "py", fileName: "py-099-fixture.json" });
+    expect(result.errors.some((e) => e.includes("requires a conceptCard"))).toBe(true);
+    expect(result.errors.some((e) => e.includes("requires non-empty lineNotes"))).toBe(true);
+  });
+
+  it("accepts a beginner challenge that carries conceptCard + lineNotes", () => {
+    const challenge = {
+      ...makeValidChallenge(),
+      id: "da-099-fixture",
+      sector: "da" as const,
+      conceptCard: "A short plain-language concept card for the fixture.",
+      lineNotes: [{ line: 1, noteMd: "Imports the math library." }],
+      takeaway: "A one-line fixture takeaway.",
+    };
+    const result = validateObject(challenge, { sectorDir: "da", fileName: "da-099-fixture.json" });
+    expect(result.errors).toEqual([]);
+  });
+
+  it("rejects a lineNote pointing past the end of the code", () => {
+    const challenge = {
+      ...makeValidChallenge(),
+      id: "py-099-fixture",
+      sector: "py" as const,
+      conceptCard: "A short concept card.",
+      lineNotes: [{ line: 99, noteMd: "Out of range note." }],
+    };
+    const result = validateObject(challenge, { sectorDir: "py", fileName: "py-099-fixture.json" });
+    expect(result.errors.some((e) => e.includes("exceeds initialCode length"))).toBe(true);
+  });
+
+  it("leaves non-beginner sectors free of the learn-first requirement", () => {
+    const result = validateObject(makeValidChallenge()); // ml, no conceptCard
+    expect(result.errors).toEqual([]);
+  });
 });
 
 describe("checkDuplicateIds", () => {

@@ -5,7 +5,10 @@ import { expect, test, type Page } from "@playwright/test";
 /** Beginner sectors gate the notebook behind a concept card; click past it if shown. */
 async function dismissConceptCard(page: Page) {
   const begin = page.getByRole("button", { name: "Begin challenge" });
-  if (await begin.isVisible().catch(() => false)) await begin.click();
+  const runCell = page.locator("[data-run-cell]");
+  // Wait for the mission to render as either the concept card or the notebook.
+  await expect(begin.or(runCell).first()).toBeVisible();
+  if (await begin.isVisible()) await begin.click();
 }
 
 async function solveKmeans(page: Page) {
