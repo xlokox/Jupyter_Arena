@@ -1,0 +1,62 @@
+{
+  "id": "py-001-unterminated-string",
+  "sector": "py",
+  "difficulty": "easy",
+  "title": "01_hello_world.ipynb",
+  "language": "python",
+  "icon": "languages",
+  "conceptTags": ["strings", "quotes", "syntax"],
+  "descriptionMd": "## Mission: Print Your First Message\n\nYou're writing the very first line of a program: store a greeting in a label and print it to the screen. It should show `Hello, world! Welcome to Python.` — but instead of running, the notebook throws a `SyntaxError` and points at your text.\n\nIn Python, a piece of text (called a *string*) has to be wrapped in matching quotes — one at the start and one at the end. One of the quotes is missing. Find it, close the text properly, and the greeting will print.",
+  "initialCode": "# Print a friendly greeting\nmessage = \"Hello, world! Welcome to Python.\nprint(message)",
+  "buggyLineStart": 2,
+  "buggyLineEnd": 2,
+  "traceback": "  Cell In[1], line 2\n    message = \"Hello, world! Welcome to Python.\n              ^\nSyntaxError: unterminated string literal (detected at line 2)",
+  "correctOutput": "Hello, world! Welcome to Python.",
+  "options": [
+    {
+      "key": "a",
+      "label": "Add the closing double-quote at the end of the text",
+      "patchCode": "# Print a friendly greeting\nmessage = \"Hello, world! Welcome to Python.\"\nprint(message)",
+      "isCorrect": true,
+      "resultLog": "Hello, world! Welcome to Python.",
+      "rationale": "A string must open and close with the same kind of quote. The text started with a double-quote but never closed, so Python kept reading and ran off the end of the line — that's what \"unterminated string literal\" means. Adding the matching `\"` at the end closes the text, and `print` shows it."
+    },
+    {
+      "key": "b",
+      "label": "Close it with a single-quote instead",
+      "patchCode": "# Print a friendly greeting\nmessage = \"Hello, world! Welcome to Python.'\nprint(message)",
+      "isCorrect": false,
+      "resultLog": "  Cell In[1], line 2\n    message = \"Hello, world! Welcome to Python.'\n              ^\nSyntaxError: unterminated string literal (detected at line 2)",
+      "rationale": "The opening and closing quotes have to be the *same* character. You opened with a double-quote (`\"`), so a single-quote (`'`) at the end doesn't count as the closer — Python still sees the string as never finished and raises the same error."
+    },
+    {
+      "key": "c",
+      "label": "Remove the quotes so it's just the words",
+      "patchCode": "# Print a friendly greeting\nmessage = Hello, world! Welcome to Python.\nprint(message)",
+      "isCorrect": false,
+      "resultLog": "  Cell In[1], line 2\n    message = Hello, world! Welcome to Python.\n                   ^\nSyntaxError: invalid syntax",
+      "rationale": "Without quotes, Python doesn't see text at all — it tries to read `Hello` as the name of something and the comma and words around it as code, which isn't valid. Any literal text you want to store or print must be wrapped in quotes."
+    }
+  ],
+  "hints": [
+    "Look at the line that stores the text. It starts with a quote character. Now find where the text is supposed to end — is there a matching quote there?",
+    "A string needs the *same* quote on both ends: open with `\"`, close with `\"`. Add the missing one at the very end of the greeting, before the line break."
+  ],
+  "explanationMd": "### Why the bug occurs\nText in Python is a **string**, and a string is marked by quotes at both ends. The opening `\"` told Python \"a string starts here\"; it then read to the end of the line looking for the closing `\"` and never found it. Python reports `unterminated string literal` — the string was opened but not finished.\n\n### Why the fix is correct\nAdding the closing `\"` at the end of the greeting tells Python exactly where the text stops. Now the whole greeting is a complete string stored in `message`, and `print(message)` displays it. The rule to carry forward: every string has matching quotes — both double (`\"...\"`) or both single (`'...'`), never one of each.",
+  "recruiterReview": "Clean first fix. A missing or mismatched quote is the most common error every programmer hits on day one — and reading the error message (\"unterminated string literal\") instead of guessing is exactly the habit that will serve you for years. You closed the string with the matching quote rather than papering over it. One tip for later: most code editors color strings, so an unclosed quote makes the rest of the line change color — a quick visual check. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Your First Strings\n\nWelcome — this is the very beginning, and everyone starts exactly here.\n\n### What is a string?\nA **string** is just text: a word, a sentence, a name, anything made of characters. In Python you tell the computer \"this is text, not code\" by wrapping it in **quotes**. Both of these are strings:\n```python\n\"Hello, world!\"\n'Python is fun'\n```\nYou can use double quotes (`\"`) or single quotes (`'`) — but you must use the **same one** at both ends.\n\n### What is a variable?\nA **variable** is a label you stick on a value so you can use it later. The `=` sign means \"store the thing on the right under the name on the left\":\n```python\nmessage = \"Hello!\"\n```\nNow `message` holds the text `Hello!`. (`=` here means *store*, not *equals* — more on that in a later lesson.)\n\n### What does print do?\n`print(...)` shows something on the screen. `print(message)` displays whatever `message` holds.\n\n### The mistake in this mission\nThe greeting opened with a quote but never closed:\n```python\nmessage = \"Hello, world! Welcome to Python.\n```\nPython read past the end of the line still looking for the closing quote, and gave up with `unterminated string literal`. The fix is to add the matching quote at the end:\n```python\nmessage = \"Hello, world! Welcome to Python.\"\n```\n\n### A tiny worked example\n```python\nname = \"Ada\"\nprint(name)\n```\nThis prints:\n```\nAda\n```\n\n### Common beginner mistakes\n- Forgetting the closing quote (the error in this mission).\n- Opening with `\"` and closing with `'` (they must match).\n- Leaving the quotes off text entirely — Python then thinks it's code, not text.\n- Putting a quote *inside* the text without care, e.g. `\"it's\"` is fine, but `'it's'` breaks because the middle `'` closes the string early.\n\n### You just learned…\nText is a **string** wrapped in matching quotes, a **variable** is a named label set with `=`, and `print` shows a value on screen. That's three of the most important ideas in all of programming — nicely done.",
+    "videos": [
+      {
+        "title": "Python strings and quotes for absolute beginners",
+        "searchQuery": "python strings quotes beginner tutorial print"
+      },
+      {
+        "title": "Variables and print in Python explained simply",
+        "searchQuery": "python variables print beginner explained simple"
+      }
+    ]
+  },
+  "estMinutes": 3,
+  "version": 1
+}

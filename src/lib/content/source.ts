@@ -113,7 +113,7 @@ function supabaseEnv(): { url: string; anonKey: string } | null {
   return url && anonKey ? { url, anonKey } : null;
 }
 
-const SECTOR_ORDER: Record<string, number> = { da: 0, ml: 1, dl: 2, fullstack: 3, db: 4 };
+const SECTOR_ORDER: Record<string, number> = { py: 0, da: 1, ml: 2, dl: 3, fullstack: 4, db: 5 };
 
 export async function getChallenges(): Promise<Challenge[]> {
   const env = supabaseEnv();

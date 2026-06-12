@@ -12,7 +12,7 @@ import { checkDuplicateIds, validateChallengeFile } from "./validate";
 
 const CONTENT_DIR = path.join(process.cwd(), "content");
 
-const SECTOR_ORDER: Record<string, number> = { da: 0, ml: 1, dl: 2, fullstack: 3, db: 4 };
+const SECTOR_ORDER: Record<string, number> = { py: 0, da: 1, ml: 2, dl: 3, fullstack: 4, db: 5 };
 
 export function loadSectors(): Sector[] {
   const raw = fs.readFileSync(path.join(CONTENT_DIR, "sectors.json"), "utf8");

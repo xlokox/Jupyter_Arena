@@ -32,9 +32,10 @@ describe("Header", () => {
     render(<Header />);
     const nav = screen.getByRole("navigation", { name: en.header.sectorFilterAria });
     const pills = Array.from(nav.querySelectorAll("button"));
-    expect(pills).toHaveLength(6);
+    expect(pills).toHaveLength(7);
     expect(pills.map((p) => p.textContent)).toEqual([
       en.sectors.all,
+      en.sectors.py,
       en.sectors.da,
       en.sectors.ml,
       en.sectors.dl,

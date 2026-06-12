@@ -23,6 +23,7 @@ const TABS: Array<{ id: SidebarTab; label: string; icon: typeof FileCode2 }> = [
 ];
 
 const SECTOR_SHORT: Record<SectorId, string> = {
+  py: "PY",
   da: "DA",
   ml: "ML",
   dl: "DL",

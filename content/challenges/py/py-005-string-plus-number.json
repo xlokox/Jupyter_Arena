@@ -1,0 +1,62 @@
+{
+  "id": "py-005-string-plus-number",
+  "sector": "py",
+  "difficulty": "easy",
+  "title": "05_build_a_label.ipynb",
+  "language": "python",
+  "icon": "languages",
+  "conceptTags": ["strings", "type-error", "f-strings"],
+  "descriptionMd": "## Mission: Build a Label\n\nYou want to glue a number onto some text to make `Current age in years: 25`. You wrote `\"Current age in years: \" + age` — and Python refuses with a `TypeError` about adding a string and an integer.\n\nText and numbers are different *types*, and `+` can't join them directly. You need to put the number into the text properly. The cleanest way is an f-string. Fix it so the label prints.",
+  "initialCode": "# Build a label that includes a number\nage = 25\nlabel = \"Current age in years: \" + age\nprint(label)",
+  "buggyLineStart": 3,
+  "buggyLineEnd": 3,
+  "traceback": "---------------------------------------------------------------------------\nTypeError                                 Traceback (most recent call last)\nCell In[1], line 3\n      2 age = 25\n----> 3 label = \"Current age in years: \" + age\n\nTypeError: can only concatenate str (not \"int\") to str",
+  "correctOutput": "Current age in years: 25",
+  "options": [
+    {
+      "key": "a",
+      "label": "Use an f-string to drop the number into the text",
+      "patchCode": "# Build a label that includes a number\nage = 25\nlabel = f\"Current age in years: {age}\"\nprint(label)",
+      "isCorrect": true,
+      "resultLog": "Current age in years: 25",
+      "rationale": "Text is a `str` and `25` is an `int` — two different types, and `+` can't join them. An **f-string** (the `f` before the quotes) lets you drop a value into text with `{ }`: Python turns `age` into text automatically and slots it in. `f\"Current age in years: {age}\"` becomes the label you wanted."
+    },
+    {
+      "key": "b",
+      "label": "Convert the word \"age\" to a string",
+      "patchCode": "# Build a label that includes a number\nage = 25\nlabel = \"Current age in years: \" + str(\"age\")\nprint(label)",
+      "isCorrect": false,
+      "resultLog": "Current age in years: age",
+      "rationale": "`str(\"age\")` converts the literal *word* `age` (it's already text, in quotes) — not the variable. So the label shows the word `age` instead of the number 25. Drop the quotes: you want the variable `age`, e.g. `str(age)` or an f-string."
+    },
+    {
+      "key": "c",
+      "label": "Wrap the number in parentheses",
+      "patchCode": "# Build a label that includes a number\nage = 25\nlabel = \"Current age in years: \" + (age)\nprint(label)",
+      "isCorrect": false,
+      "resultLog": "---------------------------------------------------------------------------\nTypeError                                 Traceback (most recent call last)\nCell In[1], line 3\n----> 3 label = \"Current age in years: \" + (age)\n\nTypeError: can only concatenate str (not \"int\") to str",
+      "rationale": "Parentheses just group a value; they don't change its type. `(age)` is still the integer 25, so `+` between text and a number fails exactly as before. You have to *convert* the number to text — with `str(age)` or an f-string."
+    }
+  ],
+  "hints": [
+    "Read the error: `can only concatenate str (not \"int\") to str`. It's saying you tried to join text (`str`) with a number (`int`) using `+`, which isn't allowed. How do you put a number *inside* text?",
+    "The easiest fix is an f-string: put `f` before the opening quote and wrap the variable in curly braces — `f\"... {age}\"`. Python converts the number for you."
+  ],
+  "explanationMd": "### Why the bug occurs\nEvery value in Python has a **type**. `\"Current age in years: \"` is a `str` (text) and `25` is an `int` (a whole number). The `+` operator means different things for each — joining for text, adding for numbers — and Python refuses to guess when you mix them, so it raises `TypeError: can only concatenate str (not \"int\") to str`.\n\n### Why the fix is correct\nAn **f-string** is text with an `f` in front of the quotes and `{ }` placeholders inside. Python evaluates whatever is in the braces and converts it to text automatically, so `f\"Current age in years: {age}\"` produces `Current age in years: 25`. (You could also write `\"...\" + str(age)` to convert the number first; f-strings are just cleaner and easier to read.)",
+  "recruiterReview": "Solid — you saw that the issue was mixing types, not a syntax slip, and reached for an f-string, which is the modern, readable way to build text with values in it. f-strings will be in essentially every program you write, so getting comfortable with `{ }` now is time well spent. A nice extra: you can format inside the braces too, like `f\"{price:.2f}\"` for two decimal places — handy once you're working with money. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Mixing Text and Numbers\n\nYou'll constantly want to build messages that include numbers — \"You scored 42 points,\" \"Total: $19.99.\" Doing it right means understanding *types*.\n\n### What is a type?\nEvery value has a **type** — a kind. The two you meet first are:\n- **`str`** (string): text, written in quotes — `\"hello\"`, `\"25\"`.\n- **`int`** (integer): a whole number, written without quotes — `25`.\n\nThey look similar on screen (`\"25\"` vs `25`) but behave very differently. `\"25\"` is text; `25` is a number you can do maths with.\n\n### Why `+` fails across types\nThe `+` symbol means \"join\" for two strings and \"add\" for two numbers. Python won't mix them, so `\"Age: \" + 25` raises `TypeError: can only concatenate str (not \"int\") to str` — \"I can only join text with text.\"\n\n### The fix: f-strings\nAn **f-string** lets you put a value straight into text. Add `f` before the opening quote and wrap the value in curly braces:\n```python\nage = 25\nlabel = f\"Current age in years: {age}\"\n# 'Current age in years: 25'\n```\nPython converts `age` to text and drops it in. You can include several:\n```python\nname = \"Ada\"\nscore = 90\nprint(f\"{name} scored {score} points\")\n# Ada scored 90 points\n```\n\n### The other way: str()\nYou can also convert a number to text yourself with `str()` and then join:\n```python\n\"Age: \" + str(25)   # 'Age: 25'\n```\nBoth work; f-strings are easier to read.\n\n### A tiny worked example\n```python\nitems = 3\nprint(f\"You have {items} new messages\")\n```\nprints:\n```\nYou have 3 new messages\n```\n\n### Common beginner mistakes\n- Joining text and a number with `+` (the error here).\n- Putting quotes around a variable name inside `str(...)`, converting the word instead of the value.\n- Forgetting the `f` before the quotes — then `{age}` prints literally as `{age}`.\n\n### You just learned…\nValues have **types** (`str` for text, `int` for numbers), `+` can't mix them, and an **f-string** (`f\"... {value}\"`) is the clean way to put numbers inside text. This is one of the most-used tools in Python.",
+    "videos": [
+      {
+        "title": "Python f-strings for absolute beginners",
+        "searchQuery": "python f-string format text numbers beginner tutorial"
+      },
+      {
+        "title": "str vs int and TypeError explained",
+        "searchQuery": "python typeerror concatenate str int convert beginner"
+      }
+    ]
+  },
+  "estMinutes": 4,
+  "version": 1
+}

@@ -1,0 +1,62 @@
+{
+  "id": "py-003-operator-precedence",
+  "sector": "py",
+  "difficulty": "easy",
+  "title": "03_order_of_operations.ipynb",
+  "language": "python",
+  "icon": "divide",
+  "conceptTags": ["arithmetic", "operator-precedence", "parentheses"],
+  "descriptionMd": "## Mission: Add First, Then Multiply\n\nYou want to take 2 plus 3, and multiply that sum by 4 — five groups of four, which should be 20. You wrote `2 + 3 * 4` and printed it, expecting `Total number of items: 20`. Python prints `14` instead.\n\nPython follows math's order of operations: multiplication happens **before** addition unless you say otherwise. Right now `3 * 4` runs first. Use parentheses to force the addition to happen first.",
+  "initialCode": "# We expect (2 + 3) groups of 4 = 20\nresult = 2 + 3 * 4\nprint(\"Total number of items:\", result)",
+  "buggyLineStart": 2,
+  "buggyLineEnd": 2,
+  "traceback": "Total number of items: 14\n\n# Expected 20. Python multiplied 3 * 4 first (= 12), then added 2, giving 14.",
+  "correctOutput": "Total number of items: 20",
+  "options": [
+    {
+      "key": "a",
+      "label": "Group the addition with parentheses: (2 + 3) * 4",
+      "patchCode": "# We expect (2 + 3) groups of 4 = 20\nresult = (2 + 3) * 4\nprint(\"Total number of items:\", result)",
+      "isCorrect": true,
+      "resultLog": "Total number of items: 20",
+      "rationale": "Python uses the same order of operations as maths: it does multiplication and division before addition and subtraction. So `2 + 3 * 4` means `2 + (3 * 4)` = 14. Wrapping the addition in parentheses — `(2 + 3) * 4` — forces it to happen first, giving 5 * 4 = 20. Parentheses always go first."
+    },
+    {
+      "key": "b",
+      "label": "Make the multiplication explicit: 2 + (3 * 4)",
+      "patchCode": "# We expect (2 + 3) groups of 4 = 20\nresult = 2 + (3 * 4)\nprint(\"Total number of items:\", result)",
+      "isCorrect": false,
+      "resultLog": "Total number of items: 14",
+      "rationale": "Those parentheses describe what Python was *already* doing — multiply first, then add — so the answer is still 14. To change the result you have to group the part you want to happen first, which is the addition: `(2 + 3) * 4`."
+    },
+    {
+      "key": "c",
+      "label": "Rearrange the numbers: 2 * 3 + 4",
+      "patchCode": "# We expect (2 + 3) groups of 4 = 20\nresult = 2 * 3 + 4\nprint(\"Total number of items:\", result)",
+      "isCorrect": false,
+      "resultLog": "Total number of items: 10",
+      "rationale": "Shuffling the numbers changes the calculation entirely — `2 * 3 + 4` is 6 + 4 = 10, not what you wanted at all. Don't reorder the values; keep them as they are and use parentheses to control *which operation happens first*."
+    }
+  ],
+  "hints": [
+    "You expected 20 but got 14. Work it out by hand: if multiplication happens before addition, what does `2 + 3 * 4` actually compute? (Hint: 3 times 4 is 12.)",
+    "Whatever is inside parentheses happens first. Wrap the two numbers you want to add together so the sum is computed before the multiply."
+  ],
+  "explanationMd": "### Why the bug occurs\nPython evaluates arithmetic in a fixed order — the same one you learned in maths class: parentheses first, then multiplication and division, then addition and subtraction. So `2 + 3 * 4` is read as `2 + (3 * 4)` = `2 + 12` = 14. The code is doing exactly what the rules say; it just isn't the grouping you intended.\n\n### Why the fix is correct\nParentheses override the default order — whatever is inside them is computed first. Writing `(2 + 3) * 4` forces the addition (`2 + 3` = 5) to happen before the multiplication, giving `5 * 4` = 20. When in doubt, add parentheses to make the grouping explicit; they cost nothing and remove all ambiguity about what runs first.",
+  "recruiterReview": "Nice — you reached for parentheses to express intent rather than reshuffling numbers and hoping. Order of operations bites everyone (in real code it shows up in things like averages and discounts), and the professional habit is to parenthesize generously so the next reader doesn't have to remember precedence rules. Clear beats clever. The mnemonic PEMDAS/BODMAS captures the order if you ever need to recall it. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Order of Operations in Python\n\nPython does arithmetic, and it does it in a specific order. If your maths comes out wrong, this is usually why.\n\n### The operators\nPython's basic maths uses familiar symbols:\n- `+` add, `-` subtract\n- `*` multiply, `/` divide\n- `**` power (e.g. `2 ** 3` is 8)\n\n### The order (precedence)\nPython evaluates in this order, just like school maths:\n1. **Parentheses** `( )` — always first.\n2. **`**`** powers.\n3. **`*` and `/`** — multiply and divide, left to right.\n4. **`+` and `-`** — add and subtract, left to right.\n\nSo `2 + 3 * 4` is **not** `(2 + 3) * 4`. Multiplication is higher up the list, so `3 * 4` runs first, then `2 +` that:\n```python\n2 + 3 * 4   # → 2 + 12 → 14\n```\n\n### Using parentheses to take control\nParentheses are first in the order, so they let you force any grouping you want:\n```python\n(2 + 3) * 4   # → 5 * 4 → 20\n```\n\n### A tiny worked example\n```python\naverage = (10 + 20 + 30) / 3\nprint(average)\n```\nprints:\n```\n20.0\n```\nWithout the parentheses, `10 + 20 + 30 / 3` would be `10 + 20 + 10` = 40 — a classic averaging bug.\n\n### How to spot it\nIf a calculation is off, write out the order by hand: do the `*` and `/` first, then the `+` and `-`. If that doesn't match what you meant, add parentheses.\n\n### Common beginner mistakes\n- Expecting left-to-right reading (`2 + 3 * 4` ≠ 20).\n- Forgetting parentheses around a sum you then divide or multiply (averages especially).\n- Reordering numbers instead of grouping operations.\n\n### You just learned…\nPython does `*` and `/` **before** `+` and `-`, and **parentheses go first** — so you can group any part of a calculation to control the result. This one idea prevents a huge share of \"my maths is wrong\" bugs.",
+    "videos": [
+      {
+        "title": "Python order of operations (PEMDAS) for beginners",
+        "searchQuery": "python order of operations pemdas arithmetic beginner tutorial"
+      },
+      {
+        "title": "Using parentheses to control math in Python",
+        "searchQuery": "python parentheses operator precedence math beginner"
+      }
+    ]
+  },
+  "estMinutes": 3,
+  "version": 1
+}

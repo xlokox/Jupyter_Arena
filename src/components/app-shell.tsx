@@ -43,15 +43,22 @@ export function AppShell({ challenges, initialChallengeId, initialChallenge }: A
   const isAuthed = useAuthStore((s) => s.status === "signedIn");
 
   const active = challenges.find((c) => c.id === activeChallengeId) ?? null;
-  // First Data Analyst mission — the ungated on-ramp the empty state nudges toward.
-  const firstBeginnerId = challenges.find((c) => c.sector === "da")?.id ?? null;
+  // First ungated beginner mission the empty state nudges toward — Python
+  // Fundamentals (the true first step) if present, else Data Analyst.
+  const firstBeginnerId =
+    challenges.find((c) => c.sector === "py")?.id ??
+    challenges.find((c) => c.sector === "da")?.id ??
+    null;
 
   // Anonymous badge evaluation lives here (not the content-agnostic store):
   // AppShell holds the metadata badges need (sector/language/difficulty). For
   // authed users the server returns awards via submit_attempt, so we skip.
   useEffect(() => {
     if (isAuthed) return;
-    const sectorTotals = { da: 0, ml: 0, dl: 0, fullstack: 0, db: 0 } as Record<SectorId, number>;
+    const sectorTotals = { py: 0, da: 0, ml: 0, dl: 0, fullstack: 0, db: 0 } as Record<
+      SectorId,
+      number
+    >;
     const solved: SolvedFact[] = [];
     for (const c of challenges) {
       sectorTotals[c.sector] += 1;

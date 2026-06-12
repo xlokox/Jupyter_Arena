@@ -7,7 +7,7 @@ import { UNLOCK_LEVELS } from "@/lib/game/xp";
  * to snake_case columns 1:1.
  */
 
-export const SECTOR_IDS = ["da", "ml", "dl", "fullstack", "db"] as const;
+export const SECTOR_IDS = ["py", "da", "ml", "dl", "fullstack", "db"] as const;
 export const DIFFICULTIES = ["easy", "medium", "hard", "very_hard"] as const;
 export const LANGUAGES = ["python", "jsx", "javascript", "sql"] as const;
 export const OPTION_KEYS = ["a", "b", "c"] as const;
@@ -32,7 +32,7 @@ export const ChallengeOptionSchema = z.object({
 });
 
 export const ChallengeSchema = z.object({
-  id: z.string().regex(/^(ml|dl|fullstack|db|da)-\d{3}-[a-z0-9-]+$/),
+  id: z.string().regex(/^(ml|dl|fullstack|db|da|py)-\d{3}-[a-z0-9-]+$/),
   sector: z.enum(SECTOR_IDS),
   difficulty: z.enum(DIFFICULTIES),
   title: z.string(),

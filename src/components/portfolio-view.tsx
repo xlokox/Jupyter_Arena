@@ -16,7 +16,7 @@ import { getAttempt, useWorkspaceStore } from "@/store/workspace";
 import { TrophyCase } from "@/components/trophy-case";
 import { en } from "@/i18n/en";
 
-const SECTORS: SectorId[] = ["da", "ml", "dl", "fullstack", "db"];
+const SECTORS: SectorId[] = ["py", "da", "ml", "dl", "fullstack", "db"];
 
 function StatCard({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
