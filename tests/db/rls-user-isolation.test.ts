@@ -88,3 +88,52 @@ describe("public_profiles", () => {
     expect(denied).not.toBeNull();
   });
 });
+
+describe("achievement tables (5.6b)", () => {
+  // Seed B real rows via admin (bypasses RLS) so the read policies are tested
+  // independently of submit_attempt v3.
+  beforeAll(async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const badge = await admin
+      .from("user_badges")
+      .insert({ user_id: b.userId, badge_id: "first_blood" });
+    expect(badge.error).toBeNull();
+    const goal = await admin
+      .from("user_daily_goals")
+      .insert({ user_id: b.userId, goal_date: today, progress_solves: 1 });
+    expect(goal.error).toBeNull();
+  });
+
+  const NEW_TABLES = ["user_badges", "user_daily_goals"];
+
+  it("badge_definitions are world-readable (drives the trophy case)", async () => {
+    const { data, error } = await anonClient().from("badge_definitions").select("id");
+    expect(error).toBeNull();
+    expect((data ?? []).length).toBeGreaterThan(0);
+  });
+
+  it("A and anon cannot read B's badges or daily goals", async () => {
+    for (const table of NEW_TABLES) {
+      const seen = await a.client.from(table).select("*").eq("user_id", b.userId);
+      expect(seen.error, table).toBeNull();
+      expect(seen.data, table).toEqual([]);
+
+      const anon = await anonClient().from(table).select("*");
+      expect(anon.error, table).toBeNull();
+      expect(anon.data, table).toEqual([]);
+    }
+  });
+
+  it("clients cannot write achievement rows directly", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const badge = await a.client
+      .from("user_badges")
+      .insert({ user_id: a.userId, badge_id: "first_blood" });
+    expect(badge.error).not.toBeNull();
+
+    const goal = await a.client
+      .from("user_daily_goals")
+      .insert({ user_id: a.userId, goal_date: today, progress_solves: 1 });
+    expect(goal.error).not.toBeNull();
+  });
+});
