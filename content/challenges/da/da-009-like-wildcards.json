@@ -58,5 +58,13 @@
     ]
   },
   "estMinutes": 4,
-  "version": 1
+  "version": 1,
+  "conceptCard": "This mission is about **searching text** in SQL with `LIKE`.\n\n- `LIKE` matches a pattern. With no wildcards it behaves like an exact match.\n- `%` is a wildcard meaning 'any characters'. `'%john%'` matches `john` anywhere.\n- In PostgreSQL `LIKE` is case-sensitive.\n\nThe query searches for `'john'` with no wildcards and finds nothing. Add the wildcards.",
+  "lineNotes": [
+    {
+      "line": 4,
+      "noteMd": "`WHERE name LIKE 'john'` has no `%` wildcards, so it only matches a name that is *exactly* `john`. To find names that *contain* john, wrap it: `'%john%'`."
+    }
+  ],
+  "takeaway": "LIKE needs % wildcards for a 'contains' search — '%john%' matches john anywhere in the text."
 }

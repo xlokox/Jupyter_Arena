@@ -58,5 +58,17 @@
     ]
   },
   "estMinutes": 6,
-  "version": 1
+  "version": 1,
+  "conceptCard": "This mission is about the **GROUP BY rule** in SQL.\n\n- Grouping folds many rows into one row per group.\n- Every column in the `SELECT` must either be in the `GROUP BY` or wrapped in an aggregate (`SUM`, `COUNT`, …).\n- A bare non-grouped column is ambiguous — the database can't pick one value for it.\n\nThe query selects `region` without grouping or aggregating it. Decide what to do with it.",
+  "lineNotes": [
+    {
+      "line": 2,
+      "noteMd": "Selects `category`, `region`, and `SUM(amount)`. `category` is grouped and `SUM` is an aggregate — but `region` is neither, which breaks the GROUP BY rule. Since the report is per category, drop `region`."
+    },
+    {
+      "line": 4,
+      "noteMd": "`GROUP BY category` collapses all rows of a category into one — so there's no single `region` to show for it."
+    }
+  ],
+  "takeaway": "In a grouped query every selected column must be grouped or aggregated — drop or aggregate the rest."
 }

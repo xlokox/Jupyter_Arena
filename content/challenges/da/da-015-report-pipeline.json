@@ -58,5 +58,21 @@
     ]
   },
   "estMinutes": 9,
-  "version": 1
+  "version": 1,
+  "conceptCard": "This capstone ties the sector together: **clean → group → sort** to rank categories by revenue.\n\n- Clean the data *completely* before computing on it.\n- `errors=\"coerce\"` turns values it can't parse into `NaN`, which sums skip — so a partial clean silently loses data.\n- Convert text to numbers *before* aggregating.\n\nThe pipeline's shape is right, but the cleaning is incomplete and quietly drops the biggest sales. Find the gap.",
+  "lineNotes": [
+    {
+      "line": 6,
+      "noteMd": "Cleans the amount column — but only removes the `$`, not the thousands comma. So `\"1,234.50\"` still won't parse, and `errors=\"coerce\"` turns it into `NaN`. Remove the comma too."
+    },
+    {
+      "line": 7,
+      "noteMd": "Totals revenue per category. Because the big-ticket amounts became `NaN` above, those categories are silently under-counted here."
+    },
+    {
+      "line": 8,
+      "noteMd": "Sorts the totals high-to-low and keeps the top 3 — a wrong ranking if the totals above are wrong."
+    }
+  ],
+  "takeaway": "Clean every formatting character before converting, and convert to numbers before you aggregate."
 }

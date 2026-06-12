@@ -58,5 +58,17 @@
     ]
   },
   "estMinutes": 5,
-  "version": 1
+  "version": 1,
+  "conceptCard": "This mission is about **numbers that arrived as text**.\n\n- Every column has a *dtype* (data type). Numbers are `int64`/`float64`; text is `object`.\n- You can only do maths (mean, sum) on numeric columns.\n- Money often loads as text because of `$` and thousands commas.\n\nThe code averages a column that's secretly text. Strip the symbols and convert it first.",
+  "lineNotes": [
+    {
+      "line": 5,
+      "noteMd": "Prints the column's **dtype**. Seeing `object` is the clue that the amounts are stored as text, not numbers."
+    },
+    {
+      "line": 8,
+      "noteMd": "Calls `.mean()` on the amount column — but it's text (`\"$1,200.50\"`), so this fails. Remove the `$` and `,` and convert to numbers first."
+    }
+  ],
+  "takeaway": "A money column with $ and commas is text — strip them and convert with astype(float) before maths."
 }

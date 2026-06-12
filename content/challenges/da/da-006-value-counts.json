@@ -58,5 +58,17 @@
     ]
   },
   "estMinutes": 4,
-  "version": 1
+  "version": 1,
+  "conceptCard": "This mission is about **counting how often each value appears**.\n\n- A single column of a DataFrame is a *Series*.\n- `series.value_counts()` tallies each distinct value in one step.\n- A hand-written loop is slower and easy to get wrong.\n\nThe code uses a loop that crashes on the first item. Replace it with the built-in tool.",
+  "lineNotes": [
+    {
+      "line": 6,
+      "noteMd": "Sets up an empty dictionary to count into — the start of a manual tally."
+    },
+    {
+      "line": 8,
+      "noteMd": "`counts[status] += 1` needs `counts[status]` to already exist before adding 1, so it crashes on the first status. `value_counts()` avoids the whole problem."
+    }
+  ],
+  "takeaway": "Use df[\"col\"].value_counts() to tally a column instead of a hand-written loop."
 }

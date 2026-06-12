@@ -58,5 +58,17 @@
     ]
   },
   "estMinutes": 6,
-  "version": 1
+  "version": 1,
+  "conceptCard": "This mission is about **dates that loaded as text**.\n\n- `read_csv` leaves dates as text (dtype `object`) by default.\n- The `.dt` accessor (for month, day, weekday) only works on real datetime values.\n- Convert with `pd.to_datetime(...)` first.\n\nThe code asks for the month before converting, and the `.dt` accessor fails. Convert first.",
+  "lineNotes": [
+    {
+      "line": 4,
+      "noteMd": "Prints the column's dtype. `object` means the dates are still **text**, so date tools won't work yet."
+    },
+    {
+      "line": 7,
+      "noteMd": "Uses `.dt.month`, but `.dt` only works on real datetimes — and this column is text. Convert it with `pd.to_datetime(...)` first."
+    }
+  ],
+  "takeaway": "Convert text dates with pd.to_datetime() before using the .dt accessor for month/day/etc."
 }
