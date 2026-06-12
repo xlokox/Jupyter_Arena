@@ -1,0 +1,62 @@
+{
+  "id": "fullstack-013-key-prop",
+  "sector": "fullstack",
+  "difficulty": "easy",
+  "title": "13_key_prop_missing.jsx",
+  "language": "jsx",
+  "icon": "list-todo",
+  "conceptTags": ["react-keys", "list-rendering", "reconciliation", "performance"],
+  "descriptionMd": "## Mission: Give Every List Item a Stable Key\n\nThe notification list renders a dynamic array of items using `Array.map`. Each item has a unique `id` field. The render works visually — all items appear — but React logs a warning, and when items are removed or reordered the wrong items are animated or lost entirely because React cannot track which DOM node corresponds to which item.\n\nThe React reconciler uses the `key` prop to identify list items across renders. Without a key, React uses the array index by default, which breaks when items are inserted, removed, or reordered: index 0 after a deletion maps to a different item than index 0 before it, causing React to mutate the wrong DOM node.\n\nAdd a stable, unique `key` to each mapped element using the item's `id`.",
+  "initialCode": "export default function NotificationList({ notifications }) {\n  return (\n    <ul className=\"notification-list\">\n      {notifications.map(notif => (\n        <li className=\"notification-item\">\n          <span className=\"notif-title\">{notif.title}</span>\n          <span className=\"notif-body\">{notif.body}</span>\n        </li>\n      ))}\n    </ul>\n  );\n}",
+  "buggyLineStart": 4,
+  "buggyLineEnd": 8,
+  "traceback": "Warning: Each child in a list should have a unique \"key\" prop.\n\nCheck the render method of `NotificationList`. See https://reactjs.org/link/warning-keys for more information.\n    at li\n    at NotificationList\n\nBug: when notification with id=2 is dismissed, React removes the last DOM\nnode (index 2) instead of the node for id=2, causing the wrong notification\nto disappear and animations to play on the wrong element.",
+  "correctOutput": "No key warnings. React tracks each notification by its stable id.\nDismissing notification id=2 removes exactly that DOM node.",
+  "options": [
+    {
+      "key": "a",
+      "label": "Add key={notif.id} to the <li> element so React can track each item by its stable id",
+      "patchCode": "export default function NotificationList({ notifications }) {\n  return (\n    <ul className=\"notification-list\">\n      {notifications.map(notif => (\n        <li key={notif.id} className=\"notification-item\">\n          <span className=\"notif-title\">{notif.title}</span>\n          <span className=\"notif-body\">{notif.body}</span>\n        </li>\n      ))}\n    </ul>\n  );\n}",
+      "isCorrect": true,
+      "resultLog": "No key warnings. React tracks each notification by its stable id.\nDismissing notification id=2 removes exactly that DOM node.",
+      "rationale": "`key` must be placed on the outermost element returned from the `map` callback — the `<li>` in this case. Using `notif.id` gives each item a stable identity that survives insertions, deletions, and reorders: React can match the previous `<li key=\"2\">` to the current `<li key=\"2\">` and only update what changed, rather than re-rendering every item from the index that was removed onward."
+    },
+    {
+      "key": "b",
+      "label": "Use the array index as the key: key={index}",
+      "patchCode": "export default function NotificationList({ notifications }) {\n  return (\n    <ul className=\"notification-list\">\n      {notifications.map((notif, index) => (\n        <li key={index} className=\"notification-item\">\n          <span className=\"notif-title\">{notif.title}</span>\n          <span className=\"notif-body\">{notif.body}</span>\n        </li>\n      ))}\n    </ul>\n  );\n}",
+      "isCorrect": false,
+      "resultLog": "No key warning. ✓\n\nBug persists: when notification id=2 (at index 1) is dismissed, the array\nbecomes [id=1, id=3]. React sees key=0 → same as before (ok), key=1 → was\nid=2, now id=3. React reuses the DOM node for id=2 and patches it with id=3's\ncontent. Animations and focus state are applied to the wrong element.",
+      "rationale": "Using the array index as a key silences the warning but does not fix the reconciliation problem. The key is supposed to be a stable identity for an item across renders. When notifications are deleted or reordered, indices change: the item that was at index 1 is now at index 0, but React sees `key=0` in both the old and new trees and considers them the same element. It patches the existing DOM node with new content rather than removing the old one and creating the correct new one. Any CSS animation or focus state on the original node is wrongly preserved. Index keys are only safe when the list is static and never reordered."
+    },
+    {
+      "key": "c",
+      "label": "Wrap the map in a React.Fragment with key={notif.id}",
+      "patchCode": "import React from \"react\";\n\nexport default function NotificationList({ notifications }) {\n  return (\n    <ul className=\"notification-list\">\n      {notifications.map(notif => (\n        <React.Fragment key={notif.id}>\n          <li className=\"notification-item\">\n            <span className=\"notif-title\">{notif.title}</span>\n            <span className=\"notif-body\">{notif.body}</span>\n          </li>\n        </React.Fragment>\n      ))}\n    </ul>\n  );\n}",
+      "isCorrect": false,
+      "resultLog": "No key warning. ✓\nReconciliation works correctly — keys are stable. ✓\n\nBut the Fragment wrapper is unnecessary: it adds an extra layer of React\nvirtualdom nodes and makes the code harder to read. The key should be on\nthe <li> directly, not on a wrapper Fragment.",
+      "rationale": "Putting `key` on a `React.Fragment` wrapping the `<li>` does make reconciliation correct — the key is on the outermost element of the map result, which is what React requires. But the Fragment serves no purpose here beyond carrying the key. `React.Fragment` is used when you need to return multiple sibling elements without a DOM wrapper; for a single element, just put `key` directly on the `<li>`. The Fragment approach works but adds unnecessary indirection."
+    }
+  ],
+  "hints": [
+    "React's reconciliation algorithm needs a way to match virtual DOM nodes from one render to the next. For list items, it uses the `key` prop. Where does React expect to find the `key`, and what value makes it meaningful across renders?",
+    "Line 4: the `<li>` returned from the `map` callback has no `key` prop. Add `key={notif.id}` to the `<li>` opening tag. The `id` is already unique per item, so React can track each notification across insertions, deletions, and reorders."
+  ],
+  "explanationMd": "### Why the bug occurs\nWhen React renders a list, it needs to efficiently update the DOM when items change. Without `key` props, React falls back to matching items by their position in the array. When an item is removed from the middle of the array, every item after it shifts down one index. React sees `key=undefined` for every element and cannot tell that item at index 1 in the new tree is a different item than index 1 in the old tree — it updates the existing DOM node with new content rather than deleting the right node.\n\n### Why the fix is correct\n`key={notif.id}` gives React a stable, unique identifier for each list item. When the `notifications` array changes, React matches `<li key=\"2\">` in the old tree to `<li key=\"2\">` in the new tree. If `id=2` is no longer in the array, React removes exactly that DOM node. Items that are still present are moved or updated in place rather than re-rendered from scratch.",
+  "recruiterReview": "Correct fix. The index-key distractor is important to include — `key={index}` silences the warning and passes a basic render test, which is why it's commonly submitted in PRs without triggering a review comment. The failure only manifests when items are deleted or reordered, which a shallow test won't catch. Understanding *why* index keys are unsafe — not just that they are — is the signal this challenge is testing. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## React Keys: Why They Exist and When They Matter\n\nReact's reconciliation algorithm compares the previous virtual DOM tree to the new one after each render and computes the minimum set of DOM operations needed. For sibling elements at the same tree position, React needs to decide: is this the same element updated, or a different element that replaced it?\n\n### What happens without keys\nWithout keys, React uses position as the implicit identity. For a list `[A, B, C]`, React knows `position 0 = A`, `position 1 = B`, `position 2 = C`. If you remove B, the new list is `[A, C]`. React sees `position 0 = A` (same), `position 1 = C` (was B — React updates B's DOM node with C's content), and removes the last node. React never removed the correct node — it patched the wrong one.\n\n### What keys do\nA `key` gives each element a stable identity independent of its position. With `key={item.id}`, React tracks: `key=\"a\" = A`, `key=\"b\" = B`, `key=\"c\" = C`. When B is removed, React sees `key=\"b\"` is gone and removes exactly that DOM node. A and C are matched by key and their DOM nodes are left in place.\n\n### Rules for keys\n- Keys must be **unique among siblings** in the same list — not globally unique.\n- Keys must be **stable** — the same item should always have the same key. Avoid `Math.random()` or `Date.now()` as keys.\n- Keys are **not props** — they are internal React metadata. A child component cannot access `this.props.key` or `props.key`.\n- The `key` must be on the **outermost element** returned from the `map` callback.\n\n### When index keys are safe\nUsing array index as a key is acceptable only when:\n1. The list is **static** — items are never added, removed, or reordered after initial render.\n2. The items have **no local state** — no CSS animations, no input focus, no collapsed state.\n\nFor any dynamic list (sorted, filtered, paginated, editable), use a stable unique ID from your data model.\n\n### Finding a stable key when the data lacks an id\nIf your data doesn't have a unique ID, your options are:\n- Generate one at the source (add `id` to your data model)\n- Use a content hash if the content is unique and immutable\n- Avoid reordering / deletion so index is stable\n\n### Common variations of this bug\n- Fragments with multiple children: use `<React.Fragment key={id}>` when the map returns multiple siblings.\n- Nested lists: every `map` call at every level needs keys — the outer list's keys don't satisfy inner lists.\n- `key` on the wrong element: putting `key` on an inner child instead of the root element of the callback.\n- Keys in conditional renders: when toggling between two branches in a single position, add different keys to force React to unmount and remount rather than patch.",
+    "videos": [
+      {
+        "title": "React key prop explained — list reconciliation and why index is wrong",
+        "searchQuery": "react key prop list reconciliation why index key is wrong explained"
+      },
+      {
+        "title": "React reconciliation algorithm — how React updates the DOM efficiently",
+        "searchQuery": "react reconciliation algorithm diffing virtual dom key prop performance"
+      }
+    ]
+  },
+  "estMinutes": 4,
+  "version": 1
+}

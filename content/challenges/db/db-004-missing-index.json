@@ -1,0 +1,62 @@
+{
+  "id": "db-004-missing-index",
+  "sector": "db",
+  "difficulty": "medium",
+  "title": "db_004_missing_index.sql",
+  "language": "sql",
+  "icon": "gauge",
+  "conceptTags": ["sql", "indexing", "query-optimization", "sequential-scan", "b-tree"],
+  "descriptionMd": "## Mission: Speed Up the User Lookup with an Index\n\nThe authentication flow runs a query to look up a user by their email address on every login. The `users` table has 2 million rows. The query takes 1.8 seconds — a full sequential scan through all 2 million rows.\n\n`EXPLAIN ANALYZE` reveals: `Seq Scan on users (cost=0.00..42000.00) rows=1 width=80)`. The database reads every row in the table to find the one matching email. There is no index on `users.email`.\n\nAdd an index on the `email` column. Choose the right index type for equality lookups on a unique, low-null column.",
+  "initialCode": "-- Slow query — full sequential scan:\nSELECT id, name, password_hash\nFROM users\nWHERE email = 'alice@example.com';\n\n-- Add the missing index here:\n",
+  "buggyLineStart": 1,
+  "buggyLineEnd": 6,
+  "traceback": "EXPLAIN ANALYZE output (before index):\n  Seq Scan on users  (cost=0.00..42000.00 rows=1 width=80)\n                     (actual time=894.231..1801.442 rows=1 loops=1)\n  Planning Time: 0.5 ms\n  Execution Time: 1801.9 ms\n\nThe database read all 2,000,000 rows to find one matching row.\nNo index exists for the email column.",
+  "correctOutput": "EXPLAIN ANALYZE output (after index):\n  Index Scan using users_email_idx on users\n    (cost=0.43..8.45 rows=1 width=80)\n    (actual time=0.041..0.043 rows=1 loops=1)\n  Planning Time: 0.3 ms\n  Execution Time: 0.06 ms\n\nQuery time reduced from 1801ms to 0.06ms — 30,000x faster.",
+  "options": [
+    {
+      "key": "a",
+      "label": "CREATE UNIQUE INDEX on users(email) — a B-tree index for fast equality lookups on a unique column",
+      "patchCode": "-- Slow query — full sequential scan:\nSELECT id, name, password_hash\nFROM users\nWHERE email = 'alice@example.com';\n\n-- Add the missing index:\nCREATE UNIQUE INDEX users_email_idx ON users(email);",
+      "isCorrect": true,
+      "resultLog": "EXPLAIN ANALYZE output (after index):\n  Index Scan using users_email_idx on users\n    (cost=0.43..8.45 rows=1 width=80)\n    (actual time=0.041..0.043 rows=1 loops=1)\n  Planning Time: 0.3 ms\n  Execution Time: 0.06 ms\n\nQuery time reduced from 1801ms to 0.06ms — 30,000x faster.",
+      "rationale": "A `UNIQUE INDEX` on `email` creates a B-tree structure that the database traverses in O(log N) time to find the matching row — approximately 21 steps for 2 million rows instead of 2 million. `UNIQUE` also enforces the email uniqueness constraint at the database level, preventing duplicate registrations. The default B-tree index type is correct for equality (`=`) and range (`>`, `<`, `BETWEEN`) queries on comparable values. The query planner switches from `Seq Scan` to `Index Scan` automatically."
+    },
+    {
+      "key": "b",
+      "label": "CREATE INDEX (non-unique) on users(email) — same B-tree, without the uniqueness constraint",
+      "patchCode": "-- Slow query — full sequential scan:\nSELECT id, name, password_hash\nFROM users\nWHERE email = 'alice@example.com';\n\n-- Add the missing index:\nCREATE INDEX users_email_idx ON users(email);",
+      "isCorrect": false,
+      "resultLog": "EXPLAIN ANALYZE output (after index):\n  Index Scan using users_email_idx on users\n    (cost=0.43..8.45 rows=1 width=80)\n    (actual time=0.041..0.044 rows=1 loops=1)\n  Execution Time: 0.07 ms\n\nPerformance fix: ✓ — query is fast.\n\nBut: duplicate emails can now exist in the database. A second user can\nregister with 'alice@example.com' — authentication becomes ambiguous.",
+      "rationale": "A non-unique B-tree index has the same lookup performance as a unique one — the query planner uses it identically. The performance problem is solved. But email addresses are intrinsically unique identifiers: two accounts cannot share one. Without the `UNIQUE` constraint, a race condition or application bug could insert a second row with the same email, causing authentication to return multiple rows and the application to break. The database-level unique constraint is a safety net that application code alone cannot reliably provide."
+    },
+    {
+      "key": "c",
+      "label": "CREATE INDEX using a GIN (generalized inverted index) for full-text search on the email column",
+      "patchCode": "-- Slow query — full sequential scan:\nSELECT id, name, password_hash\nFROM users\nWHERE email = 'alice@example.com';\n\n-- Add the missing index:\nCREATE INDEX users_email_gin_idx ON users USING GIN(to_tsvector('english', email));",
+      "isCorrect": false,
+      "resultLog": "ERROR:  operator class \"gin_tsvector_ops\" does not accept data type text for\ncolumn email in context of a plain equality query.\n\nA GIN full-text index cannot be used to answer equality (=) queries.\nThe query planner falls back to Seq Scan — performance unchanged.",
+      "rationale": "GIN (Generalized Inverted Index) is designed for full-text search, JSONB containment (`@>`), and array operations — not for equality lookups on string columns. A B-tree index answers `WHERE email = ?` with O(log N) traversal. A GIN index answers `WHERE email @@ to_tsquery('alice')` — a completely different operator class. Using GIN here is both the wrong type and requires a different query syntax. The error or silent fallback to `Seq Scan` means no performance improvement. B-tree (the default) is always the right choice for equality and range comparisons on scalar values."
+    }
+  ],
+  "hints": [
+    "A sequential scan reads every row in the table. For a 2M-row table and a query that returns 1 row, this is maximally inefficient. What data structure allows the database to find a row by value in O(log N) steps rather than O(N)?",
+    "The `WHERE email = ?` clause does an equality lookup on a column with no index. Add `CREATE UNIQUE INDEX users_email_idx ON users(email);` after the `SELECT` statement. `UNIQUE` enforces email uniqueness at the DB level; the B-tree structure makes lookups O(log N)."
+  ],
+  "explanationMd": "### Why the bug occurs\nWithout an index, the database has no knowledge of where in the table to find rows with a specific value. It performs a sequential scan: it reads every row in the table from start to finish and checks whether `email` matches the predicate. For 2 million rows, that is 2 million row evaluations per login. The cost scales linearly with table size — the larger the table, the slower every lookup.\n\n### Why the fix is correct\nA B-tree index stores the column values in a sorted tree structure. To find `email = 'alice@example.com'`, the database traverses the tree in O(log N) steps — approximately 21 comparisons for 2 million rows. It also directly yields the `ctid` (heap tuple pointer) of the matching row, so the engine fetches only that row from the heap. The `UNIQUE` constraint adds enforcement that no two rows can have the same email value, which is correct for email-as-identifier.",
+  "recruiterReview": "Correct fix. The non-unique index distractor is the one that trips up candidates who aren't thinking about data integrity — the query becomes fast either way, but allowing duplicate emails is a correctness bug that application code can't reliably prevent under concurrent writes. The GIN distractor is an educational mismatch: it's the answer to a different question ('how do I do full-text search on emails?'), and seeing it here surfaces whether the candidate knows when to use which index type. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Database Indexes: How They Work and When to Add Them\n\nAn index is a separate data structure maintained by the database engine that allows fast lookup of rows by value without scanning the entire table. Like a book index, it trades extra storage and write overhead for dramatically faster reads.\n\n### B-tree index: the default\nPostgreSQL, MySQL, and SQLite all default to B-tree indexes. A B-tree stores column values in a balanced tree sorted by value. A lookup traverses the tree from root to leaf: O(log N) comparisons for a table of N rows.\n\nB-tree indexes support:\n- Equality: `WHERE email = ?`\n- Range: `WHERE created_at BETWEEN ? AND ?`\n- Prefix: `WHERE name LIKE 'Al%'` (leading constant only)\n- Sorting: `ORDER BY email` can use the index without a sort step\n\nB-tree indexes do NOT accelerate:\n- Substring search: `WHERE name LIKE '%alice%'`\n- Full-text search: `WHERE bio @@ to_tsquery('engineer')`\n- Containment: `WHERE tags @> ARRAY['python']`\n\n### When to add an index\nAdd an index when:\n- A column appears frequently in `WHERE` clauses on large tables\n- A column is used in `JOIN ON` conditions\n- A column appears in `ORDER BY` on large result sets\n- A column should be unique (use `UNIQUE INDEX` or `UNIQUE` constraint)\n\nDo NOT add indexes blindly:\n- Every index slows down `INSERT`, `UPDATE`, and `DELETE` (the index must be updated)\n- Indexes consume disk space and buffer pool\n- Low-cardinality columns (boolean, enum with 3 values) rarely benefit from B-tree indexes\n- Small tables (under ~1000 rows) where sequential scan is already fast\n\n### Index types in PostgreSQL\n- **B-tree** (default): equality, range, sorting\n- **GIN**: full-text search, JSONB containment, arrays\n- **GiST**: geometric types, PostGIS, full-text (alternative to GIN)\n- **Hash**: equality only (rarely used — B-tree is usually at least as fast)\n- **BRIN**: very large tables sorted by insertion order (time-series)\n\n### Checking if a query uses an index\n```sql\nEXPLAIN ANALYZE SELECT * FROM users WHERE email = 'a@b.com';\n```\n- `Seq Scan` — no index used; all rows read\n- `Index Scan` — B-tree traversal; fetches heap row for each result\n- `Index Only Scan` — all required columns in the index; no heap fetch needed\n\n### Common indexing mistakes\n- Index on low-selectivity column (boolean) — the planner often ignores it\n- Missing compound index: `WHERE status = 'active' AND created_at > ?` — needs `(status, created_at)` index, not two separate indexes\n- Over-indexing write-heavy tables — each index is a write penalty\n- `LIKE '%term%'` — B-tree can't help; use GIN with `pg_trgm` extension for substring search",
+    "videos": [
+      {
+        "title": "Database indexes explained — B-tree, how indexes work",
+        "searchQuery": "database index explained B-tree how indexes work query performance"
+      },
+      {
+        "title": "PostgreSQL EXPLAIN ANALYZE — reading query plans and finding slow queries",
+        "searchQuery": "postgresql EXPLAIN ANALYZE query plan sequential scan index scan tutorial"
+      }
+    ]
+  },
+  "estMinutes": 5,
+  "version": 1
+}

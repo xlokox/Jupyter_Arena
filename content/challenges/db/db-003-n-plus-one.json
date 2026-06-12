@@ -1,0 +1,62 @@
+{
+  "id": "db-003-n-plus-one",
+  "sector": "db",
+  "difficulty": "medium",
+  "title": "db_003_n_plus_one.sql",
+  "language": "sql",
+  "icon": "database",
+  "conceptTags": ["sql", "n-plus-one", "joins", "query-optimization", "orm"],
+  "descriptionMd": "## Mission: Collapse N+1 Queries Into One JOIN\n\nThe orders report page runs one query to fetch all orders, then loops over the result and runs a second query per order to fetch the customer's name. For 500 orders, that is 501 queries — one to get the orders list and one per order. The page takes 4+ seconds to load.\n\nThis is the N+1 query problem: one initial query (1) plus N additional queries (one per row from the first). It is almost always unnecessary — a single query with a `JOIN` returns all the data in one round-trip.\n\nRewrite the two-query pattern as a single SQL query that joins `orders` with `customers` and returns both the order fields and the customer name together.",
+  "initialCode": "-- Pattern that causes N+1 queries (pseudocode showing the loop):\n-- for each order in (SELECT * FROM orders):\n--     SELECT name FROM customers WHERE id = order.customer_id\n\n-- Rewrite as a single query:\nSELECT\n  o.id,\n  o.amount,\n  o.created_at\nFROM orders o;",
+  "buggyLineStart": 6,
+  "buggyLineEnd": 9,
+  "traceback": "SLOW QUERY LOG:\n  [10:42:01] SELECT * FROM orders  → 500 rows, 12ms\n  [10:42:01] SELECT name FROM customers WHERE id = 1  → 1 row, 8ms\n  [10:42:01] SELECT name FROM customers WHERE id = 2  → 1 row, 7ms\n  ...(498 more)\n  [10:42:05] Page rendered after 4,127ms total\n\nTotal queries: 501 — one per order row plus the initial fetch.",
+  "correctOutput": "SELECT o.id, o.amount, o.created_at, c.name AS customer_name\nFROM orders o\nJOIN customers c ON c.id = o.customer_id;\n-- 1 query, 1 round-trip, 15ms total",
+  "options": [
+    {
+      "key": "a",
+      "label": "Use a JOIN to fetch orders and customer names in a single query",
+      "patchCode": "SELECT\n  o.id,\n  o.amount,\n  o.created_at,\n  c.name AS customer_name\nFROM orders o\nJOIN customers c ON c.id = o.customer_id;",
+      "isCorrect": true,
+      "resultLog": "1 query, 1 round-trip.\n\nSELECT o.id, o.amount, o.created_at, c.name AS customer_name\nFROM orders o JOIN customers c ON c.id = o.customer_id;\n\nExecution time: 15ms (was 4,127ms)\nRows returned: 500 — each with customer_name included.",
+      "rationale": "A `JOIN` instructs the database to combine rows from `orders` and `customers` in a single execution plan. The database evaluates the join condition `c.id = o.customer_id` using the index on `customers.id` (a primary key) — at most one index lookup per order row, and the database can batch or hash-join across all 500 rows in one pass. Total round-trips: 1. The N+1 pattern sends 501 separate round-trips, each with network latency and parser overhead."
+    },
+    {
+      "key": "b",
+      "label": "Fetch all customers first and resolve names in application code",
+      "patchCode": "-- Query 1: fetch all customers once\nSELECT id, name FROM customers;\n\n-- Query 2: fetch orders\nSELECT id, amount, created_at, customer_id FROM orders;\n\n-- Application code maps customer_id to name using an in-memory dictionary.",
+      "isCorrect": false,
+      "resultLog": "2 queries instead of 501. ✓ Performance improved.\n\nBut: fetches ALL customers (possibly 100,000+) to resolve 500 unique IDs.\nFor a large customers table, this wastes memory and bandwidth.\nA JOIN fetches only the customers that appear in the orders result set.",
+      "rationale": "Two queries instead of 501 is a real improvement — this is the \"batch loading\" pattern used by DataLoader in GraphQL contexts. But fetching all customers unconditionally is wasteful when the orders result references only a subset of them. A JOIN is more precise: the database returns exactly the customer rows needed. The batch pattern is appropriate when the ORM doesn't support joins well or when the relation is polymorphic; for a simple foreign-key join, the SQL JOIN is the correct tool."
+    },
+    {
+      "key": "c",
+      "label": "Use a subquery to fetch customer names inline",
+      "patchCode": "SELECT\n  o.id,\n  o.amount,\n  o.created_at,\n  (SELECT name FROM customers WHERE id = o.customer_id) AS customer_name\nFROM orders o;",
+      "isCorrect": false,
+      "resultLog": "1 SQL statement. ✓\n\nBut the correlated subquery executes once per row:\n  Execution plan: Seq Scan on orders → for each row: Index Scan on customers\n  This is N+1 in SQL — the same round-trips happen inside the database engine.\n  Execution time: ~1,800ms (faster than 501 network round-trips, but much\n  slower than a JOIN which the planner can optimize as a hash join).",
+      "rationale": "A correlated subquery (`SELECT ... WHERE id = o.customer_id`) is evaluated once per row of the outer query — the same N+1 execution inside the database engine. While it avoids N+1 network round-trips (all execution stays inside the database), the query planner cannot rewrite a correlated subquery into a hash join the way it can a regular `JOIN`. The result is a nested-loop execution that is much slower than a JOIN for large datasets. Use `JOIN` — the query planner has decades of optimization work for joins."
+    }
+  ],
+  "hints": [
+    "The N+1 query problem occurs when you run one query to get N rows, then run N more queries to look up related data. SQL has a built-in mechanism for combining rows from two tables based on a shared key in a single query. What is it?",
+    "Lines 6–9: the `SELECT` only fetches from `orders`. Add a `JOIN customers c ON c.id = o.customer_id` clause and add `c.name AS customer_name` to the `SELECT` list. This turns 501 queries into 1."
+  ],
+  "explanationMd": "### Why the bug occurs\nThe N+1 pattern emerges when application code (or an ORM in lazy-load mode) fetches a list of records and then accesses a related field on each record one at a time. Each field access triggers a separate query. For 500 orders, that is 501 queries — one to fetch the list and one per row to look up the customer name. Network round-trip latency multiplies across all N lookups: even 8ms per query × 500 queries = 4,000ms of pure latency.\n\n### Why the fix is correct\nA SQL `JOIN` tells the database engine to combine rows from two tables in a single execution plan. For `orders JOIN customers ON customers.id = orders.customer_id`, the database uses the primary key index on `customers.id` to efficiently resolve each `customer_id` in the orders result. The planner may choose a hash join (build a hash table of customers, probe it for each order row) or a nested-loop join (index lookup per order row) — either way, the work happens inside the database in one pass, not over 500 network round-trips.",
+  "recruiterReview": "Correct fix. The correlated-subquery distractor is the one that trips up candidates who know they need 'one SQL statement' but reach for a scalar subquery rather than a join — it looks like it solves the problem but reproduces N+1 semantics inside the engine. The batch-customers distractor is the DataLoader pattern, which is legitimate in GraphQL/ORM contexts but overshoots for a simple two-table join — recognizing the tradeoff shows you reason about the data size, not just the query count. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## The N+1 Query Problem: Why It Happens and How to Fix It\n\nN+1 is the most common database performance bug in web applications. It occurs whenever code fetches a list of records and then loops over the result to fetch related data one item at a time.\n\n### How it happens in ORMs\nMost ORMs use lazy loading by default: accessing a relationship property triggers a new query. In Rails/ActiveRecord:\n```ruby\n# N+1: one query for orders, one per order for customer\nOrder.all.each do |order|\n  puts order.customer.name  # triggers SELECT for each order\nend\n\n# Fix: eager load\nOrder.includes(:customer).each do |order|\n  puts order.customer.name  # all customers loaded in one query\nend\n```\n\nIn Python/SQLAlchemy:\n```python\n# N+1\norders = session.query(Order).all()\nfor order in orders:\n    print(order.customer.name)  # lazy load per order\n\n# Fix: joinedload or selectinload\norders = session.query(Order).options(joinedload(Order.customer)).all()\n```\n\n### The SQL JOIN solution\nFor a direct foreign-key relationship, a JOIN is always the right approach:\n```sql\nSELECT o.id, o.amount, c.name AS customer_name\nFROM orders o\nJOIN customers c ON c.id = o.customer_id;\n```\n\nThe `JOIN` type matters:\n- `INNER JOIN` (or just `JOIN`) — returns only rows with a matching customer. Orders without a customer_id are excluded.\n- `LEFT JOIN` — returns all orders; `customer_name` is NULL for orders without a matching customer.\n\n### When to use batch loading instead of a JOIN\nBatch loading (fetch all related IDs, then one `WHERE id IN (...)` query) is appropriate when:\n- The ORM makes joins difficult or generates bad SQL from them\n- The relationship is polymorphic (e.g., `notifiable_type`, `notifiable_id`)\n- You need to fetch the same related records for many different root queries (DataLoader pattern in GraphQL)\n\nFor simple foreign-key relationships in SQL, prefer the JOIN.\n\n### Detecting N+1 in your app\n- **Query logging**: count distinct queries per request in development. More than 5–10 for a page is a red flag.\n- **EXPLAIN ANALYZE**: look for repeated index scans on the same table.\n- **APM tools**: Datadog, New Relic, and Scout APM have N+1 detectors.\n- **`bullet` gem (Rails)** / **`nplusone` (Python)**: development-only libraries that raise warnings on detected N+1 patterns.\n\n### Common variations\n- N+1 in GraphQL resolvers — each field resolver independently queries the DB; fix with DataLoader batching.\n- N+1 in nested loops — two nested `for` loops each running a query.\n- N+1 through aggregation — `SELECT COUNT(*) WHERE parent_id = ?` called once per parent row; fix with `GROUP BY` in a single query.",
+    "videos": [
+      {
+        "title": "N+1 query problem explained — SQL JOIN vs loop queries",
+        "searchQuery": "n+1 query problem explained SQL join loop database performance fix"
+      },
+      {
+        "title": "SQL JOIN types explained — INNER LEFT RIGHT FULL",
+        "searchQuery": "SQL JOIN types INNER LEFT RIGHT explained examples tutorial"
+      }
+    ]
+  },
+  "estMinutes": 5,
+  "version": 1
+}

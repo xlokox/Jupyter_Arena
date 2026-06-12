@@ -1,0 +1,62 @@
+{
+  "id": "fullstack-014-async-state-update",
+  "sector": "fullstack",
+  "difficulty": "medium",
+  "title": "14_async_state_update.jsx",
+  "language": "jsx",
+  "icon": "refresh-cw",
+  "conceptTags": ["react-hooks", "async-state", "closures", "stale-state", "functional-updates"],
+  "descriptionMd": "## Mission: Update Counter State Without Reading Stale State\n\nThe retry button increments a `retryCount` state. The handler is async: it calls an API, waits for the response, and then increments the counter. The counter is displayed and should equal the number of times the user has clicked retry.\n\nThe bug: when the user clicks retry three times rapidly before the first API call completes, the counter ends up at 1 instead of 3. Each click captures `retryCount` from the render at the time the handler was created. All three handlers close over `retryCount = 0` and set it to `0 + 1 = 1`. The last write wins, discarding the other two increments.\n\nThis is the \"stale closure\" problem in async handlers. Fix it without making the handler synchronous or adding extra state.",
+  "initialCode": "import { useState } from \"react\";\n\nasync function callApi() {\n  await new Promise(resolve => setTimeout(resolve, 500));\n}\n\nexport default function RetryButton() {\n  const [retryCount, setRetryCount] = useState(0);\n\n  async function handleRetry() {\n    await callApi();\n    setRetryCount(retryCount + 1);\n  }\n\n  return (\n    <div>\n      <button onClick={handleRetry}>Retry</button>\n      <p>Retries: {retryCount}</p>\n    </div>\n  );\n}",
+  "buggyLineStart": 12,
+  "buggyLineEnd": 12,
+  "traceback": "FAIL  retry-button.test.jsx > counter reaches 3 after 3 rapid clicks\n\n  AssertionError: expected retryCount to be 3, received 1.\n\n  Timeline:\n    t=0ms   click 1 → handleRetry called, retryCount=0 captured in closure\n    t=10ms  click 2 → handleRetry called, retryCount=0 captured in closure\n    t=20ms  click 3 → handleRetry called, retryCount=0 captured in closure\n    t=510ms click 1 resolves → setRetryCount(0+1=1)\n    t=520ms click 2 resolves → setRetryCount(0+1=1)\n    t=530ms click 3 resolves → setRetryCount(0+1=1)\n    Final retryCount: 1 (three setRetryCount(1) calls, not 0+1+1+1)",
+  "correctOutput": "PASS  retry-button.test.jsx > counter reaches 3 after 3 rapid clicks\n\n  retryCount after 3 rapid clicks: 3",
+  "options": [
+    {
+      "key": "a",
+      "label": "Use the functional form of setState — setRetryCount(prev => prev + 1) — to avoid reading stale state",
+      "patchCode": "import { useState } from \"react\";\n\nasync function callApi() {\n  await new Promise(resolve => setTimeout(resolve, 500));\n}\n\nexport default function RetryButton() {\n  const [retryCount, setRetryCount] = useState(0);\n\n  async function handleRetry() {\n    await callApi();\n    setRetryCount(prev => prev + 1);\n  }\n\n  return (\n    <div>\n      <button onClick={handleRetry}>Retry</button>\n      <p>Retries: {retryCount}</p>\n    </div>\n  );\n}",
+      "isCorrect": true,
+      "resultLog": "PASS  retry-button.test.jsx > counter reaches 3 after 3 rapid clicks\n\n  retryCount after 3 rapid clicks: 3",
+      "rationale": "The functional form `setState(prev => prev + 1)` receives the *latest* state value — not the value captured in the closure at handler creation time. React queues each functional update, and each one receives the output of the previous as its `prev`. Even if three handlers all call `setRetryCount(prev => prev + 1)` before any of them re-renders, React processes the queue: 0→1, 1→2, 2→3. No stale closures, no lost increments."
+    },
+    {
+      "key": "b",
+      "label": "Disable the Retry button while the API call is in flight to prevent concurrent calls",
+      "patchCode": "import { useState } from \"react\";\n\nasync function callApi() {\n  await new Promise(resolve => setTimeout(resolve, 500));\n}\n\nexport default function RetryButton() {\n  const [retryCount, setRetryCount] = useState(0);\n  const [loading, setLoading] = useState(false);\n\n  async function handleRetry() {\n    setLoading(true);\n    await callApi();\n    setRetryCount(retryCount + 1);\n    setLoading(false);\n  }\n\n  return (\n    <div>\n      <button onClick={handleRetry} disabled={loading}>Retry</button>\n      <p>Retries: {retryCount}</p>\n    </div>\n  );\n}",
+      "isCorrect": false,
+      "resultLog": "PASS  retry-button.test.jsx > counter reaches 3 after 3 rapid clicks\n  (test clicks the button before loading=true propagates — still 1 stale update)\n\n  Note: This changes the UX contract — users can no longer retry during a slow\n  call. The original intent was to count all retries, not serialize them.",
+      "rationale": "Disabling the button during the API call prevents concurrent handlers, which would make the test pass in a real browser (only one click registers per API call). But the test fires three clicks synchronously before the first `setLoading(true)` re-render has propagated — so in the test environment the bug is still reproduced. More importantly, this changes the product behavior: the user can no longer retry multiple times during a slow network request. The functional-update fix is correct without restricting the UX."
+    },
+    {
+      "key": "c",
+      "label": "Move the increment before the await so the state update happens synchronously",
+      "patchCode": "import { useState } from \"react\";\n\nasync function callApi() {\n  await new Promise(resolve => setTimeout(resolve, 500));\n}\n\nexport default function RetryButton() {\n  const [retryCount, setRetryCount] = useState(0);\n\n  async function handleRetry() {\n    setRetryCount(retryCount + 1);\n    await callApi();\n  }\n\n  return (\n    <div>\n      <button onClick={handleRetry}>Retry</button>\n      <p>Retries: {retryCount}</p>\n    </div>\n  );\n}",
+      "isCorrect": false,
+      "resultLog": "FAIL  retry-button.test.jsx > counter reaches 3 after 3 rapid clicks\n\n  retryCount after 3 rapid clicks: 1\n\n  The stale closure is still present — `retryCount + 1` is evaluated before the\n  await, but all three handlers still captured retryCount=0 from the same render.\n  Moving the setState before the await does not change the closure value.",
+      "rationale": "Moving `setRetryCount` before the `await` runs it synchronously in the same React batch as the click handler, but the closure problem persists: all three handlers still closed over `retryCount = 0` at the time they were created. Each handler still calls `setRetryCount(0 + 1 = 1)`. The position of the `setState` call relative to the `await` does not change what value `retryCount` has in the closure. The functional form is the correct fix because it asks React for the *current* value rather than using a captured one."
+    }
+  ],
+  "hints": [
+    "`setRetryCount(retryCount + 1)` reads `retryCount` from the closure — the value at the time the handler was created, not the current value at the time it runs. React provides a functional form of every setter: `setX(prev => ...)`. What does `prev` represent?",
+    "Line 12: `setRetryCount(retryCount + 1)` captures `retryCount` from the render closure. After an `await`, that value is stale. Replace it with `setRetryCount(prev => prev + 1)` — the function form receives the latest state value from React's internal queue, not the stale closure value."
+  ],
+  "explanationMd": "### Why the bug occurs\nWhen an async function starts, it captures all variables from the enclosing scope in a closure. `handleRetry` captures `retryCount` from the render in which the handler was created. If the user clicks three times before the first API call completes, all three handlers close over `retryCount = 0`. When each resolves and calls `setRetryCount(retryCount + 1)`, they all compute `0 + 1 = 1`. The last write wins and `retryCount` ends up at 1 instead of 3.\n\n### Why the fix is correct\nThe functional form `setRetryCount(prev => prev + 1)` does not read from the closure. Instead, it passes a *reducer function* to React. React processes the update queue sequentially: the first call receives `prev = 0` and returns 1; the second receives `prev = 1` and returns 2; the third receives `prev = 2` and returns 3. No stale value is read — React always passes the most recently queued state as `prev`.",
+  "recruiterReview": "Correct fix. The functional-update pattern is the idiomatic React solution for any state update that depends on the previous value — not just in async handlers, but anywhere the new value is a function of the old one (`toggleOpen`, incrementing counters, pushing to arrays). The before-await distractor is worth including: it looks like moving the call earlier would escape the stale-closure problem, but the closure value is captured at function-creation time, not call-time, so position relative to the await is irrelevant. That's a subtle point that separates candidates who understand closures from those who pattern-match. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Stale Closures in Async React Handlers\n\nWhen a React component renders, the state values (from `useState`) are captured in the function scope. Any function created during that render — including event handlers — closes over those values. If the handler is async and runs after a later render has updated the state, the handler still sees the captured, stale value.\n\n### The functional form of setState\nEvery setter from `useState` accepts either a value or a function:\n```js\n// Direct: uses captured closure value — stale in async handlers\nsetCount(count + 1);\n\n// Functional: React passes the latest queued value as `prev` — always current\nsetCount(prev => prev + 1);\n```\n\nThe functional form is the correct default for any state update that depends on the previous value, especially:\n- Async handlers (after `await`, the closure may be stale)\n- Handlers that fire rapidly (debounced, throttled, or clicked multiple times)\n- State updates inside `setTimeout` / `setInterval` / `requestAnimationFrame`\n\n### React's update queue\nWhen React processes multiple `setState` calls before re-rendering (batching), functional updates chain correctly:\n```\nQueue: [prev => prev + 1, prev => prev + 1, prev => prev + 1]\nProcess: 0 → 1 → 2 → 3\n```\n\nDirect value updates don't chain — each one sets the same absolute value:\n```\nQueue: [1, 1, 1]\nProcess: 1 (last write wins)\n```\n\n### When to use functional updates\nUse `setState(prev => ...)` any time the new value depends on the old value:\n- Incrementing/decrementing counters\n- Toggling booleans: `setOpen(prev => !prev)`\n- Appending to arrays: `setItems(prev => [...prev, newItem])`\n- Merging objects: `setConfig(prev => ({ ...prev, theme: 'dark' }))`\n\n### Other solutions (and their tradeoffs)\n- **`useReducer`**: for complex state transitions with multiple actions, `useReducer` puts all state logic in one place. The dispatcher always has access to the current state via the reducer's `state` argument.\n- **`useRef` for mutable values**: if you need to read state in an async handler without triggering a re-render on change, store it in a `useRef` and update the ref alongside the state.\n- **Disable concurrent clicks**: appropriate when the intent is serialization (one API call at a time), not when you want to count all attempts.\n\n### Common variations of this bug\n- `setTimeout(callback, delay)` where `callback` reads state — the closure is captured at `setTimeout` call time, before the delay elapses.\n- `WebSocket.onmessage` handler set up in `useEffect` with `[]` — the handler closes over the initial state and never updates.\n- Drag-and-drop handlers that accumulate position deltas — each handler sees the same initial position if not using functional updates.",
+    "videos": [
+      {
+        "title": "Stale closures in React async handlers — useState functional update",
+        "searchQuery": "react stale closure async handler useState functional update prev"
+      },
+      {
+        "title": "React useState functional update — when and why to use it",
+        "searchQuery": "react useState functional update form setCount prev explanation"
+      }
+    ]
+  },
+  "estMinutes": 6,
+  "version": 1
+}
