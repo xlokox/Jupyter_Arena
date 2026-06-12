@@ -1,0 +1,62 @@
+{
+  "id": "da-001-read-csv-delimiter",
+  "sector": "da",
+  "difficulty": "easy",
+  "title": "01_load_sales_export.ipynb",
+  "language": "python",
+  "icon": "table",
+  "conceptTags": ["read-csv", "delimiter", "data-loading"],
+  "descriptionMd": "## Mission: Load the Monthly Sales Export\n\nYour teammate exported June's sales from a European billing tool and asked you to total the revenue. The plan is simple: load the file with pandas, check the columns, and sum the `amount` column.\n\nThe notebook crashes on the very last line with a `KeyError` saying `amount` doesn't exist — even though you can open the file and clearly see an amount column. Look at what pandas actually loaded (the printed columns are a big hint) and fix the way the file is read so the three columns come through separately.",
+  "initialCode": "import pandas as pd\n\n# Load the monthly sales export and inspect it\nsales = pd.read_csv(\"sales_june.csv\")\n\nprint(\"columns:\", list(sales.columns))\nprint(\"rows:\", len(sales))\n\n# Total the revenue for the month\ntotal = sales[\"amount\"].sum()\nprint(f\"total revenue: {total}\")",
+  "buggyLineStart": 4,
+  "buggyLineEnd": 4,
+  "traceback": "columns: ['date;product;amount']\nrows: 30\n---------------------------------------------------------------------------\nKeyError                                  Traceback (most recent call last)\nCell In[1], line 11\n      9 # Total the revenue for the month\n---> 11 total = sales[\"amount\"].sum()\n\nKeyError: 'amount'",
+  "correctOutput": "columns: ['date', 'product', 'amount']\nrows: 30\ntotal revenue: 48210.5",
+  "options": [
+    {
+      "key": "a",
+      "label": "Tell read_csv the file is semicolon-separated with sep=\";\"",
+      "patchCode": "import pandas as pd\n\n# Load the monthly sales export and inspect it\nsales = pd.read_csv(\"sales_june.csv\", sep=\";\")\n\nprint(\"columns:\", list(sales.columns))\nprint(\"rows:\", len(sales))\n\n# Total the revenue for the month\ntotal = sales[\"amount\"].sum()\nprint(f\"total revenue: {total}\")",
+      "isCorrect": true,
+      "resultLog": "columns: ['date', 'product', 'amount']\nrows: 30\ntotal revenue: 48210.5",
+      "rationale": "`read_csv` assumes commas separate the values, but this export uses semicolons (common in regions where the comma is the decimal mark). With the wrong separator pandas treats each whole line as one big value, so you get a single column literally named `date;product;amount`. Passing `sep=\";\"` tells pandas where the real column boundaries are, and all three columns load correctly."
+    },
+    {
+      "key": "b",
+      "label": "Pass header=None so pandas stops treating row one as headers",
+      "patchCode": "import pandas as pd\n\n# Load the monthly sales export and inspect it\nsales = pd.read_csv(\"sales_june.csv\", header=None)\n\nprint(\"columns:\", list(sales.columns))\nprint(\"rows:\", len(sales))\n\n# Total the revenue for the month\ntotal = sales[\"amount\"].sum()\nprint(f\"total revenue: {total}\")",
+      "isCorrect": false,
+      "resultLog": "columns: [0]\nrows: 31\n---------------------------------------------------------------------------\nKeyError                                  Traceback (most recent call last)\nCell In[1], line 11\n---> 11 total = sales[\"amount\"].sum()\n\nKeyError: 'amount'",
+      "rationale": "`header=None` only changes whether the first row is read as column names or as data — it does nothing about the separator. pandas still splits on commas, so you still get one column (now numbered `0` and with the header row counted as data). The problem was never the header; it was the delimiter."
+    },
+    {
+      "key": "c",
+      "label": "Load it as-is, then split the single column on \";\" afterwards",
+      "patchCode": "import pandas as pd\n\n# Load the monthly sales export and inspect it\nsales = pd.read_csv(\"sales_june.csv\")\nsales = sales[\"date;product;amount\"].str.split(\";\", expand=True)\n\nprint(\"columns:\", list(sales.columns))\nprint(\"rows:\", len(sales))\n\n# Total the revenue for the month\ntotal = sales[\"amount\"].sum()\nprint(f\"total revenue: {total}\")",
+      "isCorrect": false,
+      "resultLog": "columns: [0, 1, 2]\nrows: 30\n---------------------------------------------------------------------------\nKeyError                                  Traceback (most recent call last)\nCell In[1], line 12\n---> 12 total = sales[\"amount\"].sum()\n\nKeyError: 'amount'",
+      "rationale": "Splitting the merged column by hand does separate the values, but `expand=True` hands back plain numbered columns `0, 1, 2` with no names — so `sales[\"amount\"]` still fails, and the amounts are now text. It is fragile busywork. Letting `read_csv` parse the file with the right `sep` keeps the real headers and the numeric types for free."
+    }
+  ],
+  "hints": [
+    "Read the first printed line carefully: pandas loaded a single column whose name is `date;product;amount`. If the three names are stuck together, what character is actually sitting between them — and what character did pandas expect?",
+    "The fix is an argument to `pd.read_csv` on the line that loads the file, not anything you do afterwards. Look up the `sep` (separator) parameter."
+  ],
+  "explanationMd": "### Why the bug occurs\nA CSV file is just text, with some character separating the values on each line. `pd.read_csv` defaults to a comma, but this file separates values with semicolons. When the expected separator never appears, pandas finds no column boundaries and loads the entire line as one value — so the DataFrame has a single column whose name is the whole header line, `date;product;amount`. Asking for `sales[\"amount\"]` then raises `KeyError` because no column by that name exists.\n\n### Why the fix is correct\n`sep=\";\"` tells `read_csv` which character marks the end of one value and the start of the next. With the correct separator, pandas splits each line into three fields, reads the first row as the column names, and infers numeric types for the amounts — so `sales[\"amount\"].sum()` works. Fixing the read is better than patching the data afterwards because you keep the real column names and correct dtypes from the start.",
+  "recruiterReview": "Nice, calm debugging — you read what pandas *actually* loaded instead of assuming. The merged column name was the tell, and fixing it at the `read_csv` call (rather than splitting strings by hand) is exactly the right instinct: load the data correctly once and everything downstream is clean. Worth remembering that European exports often pair a `;` separator with a `,` decimal mark, so `decimal=\",\"` sometimes rides along with `sep=\";\"`. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Reading a CSV the Way It Was Actually Saved\n\nWelcome — this is one of the very first things every data analyst learns, and it trips up almost everyone once.\n\n### What is a CSV?\nA **CSV** (\"comma-separated values\") file is a plain-text table. Each line is one row, and a chosen character — the **delimiter** (or **separator**) — marks where one cell ends and the next begins. Despite the name, that character is not always a comma. Files exported from European software very often use a **semicolon** (`;`), because in many countries the comma is used as the decimal point (so `1,5` means one-and-a-half).\n\n### What is a DataFrame?\nWhen pandas reads a CSV it builds a **DataFrame**: a table in memory with named **columns** (like `amount`) and numbered **rows**. You grab a column by name with square brackets, e.g. `df[\"amount\"]`.\n\n### The mechanism of this bug\n`pd.read_csv` has to guess nothing about the delimiter — by default it assumes a comma. If the file actually uses semicolons, pandas scans each line, never finds a comma, and concludes the line is a single value. So your three columns collapse into **one** column whose name is the entire header line: `date;product;amount`. Any attempt to read a real column name fails.\n\n### A tiny worked example\nSuppose `mini.csv` contains:\n```\nname;score\nAda;90\nLin;85\n```\nReading it the default way gives one column:\n```python\npd.read_csv(\"mini.csv\").columns\n# Index(['name;score'], dtype='object')\n```\nTelling pandas the real separator fixes it:\n```python\npd.read_csv(\"mini.csv\", sep=\";\").columns\n# Index(['name', 'score'], dtype='object')\n```\nNow `df[\"score\"].sum()` returns `175`.\n\n### How to spot it\nWhenever a `KeyError` claims a column is missing that you can plainly see in the file, **print `df.columns` first**. If several headers are mashed together into one name, you loaded with the wrong delimiter.\n\n### Common beginner mistakes\n- Assuming every `.csv` uses commas — always glance at the raw first line.\n- Reaching for `header=None` when the columns look wrong; that controls headers, not the delimiter.\n- Splitting the merged column by hand afterwards instead of fixing the `read_csv` call.\n- Forgetting that semicolon files often also need `decimal=\",\"` so numbers parse as numbers.\n\nYou'll hit this bug the first time you open a file someone exported from Excel in another country.",
+    "videos": [
+      {
+        "title": "pandas read_csv delimiter / separator explained",
+        "searchQuery": "pandas read_csv sep delimiter semicolon csv tutorial"
+      },
+      {
+        "title": "Inspecting a DataFrame with columns, head, and shape",
+        "searchQuery": "pandas dataframe head columns shape inspect beginner"
+      }
+    ]
+  },
+  "estMinutes": 4,
+  "version": 1
+}

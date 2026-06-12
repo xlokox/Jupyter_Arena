@@ -1,0 +1,62 @@
+{
+  "id": "da-003-filter-and-ampersand",
+  "sector": "da",
+  "difficulty": "easy",
+  "title": "03_filter_ny_adults.ipynb",
+  "language": "python",
+  "icon": "filter",
+  "conceptTags": ["boolean-filtering", "operators", "row-selection"],
+  "descriptionMd": "## Mission: Filter Two Conditions at Once\n\nThe campaign team needs customers who are **both** over 30 **and** living in New York. You wrote what reads like plain English: keep the rows where `age > 30 and city == \"NY\"`.\n\npandas refuses with a `ValueError` about the \"truth value of a Series\" being ambiguous. The English word `and` isn't what pandas wants for combining column conditions. Swap it for the right operator (and mind the parentheses) so the two filters apply together.",
+  "initialCode": "import pandas as pd\n\ncustomers = pd.read_csv(\"customers.csv\")\n\n# Customers over 30 who live in New York\nny_adults = customers[customers.age > 30 and customers.city == \"NY\"]\nprint(ny_adults[[\"name\", \"age\", \"city\"]])\nprint(\"count:\", len(ny_adults))",
+  "buggyLineStart": 6,
+  "buggyLineEnd": 6,
+  "traceback": "---------------------------------------------------------------------------\nValueError                                Traceback (most recent call last)\nCell In[1], line 6\n      5 # Customers over 30 who live in New York\n----> 6 ny_adults = customers[customers.age > 30 and customers.city == \"NY\"]\n\nValueError: The truth value of a Series is ambiguous. Use a.empty, a.bool(), a.item(), a.any() or a.all().",
+  "correctOutput": "      name  age city\n1   Marcus   41   NY\n4    Priya   37   NY\n6     Dana   52   NY\ncount: 3",
+  "options": [
+    {
+      "key": "a",
+      "label": "Combine the masks with & and wrap each condition in parentheses",
+      "patchCode": "import pandas as pd\n\ncustomers = pd.read_csv(\"customers.csv\")\n\n# Customers over 30 who live in New York\nny_adults = customers[(customers.age > 30) & (customers.city == \"NY\")]\nprint(ny_adults[[\"name\", \"age\", \"city\"]])\nprint(\"count:\", len(ny_adults))",
+      "isCorrect": true,
+      "resultLog": "      name  age city\n1   Marcus   41   NY\n4    Priya   37   NY\n6     Dana   52   NY\ncount: 3",
+      "rationale": "Each comparison produces a whole column of True/False values (a boolean Series). Python's `and` only works on a single True/False, so it can't combine two columns and raises the ambiguity error. pandas uses `&` for element-by-element AND. The parentheses are required because `&` binds tighter than `>` and `==`, so without them the comparisons would be grouped wrong."
+    },
+    {
+      "key": "b",
+      "label": "Just swap \"and\" for \"&\" and leave the rest alone",
+      "patchCode": "import pandas as pd\n\ncustomers = pd.read_csv(\"customers.csv\")\n\n# Customers over 30 who live in New York\nny_adults = customers[customers.age > 30 & customers.city == \"NY\"]\nprint(ny_adults[[\"name\", \"age\", \"city\"]])\nprint(\"count:\", len(ny_adults))",
+      "isCorrect": false,
+      "resultLog": "---------------------------------------------------------------------------\nTypeError                                 Traceback (most recent call last)\nCell In[1], line 6\n----> 6 ny_adults = customers[customers.age > 30 & customers.city == \"NY\"]\n\nTypeError: unsupported operand type(s) for &: 'int' and 'str'",
+      "rationale": "`&` is the right operator but it has *higher* precedence than `>` and `==`, so Python reads this as `customers.age > (30 & customers.city) == \"NY\"`. It tries to AND the number 30 with the text city column and blows up. You must parenthesize each condition: `(customers.age > 30) & (customers.city == \"NY\")`."
+    },
+    {
+      "key": "c",
+      "label": "Filter by age first, then filter that result by city",
+      "patchCode": "import pandas as pd\n\ncustomers = pd.read_csv(\"customers.csv\")\n\n# Customers over 30 who live in New York\nadults = customers[customers.age > 30]\nny_adults = adults[customers.city == \"NY\"]\nprint(ny_adults[[\"name\", \"age\", \"city\"]])\nprint(\"count:\", len(ny_adults))",
+      "isCorrect": false,
+      "resultLog": "---------------------------------------------------------------------------\nIndexingError                             Traceback (most recent call last)\nCell In[1], line 7\n----> 7 ny_adults = adults[customers.city == \"NY\"]\n\npandas.errors.IndexingError: Unalignable boolean Series provided as indexer (index of the boolean Series and of the indexed object do not match).",
+      "rationale": "The second mask `customers.city == \"NY\"` is built from the *full* table, so it has one True/False per original row. But you apply it to `adults`, which has fewer rows and a different index, so pandas can't line them up. Two-step filtering works only if both masks come from the same frame — cleaner to combine them with `&` in one step."
+    }
+  ],
+  "hints": [
+    "Each comparison like `customers.age > 30` is not a single yes/no — it's a whole column of yes/no values. Python's `and` only knows how to combine one yes/no with another, which is why it complains.",
+    "pandas uses `&` for \"and\" across columns and `|` for \"or\". Because those symbols grab their neighbors tightly, put parentheses around each condition: `(... ) & ( ...)`."
+  ],
+  "explanationMd": "### Why the bug occurs\nA comparison on a column, like `customers.age > 30`, returns a **boolean Series**: one True/False for every row. Python's keyword `and` is defined only for a single True/False value, so when it meets a whole column it cannot decide and raises `ValueError: The truth value of a Series is ambiguous`.\n\n### Why the fix is correct\npandas overloads the bitwise operators for element-wise logic: `&` means AND, `|` means OR, applied row by row. So `(customers.age > 30) & (customers.city == \"NY\")` produces a single combined mask that is True only where both conditions hold. The parentheses are not optional: `&` has higher precedence than `>` and `==`, so without them Python would try to evaluate `30 & customers.city` first and fail. One combined mask, built from one frame, also avoids index-alignment problems that creep in when you filter in separate steps.",
+  "recruiterReview": "Solid — you recognized that a column comparison is a vector of booleans, not a single condition, which is the whole heart of filtering in pandas. Using `&` with parentheses is the idiom every analyst leans on daily. Forward tip: when a filter expression grows past two or three conditions, `df.query(\"age > 30 and city == 'NY'\")` lets you write it in readable English and sidesteps the precedence traps entirely. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Filtering Rows on More Than One Condition\n\nSelecting rows that match several conditions is bread-and-butter analysis — and the operators surprise nearly every beginner once.\n\n### The idea of a boolean mask\nIn pandas you don't loop over rows. Instead you write a condition on a whole column, e.g. `df.age > 30`. That returns a **boolean Series**: a True/False value for each row, like `[False, True, False, ...]`. Putting that mask in brackets, `df[mask]`, keeps the rows where it is True. This is called **boolean filtering**.\n\n### Why `and` fails\nPython's `and`/`or` keywords expect a single True or False. A boolean Series has *many* values, so Python can't reduce it to one answer and raises `The truth value of a Series is ambiguous`. pandas instead uses the symbols `&` (and), `|` (or), and `~` (not), which combine masks **element by element**.\n\n### Mind the parentheses\n`&` and `|` bind more tightly than comparison operators, so you must wrap each condition:\n```python\ndf[(df.age > 30) & (df.city == \"NY\")]   # correct\ndf[df.age > 30 & df.city == \"NY\"]       # WRONG: evaluates 30 & df.city first\n```\n\n### A tiny worked example\n```python\ndf = pd.DataFrame({\"age\": [25, 41, 37], \"city\": [\"NY\", \"NY\", \"LA\"]})\ndf[(df.age > 30) & (df.city == \"NY\")]\n#    age city\n# 1   41   NY\n```\nOnly the 41-year-old in NY satisfies both conditions.\n\n### How to spot it\nThe error message `truth value of a Series is ambiguous` almost always means you wrote `and`/`or` where you needed `&`/`|`. A `TypeError` about `&` between an int and a str usually means you forgot the parentheses.\n\n### Common beginner mistakes\n- Writing `and`/`or` instead of `&`/`|`.\n- Using `&`/`|` but dropping the parentheses around each condition.\n- Filtering in two steps with masks built from different frames, so the indexes don't align.\n- Forgetting `~mask` is how you negate (\"not\").\n\nYou'll hit this bug the first time you ask for rows matching two conditions at once.",
+    "videos": [
+      {
+        "title": "pandas filtering with multiple conditions (& and |)",
+        "searchQuery": "pandas filter multiple conditions and or ampersand parentheses"
+      },
+      {
+        "title": "Boolean indexing in pandas explained",
+        "searchQuery": "pandas boolean indexing mask filter rows beginner tutorial"
+      }
+    ]
+  },
+  "estMinutes": 4,
+  "version": 1
+}

@@ -1,0 +1,62 @@
+{
+  "id": "da-005-groupby-no-aggregation",
+  "sector": "da",
+  "difficulty": "easy",
+  "title": "05_average_sales_per_region.ipynb",
+  "language": "python",
+  "icon": "layers",
+  "conceptTags": ["groupby", "aggregation", "summaries"],
+  "descriptionMd": "## Mission: Average Sales per Region\n\nThe regional managers want the average sale value in each region. You grouped the sales by `region` and printed the result — but instead of a tidy table of averages you got a cryptic line about a `SeriesGroupBy object`.\n\nGrouping is only the first half of the job: pandas has split the data into per-region piles but hasn't combined each pile into a single number yet. Add the aggregation step so each region collapses to its average sale.",
+  "initialCode": "import pandas as pd\n\nsales = pd.read_csv(\"sales.csv\")\n\n# Average sale value per region\nby_region = sales.groupby(\"region\")[\"sales\"]\nprint(by_region)",
+  "buggyLineStart": 6,
+  "buggyLineEnd": 7,
+  "traceback": "<pandas.core.groupby.generic.SeriesGroupBy object at 0x7fb1c0d3a4f0>\n\n# No averages printed — this is a grouping handle, not a result.",
+  "correctOutput": "region\nEast     412.5\nNorth    305.0\nSouth    198.0\nWest     521.0\nName: sales, dtype: float64",
+  "options": [
+    {
+      "key": "a",
+      "label": "Aggregate each group with .mean()",
+      "patchCode": "import pandas as pd\n\nsales = pd.read_csv(\"sales.csv\")\n\n# Average sale value per region\nby_region = sales.groupby(\"region\")[\"sales\"].mean()\nprint(by_region)",
+      "isCorrect": true,
+      "resultLog": "region\nEast     412.5\nNorth    305.0\nSouth    198.0\nWest     521.0\nName: sales, dtype: float64",
+      "rationale": "`groupby(\"region\")[\"sales\"]` only *splits* the rows into one pile per region — it returns a grouping handle, which is why printing it shows a `SeriesGroupBy` object. You still have to tell pandas how to combine each pile into a single value. `.mean()` does exactly that, producing one average per region. (Swap in `.sum()`, `.max()`, `.count()`, … for other summaries.)"
+    },
+    {
+      "key": "b",
+      "label": "Total each region with .sum()",
+      "patchCode": "import pandas as pd\n\nsales = pd.read_csv(\"sales.csv\")\n\n# Average sale value per region\nby_region = sales.groupby(\"region\")[\"sales\"].sum()\nprint(by_region)",
+      "isCorrect": false,
+      "resultLog": "region\nEast     1650.0\nNorth    1525.0\nSouth     990.0\nWest     2084.0\nName: sales, dtype: float64",
+      "rationale": "`.sum()` is a real aggregation, so the error goes away — but it answers the wrong question. The mission asked for the *average* sale per region; these are the *totals*. A region with many small sales now looks bigger than one with a few large sales. Use `.mean()` for an average."
+    },
+    {
+      "key": "c",
+      "label": "Preview each group with .head()",
+      "patchCode": "import pandas as pd\n\nsales = pd.read_csv(\"sales.csv\")\n\n# Average sale value per region\nby_region = sales.groupby(\"region\")[\"sales\"].head()\nprint(by_region)",
+      "isCorrect": false,
+      "resultLog": "0     300\n1     180\n2     520\n3     410\n4     250\nName: sales, dtype: int64",
+      "rationale": "`.head()` on a group returns the first few *rows* of each pile — raw sale values with their original row numbers, not one summary per region. It previews data inside the groups; it never collapses them. To get one number per region you need an aggregation like `.mean()`."
+    }
+  ],
+  "hints": [
+    "Printing the variable shows a `SeriesGroupBy object`, not numbers. That object is a 'grouped but not yet summarized' handle. What step turns each group into a single value?",
+    "After `groupby(\"region\")[\"sales\"]`, chain the summary you want: `.mean()`, `.sum()`, `.count()`, `.max()`. The mission asks for an average."
+  ],
+  "explanationMd": "### Why the bug occurs\n`groupby` follows a *split–apply–combine* pattern, and you only did the split. `sales.groupby(\"region\")[\"sales\"]` divides the rows into one group per region and hands back a **GroupBy object** — a handle that knows how the data is partitioned but hasn't computed anything. Printing it shows the object's repr (`<...SeriesGroupBy object at 0x...>`) instead of numbers, because there are no numbers yet.\n\n### Why the fix is correct\n`.mean()` supplies the *apply* and *combine* steps: pandas takes each region's sales, averages them, and assembles the per-region averages into a single tidy Series indexed by region. The same handle accepts any aggregation — `.sum()` for totals, `.count()` for how many, `.max()` for the largest — so once you understand that grouping needs a follow-up summary, every group report is one method call away.",
+  "recruiterReview": "Good instinct — you recognized that the GroupBy object is an intermediate, not a result, which is the single most important idea in `groupby`. Choosing `.mean()` to match the question (rather than grabbing whichever aggregation comes to mind) is exactly the discipline that keeps reports honest. When you need several summaries at once, reach for `.agg([\"mean\", \"sum\", \"count\"])` to get them in one tidy table. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Grouping and Summarizing with groupby\n\n\"What's the average per category?\" is maybe the most common question in analysis, and `groupby` is how pandas answers it — once you remember it takes two steps.\n\n### The split–apply–combine idea\n`groupby` works in three phases:\n1. **Split** the rows into groups by some key (e.g. one pile per `region`).\n2. **Apply** a calculation to each pile (e.g. average the `sales`).\n3. **Combine** the per-group answers into one result.\n\nWhen you write `df.groupby(\"region\")[\"sales\"]`, you've only done the *split*. pandas returns a **GroupBy object** — a handle that remembers the grouping but hasn't calculated anything. Printing it shows something like `<...SeriesGroupBy object at 0x...>`, which means \"I'm grouped, but you haven't told me what to compute.\"\n\n### Add an aggregation\nThe second step is a summary function:\n```python\ndf.groupby(\"region\")[\"sales\"].mean()   # average per region\ndf.groupby(\"region\")[\"sales\"].sum()    # total per region\ndf.groupby(\"region\")[\"sales\"].count()  # how many sales per region\n```\nEach returns a Series indexed by region — one number per group.\n\n### A tiny worked example\n```python\ndf = pd.DataFrame({\"region\": [\"N\", \"N\", \"S\"], \"sales\": [100, 200, 60]})\ndf.groupby(\"region\")[\"sales\"].mean()\n# region\n# N    150.0\n# S     60.0\n```\nGroup N averages 100 and 200 to 150; group S has a single 60.\n\n### Several summaries at once\n```python\ndf.groupby(\"region\")[\"sales\"].agg([\"mean\", \"sum\", \"count\"])\n```\ngives a table with one row per region and a column per statistic.\n\n### How to spot it\nIf printing a result shows `GroupBy object` instead of numbers, you grouped but forgot to aggregate.\n\n### Common beginner mistakes\n- Printing the GroupBy handle and expecting numbers.\n- Picking the wrong summary (`sum` when the question asked for an average).\n- Confusing `.head()` (previews rows in each group) with an aggregation.\n- Forgetting you can group by several keys at once: `groupby([\"region\", \"month\"])`.\n\nYou'll hit this the first time someone asks for an average 'per' something.",
+    "videos": [
+      {
+        "title": "pandas groupby explained (split-apply-combine)",
+        "searchQuery": "pandas groupby aggregation mean sum split apply combine tutorial"
+      },
+      {
+        "title": "Common groupby aggregations and agg()",
+        "searchQuery": "pandas groupby agg multiple aggregations beginner"
+      }
+    ]
+  },
+  "estMinutes": 4,
+  "version": 1
+}

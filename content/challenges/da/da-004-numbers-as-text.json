@@ -1,0 +1,62 @@
+{
+  "id": "da-004-numbers-as-text",
+  "sector": "da",
+  "difficulty": "easy",
+  "title": "04_average_order_value.ipynb",
+  "language": "python",
+  "icon": "scale",
+  "conceptTags": ["dtypes", "to-numeric", "data-cleaning"],
+  "descriptionMd": "## Mission: Average Order Value\n\nFinance wants the average order value from the orders export. You loaded the file and called `.mean()` on the `amount` column — and pandas threw a `TypeError` instead of a number.\n\nThe `amount dtype: object` line is the giveaway: the amounts came in as **text** like `\"$1,200.50\"`, not numbers, because of the dollar signs and thousands commas. Strip those characters, convert the column to real numbers, and the average will compute.",
+  "initialCode": "import pandas as pd\n\norders = pd.read_csv(\"orders.csv\")\nprint(orders[[\"order_id\", \"amount\"]].head(3))\nprint(\"amount dtype:\", orders[\"amount\"].dtype)\n\n# Average order value\navg = orders[\"amount\"].mean()\nprint(f\"average order value: {avg:.2f}\")",
+  "buggyLineStart": 8,
+  "buggyLineEnd": 8,
+  "traceback": "   order_id      amount\n0      1001   $1,200.50\n1      1002      $45.00\n2      1003     $310.75\namount dtype: object\n---------------------------------------------------------------------------\nTypeError                                 Traceback (most recent call last)\nCell In[1], line 8\n      7 # Average order value\n----> 8 avg = orders[\"amount\"].mean()\n\nTypeError: Could not convert string '$1,200.50' to numeric",
+  "correctOutput": "amount dtype: float64\naverage order value: 518.75",
+  "options": [
+    {
+      "key": "a",
+      "label": "Remove the $ and commas, then convert the column to float",
+      "patchCode": "import pandas as pd\n\norders = pd.read_csv(\"orders.csv\")\nclean = orders[\"amount\"].str.replace(\"$\", \"\", regex=False).str.replace(\",\", \"\", regex=False)\norders[\"amount\"] = clean.astype(float)\nprint(\"amount dtype:\", orders[\"amount\"].dtype)\n\n# Average order value\navg = orders[\"amount\"].mean()\nprint(f\"average order value: {avg:.2f}\")",
+      "isCorrect": true,
+      "resultLog": "amount dtype: float64\naverage order value: 518.75",
+      "rationale": "The values are strings because of the `$` and the thousands comma — `.mean()` can't average text. Removing those two characters with `.str.replace(...)` leaves clean numeric text like `\"1200.50\"`, and `.astype(float)` turns it into real `float64` numbers. Now the column is numeric (`dtype: float64`) and `.mean()` returns the actual average."
+    },
+    {
+      "key": "b",
+      "label": "Convert straight to float without removing the symbols",
+      "patchCode": "import pandas as pd\n\norders = pd.read_csv(\"orders.csv\")\norders[\"amount\"] = orders[\"amount\"].astype(float)\nprint(\"amount dtype:\", orders[\"amount\"].dtype)\n\n# Average order value\navg = orders[\"amount\"].mean()\nprint(f\"average order value: {avg:.2f}\")",
+      "isCorrect": false,
+      "resultLog": "---------------------------------------------------------------------------\nValueError                                Traceback (most recent call last)\nCell In[1], line 4\n----> 4 orders[\"amount\"] = orders[\"amount\"].astype(float)\n\nValueError: could not convert string to float: '$1,200.50'",
+      "rationale": "`astype(float)` can only parse text that already looks like a plain number. The dollar sign and the comma are not valid in a float literal, so Python can't read `'$1,200.50'` and raises immediately. You have to strip the currency formatting *before* converting."
+    },
+    {
+      "key": "c",
+      "label": "Use pd.to_numeric with errors=\"coerce\" to skip bad values",
+      "patchCode": "import pandas as pd\n\norders = pd.read_csv(\"orders.csv\")\norders[\"amount\"] = pd.to_numeric(orders[\"amount\"], errors=\"coerce\")\nprint(\"amount dtype:\", orders[\"amount\"].dtype)\n\n# Average order value\navg = orders[\"amount\"].mean()\nprint(f\"average order value: {avg:.2f}\")",
+      "isCorrect": false,
+      "resultLog": "amount dtype: float64\naverage order value: nan",
+      "rationale": "`errors=\"coerce\"` doesn't clean the data — it replaces every value it can't parse with `NaN` (missing). Since *every* amount has a `$`, *every* value becomes `NaN`, and the mean of all-missing is `nan`. Coercion is for the occasional bad cell, not a substitute for removing the formatting first."
+    }
+  ],
+  "hints": [
+    "Look at the printed `amount dtype: object`. In pandas, `object` usually means the column is being stored as text. What characters in `$1,200.50` would stop Python from reading it as a number?",
+    "Clean the text first, then convert. The string accessor `.str.replace(\"$\", \"\", regex=False)` removes a character; chain another to drop the comma, then call `.astype(float)`."
+  ],
+  "explanationMd": "### Why the bug occurs\nEvery column in pandas has a **dtype** (data type). Numbers you can average are stored as `int64` or `float64`. But this `amount` column arrived as `object`, pandas' label for text, because each value carries a dollar sign and a thousands comma — `\"$1,200.50\"`. `.mean()` is a numeric operation; it cannot average strings, so it raises `TypeError`.\n\n### Why the fix is correct\nYou clean the text and then change the type. `.str.replace(\"$\", \"\", regex=False)` and `.str.replace(\",\", \"\", regex=False)` strip the symbols, leaving values like `\"1200.50\"` that *look* like numbers. `.astype(float)` then reinterprets that clean text as real `float64` values. Order matters: convert only after the non-numeric characters are gone. With the column genuinely numeric, `.mean()` (and `.sum()`, `.max()`, …) all work.",
+  "recruiterReview": "Well reasoned — checking the dtype before trusting a column is a habit that will save you constantly, and you cleaned the formatting before converting rather than reaching for `errors=\"coerce\"`, which would have silently nulled the whole column. Exactly the right call. One refinement for production: after converting, assert the column has no unexpected `NaN`s so a stray `'N/A'` can't slip through unnoticed. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## When Numbers Arrive as Text\n\nOne of the most common surprises in real data: a column that looks numeric is actually stored as text, so math on it fails.\n\n### What is a dtype?\nEvery pandas **column** has a **dtype** — the kind of data it holds. Whole numbers are `int64`, decimals are `float64`, and **text is `object`**. You can only do arithmetic (`mean`, `sum`, `max`) on numeric dtypes. So the first thing to check when math misbehaves is `df[\"col\"].dtype`.\n\n### The mechanism of this bug\nMoney is often exported with formatting: a currency symbol (`$`) and a thousands separator (`,`), e.g. `\"$1,200.50\"`. Those characters are not valid in a number, so pandas keeps the whole value as text (`object`). Calling `.mean()` on text raises a `TypeError`, because averaging strings is meaningless.\n\n### The fix: clean, then convert\nThe pattern is always *clean the text first, convert second*:\n```python\nclean = df[\"amount\"].str.replace(\"$\", \"\", regex=False)\nclean = clean.str.replace(\",\", \"\", regex=False)\ndf[\"amount\"] = clean.astype(float)\n```\n- `.str.replace(old, new, regex=False)` removes a character from every value.\n- `.astype(float)` reinterprets the cleaned text as real numbers.\n\n### A tiny worked example\n```python\ns = pd.Series([\"$1,200.50\", \"$45.00\"])\nclean = s.str.replace(\"$\", \"\", regex=False).str.replace(\",\", \"\", regex=False)\nclean.astype(float).mean()\n# 622.75\n```\n\n### About `pd.to_numeric(..., errors=\"coerce\")`\nThis turns *unparseable* values into `NaN` (missing). It's great for one stray bad cell, but if you point it at still-formatted values, it nulls **all** of them and your mean becomes `nan`. Clean first; coerce only to catch leftovers.\n\n### How to spot it\n`dtype: object` on a column you expect to be numeric, plus a `TypeError`/`ValueError` mentioning a string with a `$`, `,`, `%`, or whitespace.\n\n### Common beginner mistakes\n- Trusting that a money column is numeric without checking the dtype.\n- Calling `astype(float)` before stripping `$` and `,`.\n- Using `errors=\"coerce\"` as a cleaner — it hides the problem as `NaN`.\n- Forgetting `regex=False` so `$` (a regex special character) is treated literally.\n\nYou'll hit this bug the first time you try to total a price or revenue column from a real export.",
+    "videos": [
+      {
+        "title": "Convert a text column to numbers in pandas",
+        "searchQuery": "pandas convert string column to float to_numeric astype currency"
+      },
+      {
+        "title": "Understanding dtypes (object vs int vs float)",
+        "searchQuery": "pandas dtypes object int float explained beginner"
+      }
+    ]
+  },
+  "estMinutes": 5,
+  "version": 1
+}

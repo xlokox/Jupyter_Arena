@@ -1,0 +1,62 @@
+{
+  "id": "da-007-sort-values",
+  "sector": "da",
+  "difficulty": "easy",
+  "title": "07_top_selling_products.ipynb",
+  "language": "python",
+  "icon": "list-todo",
+  "conceptTags": ["sort-values", "ordering", "assignment"],
+  "descriptionMd": "## Mission: Rank Products by Sales\n\nThe team wants the best-selling products at the top of the table. You called `sort_values` on the products and then printed the first few rows — but the order is unchanged: the top row still isn't the highest seller.\n\nSorting in pandas produces a **new** ordered table rather than rearranging the original in place. The sorted result is being computed and then thrown away. Capture it so the printed rows are actually in descending order of `sales`.",
+  "initialCode": "import pandas as pd\n\nproducts = pd.read_csv(\"products.csv\")\n\n# Show products from highest to lowest sales\nproducts.sort_values(by=\"sales\", ascending=False)\nprint(products[[\"product\", \"sales\"]].head())",
+  "buggyLineStart": 6,
+  "buggyLineEnd": 6,
+  "traceback": "     product  sales\n0     Widget    120\n1     Gadget    340\n2      Gizmo     90\n3  Doohickey    510\n4   Sprocket    270\n\n# Still original order — the top row (120) is not the highest seller.",
+  "correctOutput": "     product  sales\n3  Doohickey    510\n1     Gadget    340\n4   Sprocket    270\n0     Widget    120\n2      Gizmo     90",
+  "options": [
+    {
+      "key": "a",
+      "label": "Assign the sorted table back to products",
+      "patchCode": "import pandas as pd\n\nproducts = pd.read_csv(\"products.csv\")\n\n# Show products from highest to lowest sales\nproducts = products.sort_values(by=\"sales\", ascending=False)\nprint(products[[\"product\", \"sales\"]].head())",
+      "isCorrect": true,
+      "resultLog": "     product  sales\n3  Doohickey    510\n1     Gadget    340\n4   Sprocket    270\n0     Widget    120\n2      Gizmo     90",
+      "rationale": "`sort_values` returns a **new**, reordered DataFrame and leaves the original untouched. Without assigning it, that sorted copy is discarded and `products` is still in its load order. Capturing it with `products = products.sort_values(...)` makes the new order stick (you could also pass `inplace=True`, but assigning back is the clearer, more common style)."
+    },
+    {
+      "key": "b",
+      "label": "Drop the by= argument and just sort the frame",
+      "patchCode": "import pandas as pd\n\nproducts = pd.read_csv(\"products.csv\")\n\n# Show products from highest to lowest sales\nproducts = products.sort_values(ascending=False)\nprint(products[[\"product\", \"sales\"]].head())",
+      "isCorrect": false,
+      "resultLog": "---------------------------------------------------------------------------\nTypeError                                 Traceback (most recent call last)\nCell In[1], line 6\n----> 6 products = products.sort_values(ascending=False)\n\nTypeError: sort_values() missing 1 required positional argument: 'by'",
+      "rationale": "A DataFrame has many columns, so pandas can't guess which one to sort on — `by` is required. Without it you get a `TypeError`. (Only a single-column Series can be sorted without `by`.) You must say `by=\"sales\"`."
+    },
+    {
+      "key": "c",
+      "label": "Use sort_index to reorder the rows",
+      "patchCode": "import pandas as pd\n\nproducts = pd.read_csv(\"products.csv\")\n\n# Show products from highest to lowest sales\nproducts = products.sort_index(ascending=False)\nprint(products[[\"product\", \"sales\"]].head())",
+      "isCorrect": false,
+      "resultLog": "     product  sales\n4   Sprocket    270\n3  Doohickey    510\n2      Gizmo     90\n1     Gadget    340\n0     Widget    120",
+      "rationale": "`sort_index` orders by the row labels (0, 1, 2, …), not by any column's values — so descending index just reverses the load order. The sales numbers end up scrambled, not ranked. To rank by a column you need `sort_values(by=\"sales\")`."
+    }
+  ],
+  "hints": [
+    "Compare the printed order to the original load order — they're identical. Most pandas methods don't change the table in place; they hand back a new one. What happened to the table `sort_values` returned?",
+    "Either capture the result — `products = products.sort_values(by=\"sales\", ascending=False)` — or pass `inplace=True`. And a DataFrame always needs `by=` to know which column to sort on."
+  ],
+  "explanationMd": "### Why the bug occurs\nMost pandas operations are **non-mutating**: they compute a new object and return it, leaving the original alone. `products.sort_values(by=\"sales\", ascending=False)` builds a freshly ordered DataFrame, but because the result isn't stored anywhere, it's immediately discarded. The next line prints `products`, which was never changed — so the rows are still in load order and the top row isn't the top seller.\n\n### Why the fix is correct\nAssigning the result back, `products = products.sort_values(by=\"sales\", ascending=False)`, replaces the variable with the ordered table, so the print shows products from highest to lowest sales. The `by=\"sales\"` tells pandas which column to rank on (a DataFrame can't guess), and `ascending=False` puts the largest values first. Remembering that methods return new objects — and that you must capture or reassign them — prevents a whole class of \"my change didn't take\" bugs.",
+  "recruiterReview": "Nice — you spotted that the data never actually changed and traced it to the discarded return value, which is one of the most common pandas misunderstandings. Capturing the result (over `inplace=True`) keeps the code easy to read and chain. Two things worth knowing: pass a list to sort on several keys, e.g. `sort_values(by=[\"region\", \"sales\"], ascending=[True, False])`, and reach for `nlargest(5, \"sales\")` when you only need the top few. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Sorting a Table — and Why Your Sort 'Didn't Work'\n\nRanking rows is everyday work: top customers, biggest orders, latest events. Two beginner traps hide here — forgetting `by`, and forgetting that the sort returns a new table.\n\n### Methods return new objects\nThis is the key idea: in pandas, calling a method like `sort_values` usually **does not change** the original DataFrame. It builds a new, transformed copy and **returns** it. If you don't store that return value, the work vanishes:\n```python\nproducts.sort_values(by=\"sales\", ascending=False)   # computed, then thrown away\nproducts = products.sort_values(by=\"sales\", ascending=False)  # kept\n```\n\n### sort_values needs to know the column\nA DataFrame has many columns, so you must tell it which one to order by:\n```python\ndf.sort_values(by=\"sales\", ascending=False)\n```\n- `by=\"sales\"` — the column to rank on (required for a DataFrame).\n- `ascending=False` — largest first; `True` (the default) is smallest first.\n\n### A tiny worked example\n```python\ndf = pd.DataFrame({\"product\": [\"A\", \"B\", \"C\"], \"sales\": [120, 510, 90]})\ndf = df.sort_values(by=\"sales\", ascending=False)\ndf[\"product\"].tolist()\n# ['B', 'A', 'C']\n```\nB (510) rises to the top; C (90) sinks to the bottom.\n\n### sort_values vs sort_index\n- `sort_values(by=...)` orders by the **values in a column**.\n- `sort_index()` orders by the **row labels** (0, 1, 2, …). Reversing the index is *not* the same as ranking by a column.\n\n### Just the top few?\n`df.nlargest(5, \"sales\")` (or `nsmallest`) returns the top rows directly, already sorted — handy and efficient.\n\n### How to spot it\nIf a transformation 'didn't change anything', check whether you captured the return value. If sorting raises `missing 1 required positional argument: 'by'`, you forgot the column.\n\n### Common beginner mistakes\n- Calling `sort_values(...)` without assigning the result (or `inplace=True`).\n- Forgetting `by=` on a DataFrame.\n- Using `sort_index` and expecting it to rank by a column's values.\n- Leaving `ascending` at its default `True` when you wanted largest-first.\n\nYou'll hit this the first time a sort 'silently does nothing'.",
+    "videos": [
+      {
+        "title": "pandas sort_values tutorial (by, ascending, inplace)",
+        "searchQuery": "pandas sort_values by ascending inplace tutorial"
+      },
+      {
+        "title": "Why pandas operations return new objects",
+        "searchQuery": "pandas methods return new object inplace assignment beginner"
+      }
+    ]
+  },
+  "estMinutes": 4,
+  "version": 1
+}

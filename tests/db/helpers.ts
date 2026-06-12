@@ -261,19 +261,29 @@ export async function seedFlawlessEvents(userId: string, count: number): Promise
   if (error) throw new Error(error.message);
 }
 
+/** Sector ids that are ungated (always playable) — excluded from gating tests. */
+export async function ungatedSectorIds(): Promise<string[]> {
+  const { data, error } = await admin.from("sectors").select("id").eq("is_gated", false);
+  if (error) throw new Error(error.message);
+  return (data as Array<{ id: string }>).map((r) => r.id);
+}
+
 /**
- * A published challenge of the given difficulty, excluding today's daily pick
- * (which is exempt from gating, so it can't be used to prove gating works).
+ * A published challenge of the given difficulty in a GATED sector, excluding
+ * today's daily pick. Ungated sectors (e.g. Data Analyst) are skipped — they
+ * never raise challenge_locked, so they can't prove gating works.
  */
 export async function lockedChallengeOfDifficulty(
   difficulty: "medium" | "hard" | "very_hard",
   excludeId?: string | null,
 ): Promise<string> {
+  const ungated = await ungatedSectorIds();
   let query = admin
     .from("challenges")
     .select("id")
     .eq("is_published", true)
     .eq("difficulty", difficulty);
+  if (ungated.length > 0) query = query.not("sector_id", "in", `(${ungated.join(",")})`);
   if (excludeId) query = query.neq("id", excludeId);
   const { data, error } = await query.order("id").limit(1).single();
   if (error) throw new Error(error.message);
@@ -282,6 +292,8 @@ export async function lockedChallengeOfDifficulty(
 
 /** Known seed content: ml-001 has correct option "a"; "b"/"c" are wrong. */
 export const ML_001 = "ml-001-kmeans-scaling";
+/** Data Analyst on-ramp (ungated sector); correct option "a". */
+export const DA_001 = "da-001-read-csv-delimiter";
 export const ML_002 = "ml-002-test-set-leakage";
 export const DL_001 = "dl-001-device-mismatch";
 export const DL_002 = "dl-002-missing-zero-grad";

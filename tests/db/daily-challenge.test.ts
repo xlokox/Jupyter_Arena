@@ -1,7 +1,13 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { dailyChallengeId } from "@/lib/game/daily";
 import { utcDayOf } from "@/lib/game/xp";
-import { admin, createTestUser, dailyChallengeIdServer, submit } from "./helpers";
+import {
+  admin,
+  createTestUser,
+  dailyChallengeIdServer,
+  submit,
+  ungatedSectorIds,
+} from "./helpers";
 
 /**
  * Phase 5.6b — the daily featured challenge is curated for everyone that day,
@@ -65,14 +71,17 @@ describe("daily challenge is exempt from level gating", () => {
     if (lockError) throw new Error(lockError.message);
 
     // A guaranteed-locked challenge that is NOT today's daily.
-    const { data: nonDaily, error: nonDailyError } = await admin
+    const ungated = await ungatedSectorIds();
+    let nonDailyQuery = admin
       .from("challenges")
       .select("id")
       .eq("is_published", true)
       .in("difficulty", ["medium", "hard", "very_hard"])
-      .neq("id", dailyId)
-      .limit(1)
-      .single();
+      .neq("id", dailyId);
+    if (ungated.length > 0) {
+      nonDailyQuery = nonDailyQuery.not("sector_id", "in", `(${ungated.join(",")})`);
+    }
+    const { data: nonDaily, error: nonDailyError } = await nonDailyQuery.limit(1).single();
     if (nonDailyError) throw new Error(nonDailyError.message);
     const nonDailyId = (nonDaily as { id: string }).id;
 

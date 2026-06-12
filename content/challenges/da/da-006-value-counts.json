@@ -1,0 +1,62 @@
+{
+  "id": "da-006-value-counts",
+  "sector": "da",
+  "difficulty": "easy",
+  "title": "06_orders_by_status.ipynb",
+  "language": "python",
+  "icon": "bar-chart-3",
+  "conceptTags": ["value-counts", "frequencies", "categories"],
+  "descriptionMd": "## Mission: Count Orders by Status\n\nSupport wants to know how many orders sit in each status — `shipped`, `pending`, `cancelled`. You reached for a hand-written loop that walks every order and tallies a dictionary.\n\nThe loop crashes on the very first order with a `KeyError`, because it tries to add to a count that doesn't exist yet. There's a one-liner pandas tool built for exactly this — counting how often each value appears. Use it instead of the loop.",
+  "initialCode": "import pandas as pd\n\norders = pd.read_csv(\"orders.csv\")\n\n# Count how many orders are in each status\ncounts = {}\nfor status in orders[\"status\"]:\n    counts[status] += 1\n\nprint(counts)",
+  "buggyLineStart": 7,
+  "buggyLineEnd": 8,
+  "traceback": "---------------------------------------------------------------------------\nKeyError                                  Traceback (most recent call last)\nCell In[1], line 8\n      7 for status in orders[\"status\"]:\n----> 8     counts[status] += 1\n\nKeyError: 'shipped'",
+  "correctOutput": "status\nshipped      14\npending       9\ncancelled     7\nName: count, dtype: int64",
+  "options": [
+    {
+      "key": "a",
+      "label": "Tally every category with value_counts()",
+      "patchCode": "import pandas as pd\n\norders = pd.read_csv(\"orders.csv\")\n\n# Count how many orders are in each status\ncounts = orders[\"status\"].value_counts()\n\nprint(counts)",
+      "isCorrect": true,
+      "resultLog": "status\nshipped      14\npending       9\ncancelled     7\nName: count, dtype: int64",
+      "rationale": "`value_counts()` is built for exactly this: it returns each distinct value in the column together with how many times it appears, sorted from most to least common. It replaces the entire loop, can't trip over an uninitialized key, and is far faster on large data. The hand-written loop failed because `counts[status] += 1` reads `counts[status]` before that key exists."
+    },
+    {
+      "key": "b",
+      "label": "Use .count() on the orders table",
+      "patchCode": "import pandas as pd\n\norders = pd.read_csv(\"orders.csv\")\n\n# Count how many orders are in each status\ncounts = orders.count()\n\nprint(counts)",
+      "isCorrect": false,
+      "resultLog": "order_id    30\nstatus      30\namount      30\ndtype: int64",
+      "rationale": "`.count()` reports how many *non-missing* values each column holds — here every column has 30 filled cells. That tells you the table is complete, not how the orders split across `shipped`, `pending`, and `cancelled`. For a per-category breakdown you need `value_counts()` on the status column."
+    },
+    {
+      "key": "c",
+      "label": "List the distinct statuses with .unique()",
+      "patchCode": "import pandas as pd\n\norders = pd.read_csv(\"orders.csv\")\n\n# Count how many orders are in each status\ncounts = orders[\"status\"].unique()\n\nprint(counts)",
+      "isCorrect": false,
+      "resultLog": "['shipped' 'pending' 'cancelled']",
+      "rationale": "`.unique()` lists *which* distinct values exist but not *how many* of each — you get the three status names with no tallies. It's useful for discovering categories, but the mission needs the count per status, which is what `value_counts()` provides."
+    }
+  ],
+  "hints": [
+    "The loop fails because `counts[status] += 1` needs `counts[status]` to already exist before it can add 1. But you don't need a loop at all — pandas has a method that tallies how often each value appears in a column.",
+    "On a single column (a Series), look at `.value_counts()`. It returns each category and its frequency in one step."
+  ],
+  "explanationMd": "### Why the bug occurs\nThe loop does `counts[status] += 1`, which is shorthand for `counts[status] = counts[status] + 1`. On the very first order, the key `'shipped'` isn't in the dictionary yet, so reading `counts['shipped']` raises `KeyError` before anything can be added. (You could patch the loop with `dict.get` or `collections.Counter`, but pandas already has a purpose-built tool.)\n\n### Why the fix is correct\n`orders[\"status\"].value_counts()` scans the column once and returns a Series whose index is each distinct status and whose values are the counts, ordered most-common first. It's a single, readable line that can't hit the uninitialized-key bug, handles any number of categories automatically, and runs in optimized C rather than a Python loop — so it stays fast on millions of rows. Counting category frequencies is one of the most common things you'll do, and `value_counts()` is the idiomatic way to do it.",
+  "recruiterReview": "Good move replacing the loop with `value_counts()` — it's the right tool, and you avoided the temptation to merely patch the `KeyError` with `defaultdict`. Vectorized pandas methods are clearer and dramatically faster than per-row Python loops, which matters the moment the data grows. Handy follow-ups: `value_counts(normalize=True)` gives proportions instead of raw counts, and `dropna=False` includes missing values as their own category. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Counting How Often Each Value Appears\n\n\"How many of each?\" comes up constantly — orders per status, users per country, errors per type. pandas has a one-liner for it, and reaching for a manual loop is the classic beginner detour.\n\n### Series vs DataFrame\nA single column of a DataFrame is called a **Series**. Many handy methods live on a Series, and `value_counts()` is one of the most used.\n\n### What value_counts does\n`series.value_counts()` looks at every entry, counts how many times each distinct value appears, and returns a new Series — the distinct values as the index, the counts as the values, sorted from most to least frequent:\n```python\norders[\"status\"].value_counts()\n# status\n# shipped      14\n# pending       9\n# cancelled     7\n```\n\n### Why not a loop?\nA hand-written tally is easy to get wrong. The most common slip is `counts[key] += 1` without first creating the key, which raises `KeyError`. It's also slow: a Python loop touches each row one at a time, while `value_counts()` runs in optimized C and stays fast on millions of rows.\n\n### A tiny worked example\n```python\ns = pd.Series([\"a\", \"b\", \"a\", \"a\", \"b\"])\ns.value_counts()\n# a    3\n# b    2\n```\n\n### Useful variations\n- `value_counts(normalize=True)` → proportions (e.g. `0.47`) instead of raw counts.\n- `value_counts(dropna=False)` → counts missing values (`NaN`) as their own category.\n- For counts across two columns, use `df.groupby([\"a\", \"b\"]).size()`.\n\n### Don't confuse these\n- `.count()` → one number: how many non-missing values total.\n- `.unique()` → the list of distinct values, *without* counts.\n- `.nunique()` → how many distinct values there are (a single number).\n- `.value_counts()` → each distinct value **and** its frequency.\n\n### Common beginner mistakes\n- Writing a loop with `counts[key] += 1` before the key exists.\n- Reaching for `.count()` (a grand total) when you wanted a per-category breakdown.\n- Using `.unique()` and then counting it yourself.\n\nYou'll hit this the first time someone asks for a breakdown 'by category'.",
+    "videos": [
+      {
+        "title": "pandas value_counts tutorial",
+        "searchQuery": "pandas value_counts count categories frequency tutorial"
+      },
+      {
+        "title": "count vs nunique vs unique vs value_counts",
+        "searchQuery": "pandas count nunique unique value_counts difference beginner"
+      }
+    ]
+  },
+  "estMinutes": 4,
+  "version": 1
+}

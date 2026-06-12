@@ -1,0 +1,62 @@
+{
+  "id": "da-002-column-trailing-space",
+  "sector": "da",
+  "difficulty": "easy",
+  "title": "02_apply_price_markup.ipynb",
+  "language": "python",
+  "icon": "table-2",
+  "conceptTags": ["column-selection", "messy-headers", "data-cleaning"],
+  "descriptionMd": "## Mission: Apply a Price Markup\n\nThe store wants every item marked up by 10%. You loaded the inventory file and wrote what looks like a one-liner: multiply the `Price` column by 1.10 and save it as `new_price`.\n\nInstead of a markup table you get a `KeyError: 'Price'`, even though a price column is obviously there. The printed `columns:` line holds the clue — look very closely at how the price column is named, then clean the headers so the selection works.",
+  "initialCode": "import pandas as pd\n\ninventory = pd.read_csv(\"inventory.csv\")\nprint(\"columns:\", list(inventory.columns))\n\n# Mark every item up by 10%\ninventory[\"new_price\"] = inventory[\"Price\"] * 1.10\nprint(inventory[[\"item\", \"Price\", \"new_price\"]].head())",
+  "buggyLineStart": 7,
+  "buggyLineEnd": 7,
+  "traceback": "columns: ['item', 'Price ', 'in_stock']\n---------------------------------------------------------------------------\nKeyError                                  Traceback (most recent call last)\nCell In[1], line 7\n      6 # Mark every item up by 10%\n---> 7 inventory[\"new_price\"] = inventory[\"Price\"] * 1.10\n\nKeyError: 'Price'",
+  "correctOutput": "       item   Price  new_price\n0    Pencil    1.50      1.650\n1    Eraser    0.80      0.880\n2  Notebook    3.20      3.520\n3       Pen    2.00      2.200\n4    Marker    4.50      4.950",
+  "options": [
+    {
+      "key": "a",
+      "label": "Strip whitespace off all headers, then select Price",
+      "patchCode": "import pandas as pd\n\ninventory = pd.read_csv(\"inventory.csv\")\ninventory.columns = inventory.columns.str.strip()\nprint(\"columns:\", list(inventory.columns))\n\n# Mark every item up by 10%\ninventory[\"new_price\"] = inventory[\"Price\"] * 1.10\nprint(inventory[[\"item\", \"Price\", \"new_price\"]].head())",
+      "isCorrect": true,
+      "resultLog": "columns: ['item', 'Price', 'in_stock']\n       item   Price  new_price\n0    Pencil    1.50      1.650\n1    Eraser    0.80      0.880\n2  Notebook    3.20      3.520\n3       Pen    2.00      2.200\n4    Marker    4.50      4.950",
+      "rationale": "The real header is `'Price '` with a trailing space — invisible in a printout but very real to pandas, so `inventory[\"Price\"]` finds no exact match. `inventory.columns = inventory.columns.str.strip()` rewrites every header with surrounding whitespace removed, so `'Price '` becomes `'Price'` and the selection succeeds. Cleaning all headers at once also protects the rest of your code from the same trap."
+    },
+    {
+      "key": "b",
+      "label": "Rename the column from \"Price\" to \"price\"",
+      "patchCode": "import pandas as pd\n\ninventory = pd.read_csv(\"inventory.csv\")\ninventory = inventory.rename(columns={\"Price\": \"price\"})\nprint(\"columns:\", list(inventory.columns))\n\n# Mark every item up by 10%\ninventory[\"new_price\"] = inventory[\"price\"] * 1.10\nprint(inventory[[\"item\", \"price\", \"new_price\"]].head())",
+      "isCorrect": false,
+      "resultLog": "columns: ['item', 'Price ', 'in_stock']\n---------------------------------------------------------------------------\nKeyError                                  Traceback (most recent call last)\nCell In[1], line 8\n---> 8 inventory[\"new_price\"] = inventory[\"price\"] * 1.10\n\nKeyError: 'price'",
+      "rationale": "`rename` only changes keys that match *exactly*. The dictionary key `\"Price\"` never matches the real header `\"Price \"` (with the space), so the rename silently does nothing and the column stays `'Price '`. Selecting `\"price\"` then fails too. Rename can't fix a header you can't address in the first place."
+    },
+    {
+      "key": "c",
+      "label": "Call str.strip() on the columns but keep the original frame",
+      "patchCode": "import pandas as pd\n\ninventory = pd.read_csv(\"inventory.csv\")\ninventory.columns.str.strip()\nprint(\"columns:\", list(inventory.columns))\n\n# Mark every item up by 10%\ninventory[\"new_price\"] = inventory[\"Price\"] * 1.10\nprint(inventory[[\"item\", \"Price\", \"new_price\"]].head())",
+      "isCorrect": false,
+      "resultLog": "columns: ['item', 'Price ', 'in_stock']\n---------------------------------------------------------------------------\nKeyError                                  Traceback (most recent call last)\nCell In[1], line 7\n---> 7 inventory[\"new_price\"] = inventory[\"Price\"] * 1.10\n\nKeyError: 'Price'",
+      "rationale": "`inventory.columns.str.strip()` computes a cleaned copy of the headers but throws it away — it does not change the DataFrame. You have to assign the result back with `inventory.columns = inventory.columns.str.strip()`. Forgetting that assignment is one of the most common pandas beginner slips: many operations return a new object rather than editing in place."
+    }
+  ],
+  "hints": [
+    "The selection key and the real header look identical, but one of them has an extra invisible character. Compare `\"Price\"` with what `print(\"columns:\", ...)` shows between the quotes very carefully.",
+    "pandas has a string accessor, `.str`, that works on a whole Index of column names. `df.columns.str.strip()` cleans every header — but remember to assign the result back to `df.columns`."
+  ],
+  "explanationMd": "### Why the bug occurs\nSpreadsheets and exports frequently leave stray spaces in header cells, so a column you think is named `Price` is actually `'Price '` with a trailing space. To pandas those are two different strings, so `inventory[\"Price\"]` matches nothing and raises `KeyError`. The space is invisible in a normal printout, which is what makes this so confusing the first time.\n\n### Why the fix is correct\n`inventory.columns.str.strip()` removes leading and trailing whitespace from every header, turning `'Price '` into `'Price'`. Assigning it back with `inventory.columns = ...` makes the change stick. Cleaning all headers in one move (rather than chasing one column) is the robust habit: it heals every space-padded name at once and stops the same `KeyError` from reappearing later in the notebook.",
+  "recruiterReview": "Good eye — a trailing space in a header is genuinely hard to see, and you fixed it the durable way by stripping *all* the column names instead of hard-coding the one with the space. That single line means the rest of the notebook is safe from the same gotcha. A nice habit to adopt: normalize headers right after loading (e.g. strip and lowercase them) so column access is predictable everywhere. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Cleaning Messy Column Headers\n\nThis is a rite of passage: the column is *right there*, yet pandas swears it doesn't exist. Almost always, the header has a hidden character.\n\n### A quick refresher\nA **DataFrame** is a table; each **column** has a name (its header). You select a column with `df[\"name\"]`. pandas matches that name **exactly** — same letters, same case, and the same spaces.\n\n### The mechanism of this bug\nWhen a file is exported from a spreadsheet, a header cell like `Price` sometimes carries an extra space and is saved as `'Price '`. The trailing space is invisible when printed, but to the computer `'Price'` and `'Price '` are different strings. So `df[\"Price\"]` finds no match and raises `KeyError: 'Price'`.\n\n### The `.str` accessor\npandas lets you run text operations on a whole set of strings at once through `.str`. On the column names, `df.columns.str.strip()` returns a new list of headers with surrounding spaces removed. Two things to remember:\n1. `strip()` removes spaces from **both** ends (`lstrip()` only the left, `rstrip()` only the right).\n2. It returns a **new** value — you must assign it back: `df.columns = df.columns.str.strip()`.\n\n### A tiny worked example\n```python\ndf = pd.DataFrame({\"Name \": [\"Ada\"], \" City\": [\"Pisa\"]})\ndf.columns = df.columns.str.strip()\nlist(df.columns)\n# ['Name', 'City']\ndf[\"City\"]   # now works\n```\n\n### How to spot it\nIf a `KeyError` names a column you can clearly see, print `list(df.columns)`. Stray spaces sit *inside* the quotes, e.g. `'Price '`. That space is your culprit.\n\n### Common beginner mistakes\n- Trusting that headers are clean — exports rarely are.\n- Using `rename` with the clean name as the key; it won't match the dirty one.\n- Calling `df.columns.str.strip()` but forgetting to assign it back, so nothing changes.\n- Stripping only one side (`lstrip`) when the junk is on the other end.\n\nYou'll hit this bug the moment you load almost any real spreadsheet export.",
+    "videos": [
+      {
+        "title": "Cleaning pandas column names (strip, lower, replace)",
+        "searchQuery": "pandas clean column names strip whitespace rename tutorial"
+      },
+      {
+        "title": "Selecting columns and the KeyError gotcha",
+        "searchQuery": "pandas select column keyerror exact match beginner"
+      }
+    ]
+  },
+  "estMinutes": 4,
+  "version": 1
+}
