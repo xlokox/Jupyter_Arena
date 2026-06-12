@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import type { Challenge, Difficulty, SectorId } from "@/lib/content/schema";
+import type { Difficulty, SectorId } from "@/lib/content/schema";
 import {
   applyCorrectSolve,
   applyWrongAttempt,
@@ -329,11 +329,20 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
   ),
 );
 
+/** The fields filtering needs — satisfied by both Challenge and ChallengeMeta. */
+export interface FilterableChallenge {
+  id: string;
+  sector: SectorId;
+  difficulty: Difficulty;
+  title: string;
+  conceptTags: string[];
+}
+
 /** Pure filter used by the sidebar; exported for tests and reuse. */
-export function filterChallenges(
-  challenges: readonly Challenge[],
+export function filterChallenges<T extends FilterableChallenge>(
+  challenges: readonly T[],
   filters: { sector: SectorFilter; difficulty: DifficultyFilter; query: string },
-): Challenge[] {
+): T[] {
   const query = filters.query.trim().toLowerCase();
   return challenges.filter((challenge) => {
     if (filters.sector !== "all" && challenge.sector !== filters.sector) return false;

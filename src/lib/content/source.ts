@@ -1,5 +1,12 @@
 import { createClient } from "@supabase/supabase-js";
-import { ChallengeSchema, SectorsFileSchema, type Challenge, type Sector } from "./schema";
+import {
+  ChallengeSchema,
+  SectorsFileSchema,
+  toMeta,
+  type Challenge,
+  type ChallengeMeta,
+  type Sector,
+} from "./schema";
 import { loadChallenges, loadSectors } from "./load";
 
 /**
@@ -120,6 +127,60 @@ export async function getChallenges(): Promise<Challenge[]> {
       (a, b) =>
         (SECTOR_ORDER[a.sector] ?? 9) - (SECTOR_ORDER[b.sector] ?? 9) || a.id.localeCompare(b.id),
     );
+}
+
+const META_SELECT = "id, sector_id, difficulty, title, language, icon, concept_tags, est_minutes";
+
+interface MetaRow {
+  id: string;
+  sector_id: string;
+  difficulty: string;
+  title: string;
+  language: string;
+  icon: string;
+  concept_tags: string[];
+  est_minutes: number;
+}
+
+/** List views ship metadata only (Section 11); bodies come via getChallenge. */
+export async function getChallengeMetas(): Promise<ChallengeMeta[]> {
+  const env = supabaseEnv();
+  if (!env) return loadChallenges().map(toMeta);
+
+  const anon = createClient(env.url, env.anonKey, { auth: { persistSession: false } });
+  const { data, error } = await anon.from("challenges").select(META_SELECT);
+  if (error) throw new Error(`challenge metas read failed: ${error.message}`);
+  return (data as MetaRow[])
+    .map((row) => ({
+      id: row.id,
+      sector: row.sector_id as ChallengeMeta["sector"],
+      difficulty: row.difficulty as ChallengeMeta["difficulty"],
+      title: row.title,
+      language: row.language as ChallengeMeta["language"],
+      icon: row.icon,
+      conceptTags: row.concept_tags,
+      estMinutes: row.est_minutes,
+    }))
+    .sort(
+      (a, b) =>
+        (SECTOR_ORDER[a.sector] ?? 9) - (SECTOR_ORDER[b.sector] ?? 9) ||
+        a.id.localeCompare(b.id),
+    );
+}
+
+/** One full challenge body, RLS-gated; null when unknown or unpublished. */
+export async function getChallenge(id: string): Promise<Challenge | null> {
+  const env = supabaseEnv();
+  if (!env) return loadChallenges().find((c) => c.id === id) ?? null;
+
+  const anon = createClient(env.url, env.anonKey, { auth: { persistSession: false } });
+  const { data, error } = await anon
+    .from("challenges")
+    .select(CHALLENGE_SELECT)
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw new Error(`challenge read failed: ${error.message}`);
+  return data ? mapChallengeRow(data as unknown as ChallengeRow) : null;
 }
 
 export async function getSectors(): Promise<Sector[]> {

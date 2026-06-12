@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { KeyRound, Mail, X } from "lucide-react";
+import { useFocusTrap } from "@/lib/use-focus-trap";
 import { en } from "@/i18n/en";
 
 interface SignInDialogProps {
@@ -20,6 +21,7 @@ export default function SignInDialog({ onClose }: SignInDialogProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const trapRef = useFocusTrap<HTMLDivElement>();
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -85,6 +87,7 @@ export default function SignInDialog({ onClose }: SignInDialogProps) {
         className="absolute inset-0 bg-black/60"
       />
       <div
+        ref={trapRef}
         role="dialog"
         aria-modal="true"
         aria-label={en.auth.dialogTitle}

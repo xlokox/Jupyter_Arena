@@ -55,6 +55,32 @@ export const ChallengeSchema = z.object({
 });
 
 export type Sector = z.infer<typeof SectorSchema>;
+
+/**
+ * The list-view projection (Section 11: list views ship metadata only;
+ * challenge bodies load on demand). Keep in sync with getChallengeMetas.
+ */
+export interface ChallengeMeta {
+  id: string;
+  sector: z.infer<typeof ChallengeSchema>["sector"];
+  difficulty: z.infer<typeof ChallengeSchema>["difficulty"];
+  title: string;
+  language: z.infer<typeof ChallengeSchema>["language"];
+  icon: string;
+  conceptTags: string[];
+  estMinutes: number;
+}
+
+export const toMeta = (c: z.infer<typeof ChallengeSchema>): ChallengeMeta => ({
+  id: c.id,
+  sector: c.sector,
+  difficulty: c.difficulty,
+  title: c.title,
+  language: c.language,
+  icon: c.icon,
+  conceptTags: c.conceptTags,
+  estMinutes: c.estMinutes,
+});
 export type ChallengeOption = z.infer<typeof ChallengeOptionSchema>;
 export type Challenge = z.infer<typeof ChallengeSchema>;
 export type Difficulty = (typeof DIFFICULTIES)[number];

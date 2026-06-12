@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { unstable_cache } from "next/cache";
-import { getChallenges, getSectors } from "@/lib/content/source";
+import { getChallengeMetas, getSectors } from "@/lib/content/source";
 import { dailyChallengeId } from "@/lib/game/daily";
 import { utcDayOf } from "@/lib/game/xp";
 import { AppShell } from "@/components/app-shell";
@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   description: en.app.tagline,
 };
 
-const cachedChallenges = unstable_cache(getChallenges, ["daily-challenges"], {
+const cachedChallenges = unstable_cache(getChallengeMetas, ["daily-challenge-metas"], {
   revalidate: 3600,
 });
 const cachedSectors = unstable_cache(getSectors, ["daily-sectors"], { revalidate: 3600 });

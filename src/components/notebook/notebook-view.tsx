@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Challenge } from "@/lib/content/schema";
+import { Loader2, RefreshCw } from "lucide-react";
+import type { Challenge, ChallengeMeta } from "@/lib/content/schema";
+import { useChallenge } from "@/lib/content/use-challenge";
 import { Markdown } from "@/components/markdown";
 import { ChallengeIcon } from "@/components/challenge-icon";
 import { DifficultyBadge } from "@/components/difficulty-badge";
@@ -18,11 +20,57 @@ const RUN_SIMULATION_MS = 700;
 const RUN_SIMULATION_REDUCED_MS = 200;
 
 interface NotebookViewProps {
-  challenge: Challenge;
+  meta: ChallengeMeta;
+  /** Server-rendered permalink pages seed the body for SEO + instant paint. */
+  initialChallenge?: Challenge | null;
   onNext: () => void;
 }
 
-export function NotebookView({ challenge, onNext }: NotebookViewProps) {
+export function NotebookView({ meta, initialChallenge, onNext }: NotebookViewProps) {
+  const { challenge, failed } = useChallenge(meta.id, initialChallenge);
+  if (!challenge) {
+    return <NotebookFallback meta={meta} failed={failed} />;
+  }
+  return <LoadedNotebook challenge={challenge} onNext={onNext} />;
+}
+
+function NotebookFallback({ meta, failed }: { meta: ChallengeMeta; failed: boolean }) {
+  return (
+    <div className="mx-auto max-w-4xl space-y-5 p-4 md:p-6" aria-busy={!failed}>
+      <header className="flex flex-wrap items-center gap-3">
+        <ChallengeIcon name={meta.icon} className="size-5 text-accent" />
+        <h1 className="font-mono text-base font-semibold text-text md:text-lg">{meta.title}</h1>
+        <DifficultyBadge difficulty={meta.difficulty} />
+      </header>
+      {failed ? (
+        <div
+          role="alert"
+          className="flex flex-col items-start gap-3 rounded-md border border-danger/50 bg-danger/10 p-4 text-sm text-danger"
+        >
+          {en.workspace.loadFailed}
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="flex min-h-[44px] items-center gap-2 rounded-md border border-border bg-panel-2 px-4 text-sm text-text hover:border-accent-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            <RefreshCw className="size-4" aria-hidden />
+            {en.workspace.retry}
+          </button>
+        </div>
+      ) : (
+        <div
+          role="status"
+          className="flex items-center gap-2 rounded-md border border-border bg-panel p-4 text-sm text-muted"
+        >
+          <Loader2 className="size-4 motion-safe:animate-spin" aria-hidden />
+          {en.workspace.loadingNotebook}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LoadedNotebook({ challenge, onNext }: { challenge: Challenge; onNext: () => void }) {
   const attempt = useWorkspaceStore((s) => getAttempt(s.attempts, challenge.id));
   const selectOption = useWorkspaceStore((s) => s.selectOption);
   const startRun = useWorkspaceStore((s) => s.startRun);

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect } from "react";
 import { FlaskConical } from "lucide-react";
-import type { Challenge, Sector } from "@/lib/content/schema";
+import type { Challenge, ChallengeMeta, Sector } from "@/lib/content/schema";
 import { Header } from "@/components/header";
 import { Sidebar } from "@/components/sidebar";
 import { XpToast } from "@/components/xp-toast";
@@ -12,13 +12,15 @@ import { filterChallenges, getAttempt, useWorkspaceStore } from "@/store/workspa
 import { en } from "@/i18n/en";
 
 interface AppShellProps {
-  challenges: Challenge[];
+  challenges: ChallengeMeta[];
   sectors: Sector[];
-  /** When set (e.g. the /daily route), this mission opens on mount. */
+  /** When set (e.g. /daily or /challenge/[id]), this mission opens on mount. */
   initialChallengeId?: string | null;
+  /** Permalink pages embed the full body server-side (SEO + instant paint). */
+  initialChallenge?: Challenge | null;
 }
 
-export function AppShell({ challenges, initialChallengeId }: AppShellProps) {
+export function AppShell({ challenges, initialChallengeId, initialChallenge }: AppShellProps) {
   const activeChallengeId = useWorkspaceStore((s) => s.activeChallengeId);
   const view = useWorkspaceStore((s) => s.view);
   const sectorFilter = useWorkspaceStore((s) => s.sectorFilter);
@@ -106,9 +108,13 @@ export function AppShell({ challenges, initialChallengeId }: AppShellProps) {
               <p className="max-w-md text-sm text-muted">{en.workspace.emptyBody}</p>
             </div>
           ) : view === "tutorial" ? (
-            <TutorialView challenge={active} />
+            <TutorialView meta={active} />
           ) : (
-            <NotebookView challenge={active} onNext={goToNext} />
+            <NotebookView
+              meta={active}
+              initialChallenge={initialChallenge?.id === active.id ? initialChallenge : null}
+              onNext={goToNext}
+            />
           )}
         </main>
       </div>

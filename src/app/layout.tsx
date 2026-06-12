@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { AuthProvider } from "@/components/auth/auth-provider";
+import { SITE_URL } from "@/lib/site";
 import { en } from "@/i18n/en";
 import "./globals.css";
 
@@ -15,8 +16,16 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: en.app.name,
+  metadataBase: new URL(SITE_URL),
+  title: { default: en.app.name, template: `%s — ${en.app.name}` },
   description: en.app.tagline,
+  openGraph: {
+    title: en.app.name,
+    description: en.app.tagline,
+    type: "website",
+    siteName: en.app.name,
+  },
+  twitter: { card: "summary", title: en.app.name, description: en.app.tagline },
 };
 
 export default function RootLayout({

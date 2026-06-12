@@ -1,14 +1,33 @@
 "use client";
 
-import { BookOpen, ExternalLink, Play } from "lucide-react";
-import type { Challenge } from "@/lib/content/schema";
+import { BookOpen, ExternalLink, Loader2, Play } from "lucide-react";
+import type { Challenge, ChallengeMeta } from "@/lib/content/schema";
+import { useChallenge } from "@/lib/content/use-challenge";
 import { Markdown } from "@/components/markdown";
 import { ChallengeIcon } from "@/components/challenge-icon";
 import { DifficultyBadge } from "@/components/difficulty-badge";
 import { useWorkspaceStore } from "@/store/workspace";
 import { en } from "@/i18n/en";
 
-export function TutorialView({ challenge }: { challenge: Challenge }) {
+export function TutorialView({ meta }: { meta: ChallengeMeta }) {
+  const { challenge, failed } = useChallenge(meta.id);
+  if (!challenge) {
+    return (
+      <div className="mx-auto max-w-3xl p-4 md:p-6" aria-busy={!failed}>
+        <div
+          role={failed ? "alert" : "status"}
+          className={`flex items-center gap-2 rounded-md border p-4 text-sm ${failed ? "border-danger/50 bg-danger/10 text-danger" : "border-border bg-panel text-muted"}`}
+        >
+          {!failed && <Loader2 className="size-4 motion-safe:animate-spin" aria-hidden />}
+          {failed ? en.workspace.loadFailed : en.workspace.loadingNotebook}
+        </div>
+      </div>
+    );
+  }
+  return <LoadedTutorial challenge={challenge} />;
+}
+
+function LoadedTutorial({ challenge }: { challenge: Challenge }) {
   const openMission = useWorkspaceStore((s) => s.openMission);
 
   return (

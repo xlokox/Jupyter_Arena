@@ -2,10 +2,15 @@
   "id": "dl-002-missing-zero-grad",
   "sector": "dl",
   "difficulty": "easy",
-  "title": "05_missing_zero_grad.ipynb",
+  "title": "02_missing_zero_grad.ipynb",
   "language": "python",
   "icon": "rotate-ccw",
-  "conceptTags": ["pytorch", "gradients", "training-loop", "optimization"],
+  "conceptTags": [
+    "pytorch",
+    "gradients",
+    "training-loop",
+    "optimization"
+  ],
   "descriptionMd": "## Mission: Stop the Regression Model From Exploding\n\nThis is the smallest possible PyTorch workload: a linear layer learning a known linear mapping with SGD. It should converge in under a hundred steps — the kind of sanity-check script teams run to validate a new training rig.\n\nInstead, the loss starts at a reasonable 9.78, climbs to the hundreds of thousands, and lands on `nan` by step 60. The final guard assertion fires: training diverged. Learning rate looks sane, data is well-conditioned, the model is one layer. Something in the loop itself is compounding step after step. Read the loop like the autograd engine would, and fix it.",
   "initialCode": "import torch\nfrom torch import nn\n\ntorch.manual_seed(0)\nX = torch.randn(512, 10)\ntrue_w = torch.randn(10, 1)\ny = X @ true_w + 0.1 * torch.randn(512, 1)\n\nmodel = nn.Linear(10, 1)\noptimizer = torch.optim.SGD(model.parameters(), lr=0.05)\nloss_fn = nn.MSELoss()\n\nfor step in range(100):\n    loss = loss_fn(model(X), y)\n    loss.backward()\n    optimizer.step()\n    if step % 20 == 0:\n        print(f\"step {step:3d}: loss {loss.item():.4f}\")\n\nassert torch.isfinite(loss), \"training diverged - loss is not finite\"",
   "buggyLineStart": 13,

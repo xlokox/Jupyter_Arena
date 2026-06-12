@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { ArrowLeft, BadgeCheck, BriefcaseBusiness, Flame } from "lucide-react";
-import type { Challenge, SectorId } from "@/lib/content/schema";
+import type { ChallengeMeta, SectorId } from "@/lib/content/schema";
 import {
   accuracy,
   displayStreak,
@@ -27,7 +27,7 @@ function StatCard({ label, value, hint }: { label: string; value: string; hint?:
   );
 }
 
-export function PortfolioView({ challenges }: { challenges: Challenge[] }) {
+export function PortfolioView({ challenges }: { challenges: ChallengeMeta[] }) {
   const stats = useWorkspaceStore((s) => s.stats);
   const attempts = useWorkspaceStore((s) => s.attempts);
 

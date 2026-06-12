@@ -2,10 +2,14 @@
   "id": "fullstack-002-index-keys",
   "sector": "fullstack",
   "difficulty": "easy",
-  "title": "06_task_index_keys.jsx",
+  "title": "01_task_index_keys.jsx",
   "language": "jsx",
   "icon": "list-todo",
-  "conceptTags": ["react-keys", "list-rendering", "reconciliation"],
+  "conceptTags": [
+    "react-keys",
+    "list-rendering",
+    "reconciliation"
+  ],
   "descriptionMd": "## Mission: Make the Pinned Task Keep Its Checkmark\n\nThe task list supports two interactions: check a task off, and pin a task to the top of the list. Each row renders an uncontrolled checkbox, the task text, and a Pin button. The architectural goal is unremarkable list UI — which is exactly why the bug report is so confusing.\n\nQA's failing scenario: check the third task, pin it to the top — and the checkmark *stays at the third row*, now decorating a completely different task. No errors in the console, no failed network calls. The list data moves correctly; the checkbox state doesn't travel with it. Something about how React matches rows between renders is misaligned with how the rows actually move.",
   "initialCode": "import { useState } from \"react\";\n\nconst initialTasks = [\n  { id: \"a1\", text: \"Ship the release\" },\n  { id: \"b2\", text: \"Fix the flaky test\" },\n  { id: \"c3\", text: \"Review the RFC\" },\n];\n\nexport default function TaskList() {\n  const [tasks, setTasks] = useState(initialTasks);\n\n  function moveToTop(index) {\n    setTasks((prev) => [prev[index], ...prev.filter((_, i) => i !== index)]);\n  }\n\n  return (\n    <ul>\n      {tasks.map((task, index) => (\n        <li key={index}>\n          <input type=\"checkbox\" aria-label={`done: ${task.text}`} />\n          <span>{task.text}</span>\n          <button onClick={() => moveToTop(index)}>Pin</button>\n        </li>\n      ))}\n    </ul>\n  );\n}",
   "buggyLineStart": 19,

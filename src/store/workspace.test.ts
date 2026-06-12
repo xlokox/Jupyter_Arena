@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import type { Challenge } from "@/lib/content/schema";
+import type { FilterableChallenge } from "./workspace";
 import {
   EMPTY_ATTEMPT,
   filterChallenges,
@@ -122,15 +122,14 @@ describe("hints", () => {
   });
 });
 
-const stub = (overrides: Partial<Challenge>): Challenge =>
-  ({
-    id: "ml-001-a",
-    sector: "ml",
-    difficulty: "easy",
-    title: "01_a.ipynb",
-    conceptTags: ["feature-scaling"],
-    ...overrides,
-  }) as Challenge;
+const stub = (overrides: Partial<FilterableChallenge>): FilterableChallenge => ({
+  id: "ml-001-a",
+  sector: "ml",
+  difficulty: "easy",
+  title: "01_a.ipynb",
+  conceptTags: ["feature-scaling"],
+  ...overrides,
+});
 
 describe("filterChallenges", () => {
   const catalog = [

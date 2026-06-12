@@ -104,7 +104,7 @@ test.describe("notebook flows", () => {
     await page.locator("body").press("Enter");
     await expect(page.getByText("Not the fix", { exact: false })).toBeVisible();
     await page.locator("body").press("n");
-    await expect(page.getByRole("heading", { name: "08_scaler_fit_on_test.ipynb" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "02_scaler_fit_on_test.ipynb" })).toBeVisible();
   });
 });
 
@@ -148,6 +148,23 @@ test.describe("accessibility", () => {
     await page.getByRole("radio", { name: /Standardize both features/ }).click();
     await page.getByRole("button", { name: "Run Cell" }).click();
     await expect(page.getByText("APPROVED", { exact: true })).toBeVisible();
+    results = await new AxeBuilder({ page }).analyze();
+    expect(results.violations).toEqual([]);
+  });
+
+  test("axe scan is clean on the tutorial view and the portfolio", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("tab", { name: "Tutorials" }).click();
+    await page
+      .getByRole("button", { name: /01_kmeans_customer_segmentation\.ipynb/ })
+      .first()
+      .click();
+    await expect(page.getByRole("button", { name: "Start mission" })).toBeVisible();
+    let results = await new AxeBuilder({ page }).analyze();
+    expect(results.violations).toEqual([]);
+
+    await page.goto("/portfolio");
+    await expect(page.getByRole("heading", { name: "Public Portfolio Dashboard" })).toBeVisible();
     results = await new AxeBuilder({ page }).analyze();
     expect(results.violations).toEqual([]);
   });

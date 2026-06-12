@@ -72,11 +72,15 @@ test("portfolio reflects earned stats and sector progress", async ({ page }) => 
     page.getByText("Perfect for your LinkedIn or resume to prove your debugging speed!"),
   ).toBeVisible();
   await expect(page.getByText("Total XP")).toBeVisible();
-  await expect(page.getByText("1/8")).toBeVisible();
+  await expect(page.getByText("1/60")).toBeVisible();
   await expect(page.getByText("100%")).toBeVisible();
   await expect(page.getByRole("progressbar", { name: "Machine Learning" })).toHaveAttribute(
     "aria-valuenow",
     "1",
+  );
+  await expect(page.getByRole("progressbar", { name: "Machine Learning" })).toHaveAttribute(
+    "aria-valuemax",
+    "15",
   );
   await expect(page.getByRole("progressbar", { name: "Databases" })).toHaveAttribute(
     "aria-valuenow",

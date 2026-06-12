@@ -2,10 +2,14 @@
   "id": "db-002-sql-injection",
   "sector": "db",
   "difficulty": "easy",
-  "title": "07_login_sql_injection.py",
+  "title": "02_login_sql_injection.py",
   "language": "python",
   "icon": "shield-alert",
-  "conceptTags": ["sql-injection", "parameterized-queries", "security"],
+  "conceptTags": [
+    "sql-injection",
+    "parameterized-queries",
+    "security"
+  ],
   "descriptionMd": "## Mission: Close the Login Lookup Hole\n\nThe user-lookup helper backs the login flow: given an email address, return the matching user row. It works fine for every legitimate address — and that is exactly the problem, because it also \"works\" for things that are not addresses at all.\n\nThe security review added a standard probe to the test suite: the classic `x' OR '1'='1` payload, which must return no user. Tonight's run is red — the probe came back with a row, and not just any row: the first user in the table, an admin. The query string is being assembled in a way that lets user input rewrite the WHERE clause. Find the construction flaw and fix it with the mechanism the database driver provides for exactly this.",
   "initialCode": "import sqlite3\n\ndef find_user(conn, email):\n    cur = conn.cursor()\n    query = f\"SELECT id, name FROM users WHERE email = '{email}'\"\n    cur.execute(query)\n    return cur.fetchone()\n\nconn = sqlite3.connect(\"app.db\")\nprint(find_user(conn, \"dana@example.com\"))\n\nprobe = find_user(conn, \"x' OR '1'='1\")\nassert probe is None, f\"injection probe returned a row: {probe!r}\"",
   "buggyLineStart": 5,

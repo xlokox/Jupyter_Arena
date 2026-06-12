@@ -1,7 +1,7 @@
 "use client";
 
 import { BookOpen, CheckCircle2, FileCode2, Search, X } from "lucide-react";
-import type { Challenge } from "@/lib/content/schema";
+import type { ChallengeMeta } from "@/lib/content/schema";
 import { DIFFICULTIES } from "@/lib/content/schema";
 import { ChallengeIcon } from "@/components/challenge-icon";
 import { DifficultyBadge } from "@/components/difficulty-badge";
@@ -12,6 +12,7 @@ import {
   type DifficultyFilter,
   type SidebarTab,
 } from "@/store/workspace";
+import { useFocusTrap } from "@/lib/use-focus-trap";
 import { en } from "@/i18n/en";
 
 const TABS: Array<{ id: SidebarTab; label: string; icon: typeof FileCode2 }> = [
@@ -19,7 +20,7 @@ const TABS: Array<{ id: SidebarTab; label: string; icon: typeof FileCode2 }> = [
   { id: "tutorials", label: en.sidebar.tutorials, icon: BookOpen },
 ];
 
-function SidebarContent({ challenges }: { challenges: Challenge[] }) {
+function SidebarContent({ challenges }: { challenges: ChallengeMeta[] }) {
   const sidebarTab = useWorkspaceStore((s) => s.sidebarTab);
   const setSidebarTab = useWorkspaceStore((s) => s.setSidebarTab);
   const sectorFilter = useWorkspaceStore((s) => s.sectorFilter);
@@ -171,7 +172,7 @@ function SidebarContent({ challenges }: { challenges: Challenge[] }) {
   );
 }
 
-export function Sidebar({ challenges }: { challenges: Challenge[] }) {
+export function Sidebar({ challenges }: { challenges: ChallengeMeta[] }) {
   const sidebarOpen = useWorkspaceStore((s) => s.sidebarOpen);
   const setSidebarOpen = useWorkspaceStore((s) => s.setSidebarOpen);
 
@@ -184,35 +185,49 @@ export function Sidebar({ challenges }: { challenges: Challenge[] }) {
 
       {/* Mobile drawer */}
       {sidebarOpen && (
-        <div className="fixed inset-0 z-40 md:hidden">
+        <MobileDrawer challenges={challenges} onClose={() => setSidebarOpen(false)} />
+      )}
+    </>
+  );
+}
+
+function MobileDrawer({
+  challenges,
+  onClose,
+}: {
+  challenges: ChallengeMeta[];
+  onClose: () => void;
+}) {
+  const trapRef = useFocusTrap<HTMLDivElement>();
+  return (
+    <div className="fixed inset-0 z-40 md:hidden">
+      <button
+        type="button"
+        aria-label={en.sidebar.closeSidebar}
+        onClick={onClose}
+        className="absolute inset-0 bg-black/60"
+      />
+      <div
+        ref={trapRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={en.sidebar.fileExplorerAria}
+        className="absolute inset-y-0 start-0 flex w-[85vw] max-w-80 flex-col bg-panel shadow-xl"
+      >
+        <div className="flex items-center justify-end border-b border-border p-1">
           <button
             type="button"
             aria-label={en.sidebar.closeSidebar}
-            onClick={() => setSidebarOpen(false)}
-            className="absolute inset-0 bg-black/60"
-          />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label={en.sidebar.fileExplorerAria}
-            className="absolute inset-y-0 start-0 flex w-[85vw] max-w-80 flex-col bg-panel shadow-xl"
+            onClick={onClose}
+            className="flex size-11 items-center justify-center rounded-md text-muted hover:text-text focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
           >
-            <div className="flex items-center justify-end border-b border-border p-1">
-              <button
-                type="button"
-                aria-label={en.sidebar.closeSidebar}
-                onClick={() => setSidebarOpen(false)}
-                className="flex size-11 items-center justify-center rounded-md text-muted hover:text-text focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
-              >
-                <X className="size-5" aria-hidden />
-              </button>
-            </div>
-            <div className="min-h-0 flex-1">
-              <SidebarContent challenges={challenges} />
-            </div>
-          </div>
+            <X className="size-5" aria-hidden />
+          </button>
         </div>
-      )}
-    </>
+        <div className="min-h-0 flex-1">
+          <SidebarContent challenges={challenges} />
+        </div>
+      </div>
+    </div>
   );
 }
