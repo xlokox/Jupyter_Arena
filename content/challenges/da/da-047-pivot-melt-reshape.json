@@ -1,0 +1,85 @@
+{
+  "id": "da-047-pivot-melt-reshape",
+  "sector": "da",
+  "difficulty": "medium",
+  "title": "47_revenue_by_month_per_region.ipynb",
+  "language": "python",
+  "icon": "table-2",
+  "conceptTags": ["pandas", "pivot", "reshape"],
+  "descriptionMd": "## Mission: Reshape Revenue for the Exec Deck\n\nYou have a long-format DataFrame: each row is `(region, month, revenue)` with one row per region × month. The exec wants it as a **table with regions as rows and months as columns** so they can compare regions side-by-side. You tried `df.pivot(index='region', columns='month', values='revenue')` and it raised `ValueError: Index contains duplicate entries, cannot reshape`.\n\nThe error message is precise but not friendly. `pivot` requires the `(index, columns)` combination to be **unique** — and your data has two rows for `('north', 'Jan')` because the same region reported revenue twice (mid-month and end-month, illustrative). For non-unique combinations you need `pivot_table`, which **aggregates** duplicates. Pick the right tool.",
+  "initialCode": "import pandas as pd\n\nrevenue = pd.DataFrame({\n    \"region\":  [\"north\", \"north\", \"south\", \"east\", \"north\", \"south\", \"east\", \"north\"],\n    \"month\":   [\"Jan\",   \"Feb\",   \"Jan\",   \"Jan\", \"Mar\",   \"Feb\",   \"Feb\", \"Jan\"],\n    \"revenue\": [4200,    4800,    3100,    2900, 5100,    3400,    3000, 1200],\n})\n# Note: ('north', 'Jan') appears TWICE — that's the duplicate that breaks pivot.\n\nwide = revenue.pivot(index=\"region\", columns=\"month\", values=\"revenue\")\nprint(wide)",
+  "buggyLineStart": 10,
+  "buggyLineEnd": 10,
+  "traceback": "---------------------------------------------------------------------------\nValueError                                Traceback (most recent call last)\nCell In[1], line 10\n     10 wide = revenue.pivot(index=\"region\", columns=\"month\", values=\"revenue\")\n\nValueError: Index contains duplicate entries, cannot reshape",
+  "correctOutput": "month     Feb   Jan   Mar\nregion                  \neast     3000  2900   NaN\nnorth    4800  5400  5100   # ← Jan = 4200 + 1200 = 5400 (sum aggregates the duplicates)\nsouth    3400  3100   NaN",
+  "options": [
+    {
+      "key": "a",
+      "label": "Use `pivot_table` and specify `aggfunc='sum'` to combine duplicates",
+      "patchCode": "import pandas as pd\n\nrevenue = pd.DataFrame({\n    \"region\":  [\"north\", \"north\", \"south\", \"east\", \"north\", \"south\", \"east\", \"north\"],\n    \"month\":   [\"Jan\",   \"Feb\",   \"Jan\",   \"Jan\", \"Mar\",   \"Feb\",   \"Feb\", \"Jan\"],\n    \"revenue\": [4200,    4800,    3100,    2900, 5100,    3400,    3000, 1200],\n})\n\nwide = revenue.pivot_table(index=\"region\", columns=\"month\", values=\"revenue\", aggfunc=\"sum\")\nprint(wide)",
+      "isCorrect": true,
+      "resultLog": "month     Feb   Jan   Mar\nregion                  \neast     3000  2900   NaN\nnorth    4800  5400  5100\nsouth    3400  3100   NaN",
+      "rationale": "`pivot_table` is `pivot`'s safer cousin: it **aggregates duplicates** with whatever function you specify (`sum`, `mean`, `count`, `first`, a callable). For revenue per region per month, `sum` is the right aggregation — two mid-month measurements for the same region add to the monthly total. The `aggfunc` parameter forces you to *think about how to combine duplicates*, which is the right design: silently picking 'first' or 'last' (as some tools do) hides whatever business decision lives there."
+    },
+    {
+      "key": "b",
+      "label": "Drop the duplicate rows first: `revenue = revenue.drop_duplicates(['region', 'month'])`",
+      "patchCode": "import pandas as pd\n\nrevenue = pd.DataFrame({\n    \"region\":  [\"north\", \"north\", \"south\", \"east\", \"north\", \"south\", \"east\", \"north\"],\n    \"month\":   [\"Jan\",   \"Feb\",   \"Jan\",   \"Jan\", \"Mar\",   \"Feb\",   \"Feb\", \"Jan\"],\n    \"revenue\": [4200,    4800,    3100,    2900, 5100,    3400,    3000, 1200],\n})\n\nrevenue = revenue.drop_duplicates([\"region\", \"month\"])\nwide = revenue.pivot(index=\"region\", columns=\"month\", values=\"revenue\")\nprint(wide)",
+      "isCorrect": false,
+      "resultLog": "month     Feb   Jan   Mar\nregion                  \neast     3000  2900   NaN\nnorth    4800  4200  5100   # ← only the FIRST north-Jan row; the 1200 silently lost\nsouth    3400  3100   NaN",
+      "rationale": "Compiles, but the answer is **wrong by $1,200**. `drop_duplicates` keeps the first occurrence by default and throws away the second — so the second north-Jan measurement vanishes from the totals. The duplicate exists for a reason (two reporting events for the same region-month); `pivot_table(aggfunc='sum')` honors them; `drop_duplicates` censors them. Use `drop_duplicates` only when the duplicates are *genuinely* redundant (e.g. accidentally double-loaded data), not when they encode partial-period measurements."
+    },
+    {
+      "key": "c",
+      "label": "Group first, then pivot: `revenue.groupby(['region', 'month'])['revenue'].sum().reset_index().pivot(...)`",
+      "patchCode": "import pandas as pd\n\nrevenue = pd.DataFrame({\n    \"region\":  [\"north\", \"north\", \"south\", \"east\", \"north\", \"south\", \"east\", \"north\"],\n    \"month\":   [\"Jan\",   \"Feb\",   \"Jan\",   \"Jan\", \"Mar\",   \"Feb\",   \"Feb\", \"Jan\"],\n    \"revenue\": [4200,    4800,    3100,    2900, 5100,    3400,    3000, 1200],\n})\n\nwide = (\n    revenue\n    .groupby([\"region\", \"month\"])[\"revenue\"].sum()\n    .reset_index()\n    .pivot(index=\"region\", columns=\"month\", values=\"revenue\")\n)\nprint(wide)",
+      "isCorrect": false,
+      "resultLog": "month     Feb   Jan   Mar\nregion                  \neast     3000  2900   NaN\nnorth    4800  5400  5100\nsouth    3400  3100   NaN",
+      "rationale": "Output is right and the intermediate `groupby` is genuinely useful for any *other* aggregation you might want to apply. But for the specific 'aggregate-then-pivot' shape, `pivot_table(aggfunc='sum')` is exactly what this two-step pipeline does, in one call. The two-step version is more verbose and harder to read at a glance. Reach for the dedicated tool first; reach for the manual pipeline when you need a custom aggregation."
+    }
+  ],
+  "hints": [
+    "Read the error: 'Index contains duplicate entries.' Print `revenue.groupby(['region', 'month']).size().sort_values(ascending=False).head()` — duplicates are listed.",
+    "Switch from `pivot` to `pivot_table(aggfunc='sum')` — it aggregates the duplicates instead of refusing them."
+  ],
+  "explanationMd": "### Why the bug occurs\n`pivot` is the **non-aggregating** reshape: it requires the `(index, columns)` combinations to be unique. If two source rows have the same region and the same month, pandas refuses — there's no rule for combining them.\n\nThe error message is `ValueError: Index contains duplicate entries, cannot reshape`. Once you've read it twice, the fix is mechanical: either the duplicates are bugs (and you should clean them upstream), or they encode legitimate partial measurements (and you should aggregate them).\n\n### Why the fix is correct\n`pivot_table` accepts duplicates by **aggregating them**. The `aggfunc` parameter is the rule:\n- `sum` for revenue, counts, quantities.\n- `mean` for prices, rates, percentages.\n- `count` for occurrence counts.\n- `first`/`last` only when you genuinely want the chronologically-ordered first/last.\n- `lambda values: …` for any custom rule.\n\nThe explicit `aggfunc` makes the business decision visible. Two mid-month revenue reports → `sum` adds them; two price quotes → `mean` averages them; two click events → `count` counts them. The choice is data-domain, not pandas.\n\n### `pivot`, `pivot_table`, `melt`, `stack`/`unstack` — the reshape toolkit\n- **`pivot`** — long → wide, **no aggregation** (rejects duplicates).\n- **`pivot_table`** — long → wide, **aggregates** with `aggfunc`.\n- **`melt`** — wide → long; the inverse of `pivot`. Useful for turning many same-meaning columns into a tidy long format.\n- **`stack`/`unstack`** — equivalent to melt/pivot but operating on the *index* rather than column names. Same semantics, different ergonomics.\n\nMost real reports start in long format (one fact per row, often from a SQL `SELECT`) and end in wide format (for human display). The reshape happens at the boundary between the analyst's working set and the exec deck.\n\n### `melt` — the inverse direction\nIf you receive *wide* data (one column per month) and you need long for `groupby` or plotting:\n```python\nlong = wide.reset_index().melt(\n    id_vars=\"region\",\n    var_name=\"month\",\n    value_name=\"revenue\",\n)\n```\nThis is the canonical *tidy data* transformation (Hadley Wickham 2014, *Journal of Statistical Software*) — one observation per row, one variable per column. The vast majority of pandas/groupby/seaborn/matplotlib operations are easier on tidy long data; reshape to wide only at the very last step for display.",
+  "recruiterReview": "Strong — you read the error message, recognised what `pivot` was complaining about, and reached for `pivot_table` with an explicit `aggfunc`. That last word — **explicit** — is what separates a senior analyst from a junior. Silently picking 'first' or 'last' (some tools do) hides the business rule. A few follow-ups for production: 1) **always print the row count of the long table and the cell-count of the wide table** as a sanity check before exporting. 2) When the wide table has lots of `NaN`s, consider keeping the long format and let the consumer pivot — wide CSVs are notoriously fragile to schema drift. 3) For multi-aggregation (sum + mean + count in one table), pass a dict or list to `aggfunc`. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Reshape: Long ↔ Wide, and the Tools That Do It\n\nReshape is one of the most-confusing pandas areas because it's a small toolkit with overlapping options. Once you've internalised the **long ↔ wide** distinction, the right tool falls out of the question.\n\n### Long vs wide — one example\n**Long** (one observation per row, every variable a column):\n```\nregion  month  revenue\nnorth   Jan    4200\nnorth   Feb    4800\nsouth   Jan    3100\n```\nGreat for `groupby`, plotting, SQL-style work, and storage.\n\n**Wide** (one row per entity, many columns per metric):\n```\nregion   Jan   Feb   Mar\nnorth    4200  4800  5100\nsouth    3100  3400  ...\n```\nGreat for human display, side-by-side comparison, exec decks.\n\nMost real work starts long (a `SELECT` returns long), does analysis long, and reshapes to wide only at the display boundary. The Hadley Wickham *Tidy Data* paper (2014, *Journal of Statistical Software*) is the canonical reference for why long is the right *working* format.\n\n### The four reshape tools\n\n#### `pivot` — long → wide, no aggregation\n```python\ndf.pivot(index=\"region\", columns=\"month\", values=\"revenue\")\n```\n- Requires `(index, columns)` combinations to be **unique**.\n- Raises `ValueError` on duplicates.\n- The fastest reshape; use when you know your data is unique.\n\n#### `pivot_table` — long → wide, aggregates duplicates\n```python\ndf.pivot_table(index=\"region\", columns=\"month\", values=\"revenue\", aggfunc=\"sum\")\n```\n- Accepts duplicates by aggregating via `aggfunc`.\n- `aggfunc` can be a string (`'sum'`, `'mean'`, `'count'`, `'min'`, `'max'`, `'first'`), a callable (`np.mean`), a list (`['sum', 'mean']`), or a dict mapping column → function.\n- Slightly slower than `pivot` because of the groupby step.\n- The right default for production reports.\n\n#### `melt` — wide → long\n```python\nwide.reset_index().melt(\n    id_vars=\"region\",\n    var_name=\"month\",\n    value_name=\"revenue\",\n)\n```\n- `id_vars` are the columns to keep as identifying columns.\n- All other columns become rows; their names go into `var_name`, their values into `value_name`.\n- The inverse of `pivot` for tidying messy wide CSVs.\n\n#### `stack` / `unstack` — same as melt/pivot, but operates on the index\n```python\nlong = wide.stack()        # columns → rows of a MultiIndex\nwide = long.unstack()      # the inverse\n```\nUseful when you want a `MultiIndex` Series rather than a long DataFrame. Same semantics; different ergonomics.\n\n### Which one when — a decision tree\n1. **Are you going long → wide?** → `pivot` (if unique) or `pivot_table` (if not). When in doubt, `pivot_table` — it handles both cases and warns you with `aggfunc` about the aggregation.\n2. **Are you going wide → long?** → `melt`. `id_vars` for the identifier columns; everything else becomes long.\n3. **MultiIndex shuffling without changing columns?** → `stack` / `unstack`.\n4. **Cross-tabulation (counts of one categorical against another)?** → `pd.crosstab(rows, cols)`. It's `pivot_table` with `aggfunc='count'` and slightly nicer ergonomics.\n\n### `pivot_table` advanced — multi-aggregation\nGet sum AND count AND mean per cell in one table:\n```python\ndf.pivot_table(\n    index=\"region\", columns=\"month\", values=\"revenue\",\n    aggfunc=[\"sum\", \"count\", \"mean\"],\n)\n```\nThe result has a MultiIndex of (aggfunc, month) on the columns. Useful for QA reports where you want to see counts alongside totals.\n\n### Marginals — row/column totals for free\n```python\ndf.pivot_table(..., margins=True, margins_name=\"Total\")\n```\nAdds a 'Total' row and column with the marginal sum. Saves you from manually appending `.sum()`.\n\n### `NaN` handling\nUnmatched cells in a `pivot_table` are `NaN` by default. For display:\n```python\nwide.fillna(0)            # show 0 where there's no data\nwide.fillna(\"—\")          # show em-dash in the CSV\n```\nDecide explicitly. Silent `NaN` in CSVs export as empty cells and many spreadsheet apps misinterpret them.\n\n### Common reasoning mistakes\n- Using `pivot` on duplicates and getting confused by the `ValueError`.\n- Calling `drop_duplicates` to silence the error, losing data.\n- Reshape to wide too early; do groupby/filter long, then pivot once at the end.\n- Forgetting `reset_index()` before `melt` (it ignores the index by default).\n- Using `pivot_table` with the default `aggfunc='mean'` when you want `sum` (the default is often surprising).\n\n### You just learned…\nLong ↔ wide is the central pandas reshape axis. `pivot` is fast but rejects duplicates; **`pivot_table` aggregates them via `aggfunc`** — use it when in doubt. `melt` goes wide → long. **Stay long during analysis; reshape to wide only at the display boundary.**",
+    "videos": [
+      { "title": "Pandas pivot vs pivot_table vs melt", "searchQuery": "pandas pivot pivot_table melt reshape tutorial beginner" },
+      { "title": "Tidy data principles", "searchQuery": "tidy data hadley wickham reshape pandas tutorial" }
+    ]
+  },
+  "estMinutes": 7,
+  "version": 1,
+  "conceptCard": "This mission is about **reshape: long ↔ wide**.\n\n- `pivot` is fast but requires `(index, columns)` to be unique — duplicates raise `ValueError`.\n- `pivot_table` accepts duplicates and **aggregates** them via `aggfunc` (sum, mean, count, …).\n- `melt` is the inverse (wide → long); use it to tidy messy spreadsheets before analysis.\n\nThe code uses `pivot` and hits duplicates. Switch to `pivot_table(aggfunc='sum')`.",
+  "lineNotes": [
+    { "line": 3, "noteMd": "Long-format input — one row per `(region, month)` observation." },
+    { "line": 7, "noteMd": "Note `('north', 'Jan')` appears at rows 0 and 7 — that's the duplicate." },
+    { "line": 10, "noteMd": "**The bug.** `pivot` rejects duplicates. Use `pivot_table(aggfunc='sum')` so two mid-month figures add to the monthly total." }
+  ],
+  "takeaway": "Use pivot_table(aggfunc='sum') for long → wide with duplicates; pivot only works on unique keys.",
+  "glossary": [
+    {
+      "term": "long format",
+      "definitionMd": "Data where each row is **one observation** and every column is **one variable**. Easy to filter, group, plot. The 'tidy' format (Wickham 2014, *Journal of Statistical Software*)."
+    },
+    {
+      "term": "wide format",
+      "definitionMd": "Data where each row is **one entity** and many columns hold the same kind of metric (e.g. one column per month). Easy for humans to compare side-by-side; awkward for analysis."
+    },
+    {
+      "term": "`pivot`",
+      "definitionMd": "Long → wide reshape with no aggregation. Requires `(index, columns)` combinations to be unique; raises `ValueError` on duplicates."
+    },
+    {
+      "term": "`pivot_table`",
+      "definitionMd": "Long → wide reshape that **aggregates duplicates** using `aggfunc`. The right default for production reports; the explicit `aggfunc` documents the business rule for combining duplicates."
+    },
+    {
+      "term": "`melt`",
+      "definitionMd": "Wide → long reshape. Specify `id_vars` (the identifying columns to keep); everything else becomes rows. The inverse of `pivot`."
+    }
+  ]
+}
