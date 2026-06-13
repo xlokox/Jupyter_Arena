@@ -1,0 +1,82 @@
+{
+  "id": "py-022-fstring-money-format",
+  "sector": "py",
+  "difficulty": "medium",
+  "title": "22_print_the_invoice.ipynb",
+  "language": "python",
+  "icon": "languages",
+  "conceptTags": ["f-strings", "format-spec", "rounding"],
+  "descriptionMd": "## Mission: Print the Invoice\n\nYour script totals an invoice and prints it as `Total: $1234.5678901234`. You wanted **two decimal places** — `$1234.57` — like every receipt you've ever seen.\n\nThe usual fix is the f-string **format spec** — the `:.Nf` suffix inside the braces. You wrote `:.2` (no `f`), which means \"two significant digits,\" not \"two decimal places.\" Fix the suffix.",
+  "initialCode": "subtotal = 1234.5678901234\ntax     = subtotal * 0.0825\ntotal   = subtotal + tax\nprint(f\"Subtotal: ${subtotal:.2}\")\nprint(f\"Tax:      ${tax:.2}\")\nprint(f\"Total:    ${total:.2}\")",
+  "buggyLineStart": 4,
+  "buggyLineEnd": 6,
+  "traceback": "Subtotal: $1.2e+03\nTax:      $1e+02\nTotal:    $1.3e+03",
+  "correctOutput": "Subtotal: $1234.57\nTax:      $101.85\nTotal:    $1336.42",
+  "options": [
+    {
+      "key": "a",
+      "label": "Use `:.2f` to mean \"fixed-point, two decimals\"",
+      "patchCode": "subtotal = 1234.5678901234\ntax     = subtotal * 0.0825\ntotal   = subtotal + tax\nprint(f\"Subtotal: ${subtotal:.2f}\")\nprint(f\"Tax:      ${tax:.2f}\")\nprint(f\"Total:    ${total:.2f}\")",
+      "isCorrect": true,
+      "resultLog": "Subtotal: $1234.57\nTax:      $101.85\nTotal:    $1336.42",
+      "rationale": "`:.2f` is the f-string **format spec** for *two decimal places, fixed-point*. The `2` is the precision after the decimal; the `f` says \"fixed-point, please\" (so the value never switches to scientific notation). For money, `:.2f` is essentially always what you want."
+    },
+    {
+      "key": "b",
+      "label": "Round the value beforehand: `round(total, 2)`",
+      "patchCode": "subtotal = 1234.5678901234\ntax     = subtotal * 0.0825\ntotal   = subtotal + tax\nprint(f\"Subtotal: ${round(subtotal, 2)}\")\nprint(f\"Tax:      ${round(tax, 2)}\")\nprint(f\"Total:    ${round(total, 2)}\")",
+      "isCorrect": false,
+      "resultLog": "Subtotal: $1234.57\nTax:      $101.85\nTotal:    $1336.42",
+      "rationale": "Works for these values, but `round(x, 2)` returns a float that *might* drop a trailing zero (`round(2.50, 2)` prints as `2.5`, not `2.50`) — and you only spot that on real data. `:.2f` always gives you exactly two decimals in the output. Format the **display**, don't mutate the **value**."
+    },
+    {
+      "key": "c",
+      "label": "Convert to a string with two characters after the dot",
+      "patchCode": "subtotal = 1234.5678901234\ntax     = subtotal * 0.0825\ntotal   = subtotal + tax\nprint(f\"Subtotal: ${str(subtotal)[:7]}\")\nprint(f\"Tax:      ${str(tax)[:6]}\")\nprint(f\"Total:    ${str(total)[:7]}\")",
+      "isCorrect": false,
+      "resultLog": "Subtotal: $1234.56\nTax:      $101.85\nTotal:    $1336.42",
+      "rationale": "String-slicing **truncates** rather than **rounds** — `1234.5678` becomes `1234.56`, not `1234.57` — and the lengths break for any value with a different number of digits before the decimal (`9.99` would print as `9.99`, `99.99` as `99.99`, `999.99` as `999.99`, but `9999.99` as `9999.9`). Brittle and slightly wrong. Use `:.2f`."
+    }
+  ],
+  "hints": [
+    "Read what `:.2` means: it's the format spec for **2 significant digits**, which uses scientific notation for big numbers. You wanted `:.2f` — fixed-point, 2 decimals.",
+    "Inside an f-string, after the colon, the standard format spec is `:[.precision][type]`. For money use `:.2f`."
+  ],
+  "explanationMd": "### Why the bug occurs\nInside an f-string brace, anything after `:` is a **format spec**. The spec `:.2` means \"two significant digits\" — Python's default precision rule — and for numbers ≥ 10 it switches to scientific notation (`1.2e+03`). For money you almost never want scientific; you want a fixed number of digits after the decimal point.\n\n### Why the fix is correct\n`:.2f` is the format spec for \"**f**ixed-point, two decimals\". It rounds half-to-even and pads with a trailing zero when needed (`2.5` prints as `2.50`). The value itself is unchanged — only the **display** is formatted — which is the correct discipline for money: keep the precise value in memory, format only when showing it to a human. (Real currency code stores values as integer cents or `Decimal` to avoid floating-point rounding drift, but `:.2f` is the right *display* tool either way.)",
+  "recruiterReview": "Solid — you matched the wrong format spec to the right one, which is the kind of attention to detail reviewers look for. One important habit to build for money: don't store dollars as `float`. Floats can't represent `0.10` exactly, so totals drift after enough additions. Use integer cents (`12345` for $123.45) or `decimal.Decimal` and format with `:.2f` only at the very edge. For now this fix is exactly right. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## F-String Format Specs\n\nF-strings have a small but surprisingly powerful language hidden after the colon. Once you know a few specs you'll never reach for `round()` or `str.format()` again.\n\n### The shape\n```\nf\"{value:[flags][width][.precision][type]}\"\n```\nMost beginners use only `precision` and `type`. A few examples will make it click.\n\n### Money: `:.2f`\n```python\nf\"{1234.5678:.2f}\"   # '1234.57'\nf\"{2.5:.2f}\"         # '2.50'   (pads with a zero)\nf\"{0:.2f}\"           # '0.00'\n```\n`f` says \"fixed-point\"; the `2` is the number of digits after the decimal.\n\n### Thousands separators: `:,`\n```python\nf\"{1234567:,}\"        # '1,234,567'\nf\"{1234567.89:,.2f}\"  # '1,234,567.89'  (combine for money)\n```\n\n### Percentages: `:.0%` / `:.1%`\n```python\nf\"{0.085:.1%}\"   # '8.5%'   (multiplies by 100 for you)\nf\"{0.085:.0%}\"   # '8%'\n```\n\n### Padding and alignment\n```python\nf\"{42:>5}\"   # '   42'   (right-aligned, width 5)\nf\"{42:<5}\"   # '42   '   (left-aligned)\nf\"{42:^5}\"   # ' 42  '   (centred)\nf\"{42:05}\"   # '00042'   (pad with zeros)\n```\nUseful for table-like console output.\n\n### Other specs\n- `:e` — scientific (`1.234568e+03`)\n- `:b`, `:o`, `:x` — binary, octal, hex (`255` → `0xff` with `:x`)\n- `:.3g` — \"general\" with 3 significant digits (mixes fixed and scientific based on magnitude)\n\n### What the buggy `:.2` does\n`:.2` with no `f` is the default \"general\" format: 2 significant digits, scientific for big numbers, fixed for small. That's why the mission's `1234.57` came out as `1.2e+03`. The `f` is what locks it to fixed-point.\n\n### Format the display, not the value\nA common beginner shape:\n```python\ntotal = round(total, 2)\nprint(total)\n```\nThis is doing two things — *mutating* the value and *displaying* it. Prefer to leave the value alone:\n```python\nprint(f\"{total:.2f}\")\n```\nIt keeps the precise value available for further math and only formats at the edge.\n\n### Common beginner mistakes\n- Writing `:.2` instead of `:.2f` (the bug).\n- Mixing `format()` and f-strings — pick one; f-strings are usually shorter.\n- Storing money as `float`. Use integer cents or `decimal.Decimal` in real code.\n\n### You just learned…\nAfter `:` in an f-string is a small format-spec language. `:.2f` means *fixed-point, two decimals*. `:,` adds thousands separators. `:.1%` formats percentages. **Format the display, don't mutate the value.**",
+    "videos": [
+      {
+        "title": "F-string format spec for beginners",
+        "searchQuery": "python f-string format spec precision tutorial beginner"
+      },
+      {
+        "title": "Formatting money and percentages in Python",
+        "searchQuery": "python format money decimal places f-string tutorial"
+      }
+    ]
+  },
+  "estMinutes": 5,
+  "version": 1,
+  "conceptCard": "This mission is about the **f-string format spec**.\n\n- Inside `{value:SPEC}`, the spec controls formatting.\n- `:.2f` means **fixed-point, two decimals** — exactly what money needs.\n- `:.2` (without `f`) means *significant digits*, which can switch to scientific.\n\nThe code uses `:.2` and gets `1.2e+03`. Add the `f`: `:.2f`.",
+  "lineNotes": [
+    {
+      "line": 1,
+      "noteMd": "A precise subtotal, stored as a float (real apps use integer cents or `Decimal`)."
+    },
+    {
+      "line": 4,
+      "noteMd": "**The bug.** `:.2` means 2 significant digits, which renders big numbers as scientific. Use `:.2f` for fixed-point money."
+    },
+    {
+      "line": 5,
+      "noteMd": "Same problem — `:.2` here too."
+    },
+    {
+      "line": 6,
+      "noteMd": "Same problem — `:.2` here too. All three need the trailing `f`."
+    }
+  ],
+  "takeaway": "For money in an f-string use :.2f — fixed-point, two decimals — not :.2."
+}

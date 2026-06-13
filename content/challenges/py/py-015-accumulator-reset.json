@@ -1,0 +1,78 @@
+{
+  "id": "py-015-accumulator-reset",
+  "sector": "py",
+  "difficulty": "medium",
+  "title": "15_sum_a_list.ipynb",
+  "language": "python",
+  "icon": "sigma",
+  "conceptTags": ["loops", "accumulator", "variable-scope"],
+  "descriptionMd": "## Mission: Add Up a List\n\nYou loop over four numbers and add each into a running `total`, expecting `100`. The program prints `40` — only the last number survived.\n\nThe line that resets `total` to 0 is *inside* the loop, so it wipes the running sum at the start of every pass. To keep a running total, you set the starting value **once, before** the loop, then add to it each time. Move the reset out so the total accumulates.",
+  "initialCode": "# Add up all the numbers in the list\nnumbers = [10, 20, 30, 40]\nfor n in numbers:\n    total = 0\n    total = total + n\nprint(\"The grand total is:\", total)",
+  "buggyLineStart": 4,
+  "buggyLineEnd": 4,
+  "traceback": "The grand total is: 40\n\n# total resets to 0 on every pass, so only the last number (40) is left.",
+  "correctOutput": "The grand total is: 100",
+  "options": [
+    {
+      "key": "a",
+      "label": "Set total to 0 once, before the loop",
+      "patchCode": "# Add up all the numbers in the list\nnumbers = [10, 20, 30, 40]\ntotal = 0\nfor n in numbers:\n    total = total + n\nprint(\"The grand total is:\", total)",
+      "isCorrect": true,
+      "resultLog": "The grand total is: 100",
+      "rationale": "A running total (an *accumulator*) needs to start at 0 exactly once, *before* the loop, and then grow on each pass. With `total = 0` inside the loop it was wiped back to zero every iteration, so only the final `+ 40` remained. Moving the initialization above the loop lets the additions build up: 0+10+20+30+40 = 100."
+    },
+    {
+      "key": "b",
+      "label": "Keep the reset inside but use += to add",
+      "patchCode": "# Add up all the numbers in the list\nnumbers = [10, 20, 30, 40]\nfor n in numbers:\n    total = 0\n    total += n\nprint(\"The grand total is:\", total)",
+      "isCorrect": false,
+      "resultLog": "The grand total is: 40",
+      "rationale": "`total += n` is just shorthand for `total = total + n`, so it adds correctly — but `total = 0` is still inside the loop, resetting the sum to 0 at the start of every pass. You'd add only `n` each time and keep the last one (40). The reset, not the add, is the problem; move it before the loop."
+    },
+    {
+      "key": "c",
+      "label": "Remove the reset line entirely",
+      "patchCode": "# Add up all the numbers in the list\nnumbers = [10, 20, 30, 40]\nfor n in numbers:\n    total = total + n\nprint(\"The grand total is:\", total)",
+      "isCorrect": false,
+      "resultLog": "---------------------------------------------------------------------------\nNameError                                 Traceback (most recent call last)\nCell In[1], line 4\n----> 4     total = total + n\n\nNameError: name 'total' is not defined",
+      "rationale": "Now there's no starting value at all, so on the very first pass `total + n` tries to read a `total` that was never created — `NameError`. You don't want to remove the initialization; you want to move it *before* the loop so it runs once and gives the sum a place to start."
+    }
+  ],
+  "hints": [
+    "The answer (40) is exactly the last number in the list. That happens when the running total is being wiped just before the final addition. Which line resets it, and how often does it run?",
+    "An accumulator is initialized once, *before* the loop. Move `total = 0` above the `for` line so each pass adds to the growing total instead of starting over."
+  ],
+  "explanationMd": "### Why the bug occurs\nBuilding a running total uses an **accumulator**: a variable you start at 0 and add to repeatedly. Here `total = 0` was written *inside* the loop, so every pass reset the running sum back to zero before adding the current number. After the loop, `total` held only the last addition (0 + 40 = 40), not the sum of all four.\n\n### Why the fix is correct\nMoving `total = 0` to *before* the loop initializes the accumulator a single time. Then each pass adds the next number to whatever has built up so far: 0 → 10 → 30 → 60 → 100. The pattern is universal: **initialize once before the loop, update inside it.** Note the contrast with the other options — using `+=` doesn't help while the reset stays inside (it's the reset that's wrong), and removing the initialization entirely leaves `total` undefined on the first pass (`NameError`). The starting value belongs above the loop.",
+  "recruiterReview": "Excellent — you diagnosed it from the symptom (the result equals the last element) and fixed the structure rather than the arithmetic. The accumulator pattern — initialize before, update inside — is one you'll use constantly: sums, counts, building lists, maxima. Recognizing that `+=` was a red herring and that the *placement* of the initialization was the real issue shows you're reasoning about control flow, not just syntax. Strong finish to the sector. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## The Accumulator Pattern\n\nAdding things up, counting matches, building a result over a loop — they all use the same shape, and getting that shape right is a genuine milestone.\n\n### What is an accumulator?\nAn **accumulator** is a variable that collects a result across the passes of a loop. The recipe never changes:\n1. **Initialize** it once, *before* the loop (a sum starts at 0, a count at 0, a list at `[]`).\n2. **Update** it *inside* the loop, once per item.\n3. **Use** it *after* the loop.\n\n```python\ntotal = 0                 # 1. before the loop\nfor n in [10, 20, 30, 40]:\n    total = total + n     # 2. inside the loop\nprint(total)              # 3. after — 100\n```\n\n### The classic bug: initializing inside the loop\nIf step 1 happens *inside* the loop, it re-runs every pass and wipes your progress:\n```python\nfor n in numbers:\n    total = 0             # reset every pass!\n    total = total + n\n# total ends up as just the last number\n```\nThe sum can never build up because it keeps starting over.\n\n### A shorthand: +=\n`total += n` means exactly `total = total + n`. It's convenient, but it doesn't fix a misplaced initialization — *where* you start the accumulator is what matters.\n\n### Counting is the same shape\n```python\ncount = 0\nfor word in [\"a\", \"bb\", \"a\"]:\n    if word == \"a\":\n        count += 1\nprint(count)   # 2\n```\n\n### A tiny worked example\n```python\nproduct = 1                  # start at 1 for multiplication\nfor n in [2, 3, 4]:\n    product = product * n\nprint(product)               # 24\n```\nNote a *product* starts at 1, not 0.\n\n### How to spot it\nIf a running total or count comes out equal to the **last** value (or just 1), your initialization is probably inside the loop, resetting each pass.\n\n### Common beginner mistakes\n- Putting `total = 0` inside the loop (resets every pass).\n- Removing the initialization entirely (`NameError` on the first add).\n- Starting a product accumulator at 0 (everything becomes 0).\n\n### You just learned…\nThe **accumulator pattern**: initialize a collecting variable **once before** the loop, update it **inside**, and use it **after**. It powers sums, counts, and building results — one of the most reused shapes in all of programming. That's the Python Fundamentals sector complete — well done!",
+    "videos": [
+      {
+        "title": "Python accumulator pattern (summing in a loop) for beginners",
+        "searchQuery": "python sum list loop accumulator total beginner tutorial"
+      },
+      {
+        "title": "Initializing variables before a loop",
+        "searchQuery": "python initialize variable before loop accumulator beginner"
+      }
+    ]
+  },
+  "estMinutes": 5,
+  "version": 1,
+  "conceptCard": "This mission is about the **accumulator pattern** — building up a result in a loop.\n\n- Start a collecting variable (like a running total) at 0 **once, before** the loop.\n- Add to it **inside** the loop, one item at a time.\n- Use it **after** the loop.\n\nThe code resets the total inside the loop, so it never builds up. Move the start outside.",
+  "lineNotes": [
+    {
+      "line": 3,
+      "noteMd": "Loops over each number in the list, one per pass."
+    },
+    {
+      "line": 4,
+      "noteMd": "Resets `total` to 0 — but this is **inside** the loop, so it wipes the running sum at the start of every pass. This line belongs *before* the loop."
+    },
+    {
+      "line": 5,
+      "noteMd": "Adds the current number to `total`. This is correct; it's the reset above it that breaks the running total."
+    }
+  ],
+  "takeaway": "Initialize an accumulator once before the loop, then add to it inside — never reset it each pass."
+}

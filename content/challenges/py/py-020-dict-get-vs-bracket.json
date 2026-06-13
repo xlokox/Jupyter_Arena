@@ -1,0 +1,82 @@
+{
+  "id": "py-020-dict-get-vs-bracket",
+  "sector": "py",
+  "difficulty": "medium",
+  "title": "20_user_profile_default.ipynb",
+  "language": "python",
+  "icon": "braces",
+  "conceptTags": ["dict", "key-error", "get"],
+  "descriptionMd": "## Mission: Display Name with a Default\n\nYour function returns a user's display name. If the user has a `display_name` field, use it. Otherwise, use the username with `@` in front. Simple.\n\nFor a user without `display_name`, the function crashes with `KeyError: 'display_name'` — even though you wrote an `if` to check first. The trap: `if profile[\"display_name\"]` already **reads the key** before the `if` can decide anything. Use the dict method that lets you ask for a key with a default — and decide based on what you get back.",
+  "initialCode": "def display_name(profile):\n    if profile[\"display_name\"]:\n        return profile[\"display_name\"]\n    return f\"@{profile['username']}\"\n\nada    = {\"username\": \"ada\",  \"display_name\": \"Ada L.\"}\nlinus  = {\"username\": \"linus\"}\n\nprint(f\"display_name(ada)   = {display_name(ada)}\")\nprint(f\"display_name(linus) = {display_name(linus)}\")",
+  "buggyLineStart": 2,
+  "buggyLineEnd": 2,
+  "traceback": "display_name(ada)   = Ada L.\n---------------------------------------------------------------------------\nKeyError                                  Traceback (most recent call last)\nCell In[1], line 10\n      9 print(f\"display_name(ada)   = {display_name(ada)}\")\n---> 10 print(f\"display_name(linus) = {display_name(linus)}\")\n\nCell In[1], line 2, in display_name(profile)\n      1 def display_name(profile):\n----> 2     if profile[\"display_name\"]:\n      3         return profile[\"display_name\"]\n      4     return f\"@{profile['username']}\"\n\nKeyError: 'display_name'",
+  "correctOutput": "display_name(ada)   = Ada L.\ndisplay_name(linus) = @linus",
+  "options": [
+    {
+      "key": "a",
+      "label": "Use `profile.get(\"display_name\")` and check the result",
+      "patchCode": "def display_name(profile):\n    name = profile.get(\"display_name\")\n    if name:\n        return name\n    return f\"@{profile['username']}\"\n\nada    = {\"username\": \"ada\",  \"display_name\": \"Ada L.\"}\nlinus  = {\"username\": \"linus\"}\n\nprint(f\"display_name(ada)   = {display_name(ada)}\")\nprint(f\"display_name(linus) = {display_name(linus)}\")",
+      "isCorrect": true,
+      "resultLog": "display_name(ada)   = Ada L.\ndisplay_name(linus) = @linus",
+      "rationale": "`dict.get(key)` returns the value if the key is there and `None` (a falsy value) if it isn't. `if name:` then handles both \"missing\" and \"present but empty string\" with one check — exactly the behaviour the function intends. This is the idiomatic Python for \"look up a key, fall back if missing.\""
+    },
+    {
+      "key": "b",
+      "label": "Wrap the bracket access in `try/except KeyError`",
+      "patchCode": "def display_name(profile):\n    try:\n        return profile[\"display_name\"]\n    except KeyError:\n        return f\"@{profile['username']}\"\n\nada    = {\"username\": \"ada\",  \"display_name\": \"Ada L.\"}\nlinus  = {\"username\": \"linus\"}\n\nprint(f\"display_name(ada)   = {display_name(ada)}\")\nprint(f\"display_name(linus) = {display_name(linus)}\")",
+      "isCorrect": false,
+      "resultLog": "display_name(ada)   = Ada L.\ndisplay_name(linus) = @linus",
+      "rationale": "It works for these two users, but uses exceptions for normal control flow — heavier than needed and noisier in logs/profilers. Also doesn't handle the \"present but empty string\" case (`display_name = \"\"` would be returned verbatim). `dict.get()` exists precisely for this; reach for it first."
+    },
+    {
+      "key": "c",
+      "label": "Check membership first: `if \"display_name\" in profile`",
+      "patchCode": "def display_name(profile):\n    if \"display_name\" in profile:\n        return profile[\"display_name\"]\n    else:\n        return f\"@{profile['username']}\"\n\nada    = {\"username\": \"ada\",  \"display_name\": \"Ada L.\"}\nlinus  = {\"username\": \"linus\"}\n\nprint(f\"display_name(ada)   = {display_name(ada)}\")\nprint(f\"display_name(linus) = {display_name(linus)}\")",
+      "isCorrect": false,
+      "resultLog": "display_name(ada)   = Ada L.\ndisplay_name(linus) = @linus",
+      "rationale": "Correct output, but two lookups: `in` searches the dict, then `[\"display_name\"]` searches it again. More importantly, if `display_name = \"\"` (a present-but-empty value) this would return the empty string. `.get()` is cleaner and naturally folds the empty-string case in with `if name:`."
+    }
+  ],
+  "hints": [
+    "Trace it: when `linus` reaches line 2, what does `profile[\"display_name\"]` evaluate to? The `if` never gets to decide.",
+    "`dict.get(\"key\")` returns the value or `None` if the key is missing. Store the result and check it."
+  ],
+  "explanationMd": "### Why the bug occurs\nBracket access `profile[\"display_name\"]` always **tries to read the key**. If the key isn't there, Python raises `KeyError` immediately — *before* the `if` decides anything. The check is supposed to guard the access, but the access happens *as part of the check*. So `if profile[\"display_name\"]:` only works when the key is guaranteed to exist.\n\n### Why the fix is correct\n`profile.get(\"display_name\")` returns the value if the key is present and a default (`None` by default, or whatever you pass as the second argument) if it isn't. No exception, just a value. Storing it once and then checking it (`if name:`) handles three cases with one line: key missing, key present but empty, key present with a real value. It also reads cleanly aloud — \"if there's a name, return it; otherwise the @-handle.\"\n\nYou can also supply a default directly: `profile.get(\"display_name\", \"\")` returns `\"\"` for both missing-and-empty cases, which sometimes simplifies downstream logic further.",
+  "recruiterReview": "Solid — you reached for `dict.get()`, which is the right answer 90% of the time. You also folded the missing-and-empty cases into one `if name:` check, which keeps the function short and reads naturally. One thing to keep in mind for later: `get()` with a mutable default (`get(\"x\", [])`) doesn't have the same shared-state trap as the function-default one, because a fresh `[]` is created each call. But if you compute a default eagerly that's expensive to produce, prefer `if x not in d: d[x] = expensive()` over `get(x, expensive())`. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Looking Up Dict Keys Safely\n\nDictionaries are everywhere in Python — JSON, config files, query results, request bodies. Reading from them comes up constantly, so a small amount of fluency here pays off forever.\n\n### Bracket access raises on missing keys\n```python\nprofile = {\"username\": \"ada\"}\nprofile[\"display_name\"]\n# KeyError: 'display_name'\n```\nThis is by design: if you read a key with `[]`, you're asserting it's there. Get used to that error — it's one of the most common Python crashes.\n\n### `dict.get()` returns a default instead of crashing\n```python\nprofile.get(\"display_name\")         # None\nprofile.get(\"display_name\", \"\")     # ''\nprofile.get(\"display_name\", \"Anon\") # 'Anon'\n```\nThe first argument is the key; the optional second is the fallback. No exception raised — just a value you can branch on.\n\n### A two-line idiom for \"use it if present, else build a fallback\"\n```python\nname = profile.get(\"display_name\")\nif name:\n    return name\nreturn f\"@{profile['username']}\"\n```\nNote the `if name:` — that's `True` for any non-empty string and `False` for `None` *and* empty string. One check, three cases handled.\n\n### Membership: `in`\n```python\nif \"display_name\" in profile:\n    ...\n```\nUseful when you want to know whether a key exists without caring about its value. Slightly more expensive than `.get()` only if you then read the key (two lookups), but unbeatable for read-only checks.\n\n### Pulling with a default and short-circuiting (Python 3.8+)\n```python\nname = profile.get(\"display_name\") or f\"@{profile['username']}\"\n```\nThe `or` returns the first truthy value, so missing **and** empty both fall through to the `@-handle`. Elegant when both sides are cheap to compute.\n\n### Try/except is a tool, not the default\n```python\ntry:\n    name = profile[\"display_name\"]\nexcept KeyError:\n    name = \"\"\n```\nIt works, but \"check then act\" with `.get()` is shorter and avoids the cost of catching an exception during ordinary control flow. Save `try/except KeyError` for *truly exceptional* cases (a network response is missing a field that should always be there — log a warning).\n\n### Mutable defaults — a small caution\n`profile.get(\"tags\", [])` is safe per call (a fresh `[]` is built each time), but if you start writing to that returned list and the key was missing, you're writing to a throwaway list, not the dict. Use `dict.setdefault(\"tags\", []).append(x)` to both write to the dict and append in one go.\n\n### Common beginner mistakes\n- `if d[k]:` guarded by a check elsewhere — works until the elsewhere check is wrong.\n- Using `try/except KeyError` everywhere for normal lookups (noisy, slower).\n- Forgetting `dict.get(\"k\", DEFAULT)`'s second argument and being surprised by `None`.\n\n### You just learned…\nBracket access `d[k]` raises `KeyError` on a missing key. `d.get(k, fallback)` returns a value either way. Combine `.get()` with `if name:` to handle missing *and* empty in one line. This idiom shows up in nearly every Python data script.",
+    "videos": [
+      {
+        "title": "dict.get() vs [] in Python",
+        "searchQuery": "python dict get vs bracket key error tutorial"
+      },
+      {
+        "title": "Handling missing keys in Python dictionaries",
+        "searchQuery": "python dictionary missing key default beginner"
+      }
+    ]
+  },
+  "estMinutes": 6,
+  "version": 1,
+  "conceptCard": "This mission is about **reading dict keys safely**.\n\n- `d[\"k\"]` **raises `KeyError`** when `k` isn't there — even inside an `if`.\n- `d.get(\"k\")` returns the value or `None` (no exception).\n- The classic idiom: `name = d.get(\"k\"); if name: ...; else fallback`.\n\nThe code uses bracket access inside the `if`, so reading the key fails before the check runs. Switch to `.get()` and branch on the result.",
+  "lineNotes": [
+    {
+      "line": 2,
+      "noteMd": "**The bug.** `profile[\"display_name\"]` runs *before* the `if` decides — and raises `KeyError` when the user has no display name."
+    },
+    {
+      "line": 3,
+      "noteMd": "Never reached for users without the key. With the fix, we return the looked-up value here."
+    },
+    {
+      "line": 4,
+      "noteMd": "The fallback `@username` line. Worked for users *with* a display name shape, but unreachable from the buggy `if`."
+    },
+    {
+      "line": 7,
+      "noteMd": "`linus` has no `display_name` key — this is the case that explodes."
+    }
+  ],
+  "takeaway": "Use d.get(\"k\") to read a possibly-missing key; [] raises before any if can guard it."
+}

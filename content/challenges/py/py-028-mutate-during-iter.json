@@ -1,0 +1,64 @@
+{
+  "id": "py-028-mutate-during-iter",
+  "sector": "py",
+  "difficulty": "medium",
+  "title": "28_prune_inactive_users.ipynb",
+  "language": "python",
+  "icon": "shuffle",
+  "conceptTags": ["iteration", "mutation", "list"],
+  "descriptionMd": "## Mission: Prune Inactive Users\n\nYou're cleaning up a user list — delete everyone marked `inactive`. You wrote a `for` loop that iterates the list and removes each inactive user. After the loop runs, you print the result expecting `['Ada', 'Linus']`. You get `['Ada', 'Inactive_2', 'Linus']` — one inactive user **survived**.\n\nThis bug has been written about in every Python style guide since the language was created — it's also the shape behind countless production incidents where 'we cleaned up the list and one item slipped through.' When you call `list.remove()` *while iterating*, the iterator's index shifts and the next item is **skipped**. Don't mutate the thing you're iterating. Build a new list instead.",
+  "initialCode": "users = [\"Ada\", \"Inactive_1\", \"Inactive_2\", \"Linus\"]\n\nfor u in users:\n    if u.startswith(\"Inactive\"):\n        users.remove(u)\n\nprint(f\"after prune: {users}\")",
+  "buggyLineStart": 4,
+  "buggyLineEnd": 5,
+  "traceback": "after prune: ['Ada', 'Inactive_2', 'Linus']\n# expected: ['Ada', 'Linus'] — Inactive_2 survived because the iterator's index shifted when Inactive_1 was removed",
+  "correctOutput": "after prune: ['Ada', 'Linus']\n# both inactives removed cleanly via a new list",
+  "options": [
+    {
+      "key": "a",
+      "label": "Build a new list with a comprehension: `users = [u for u in users if ...]`",
+      "patchCode": "users = [\"Ada\", \"Inactive_1\", \"Inactive_2\", \"Linus\"]\n\nusers = [u for u in users if not u.startswith(\"Inactive\")]\n\nprint(f\"after prune: {users}\")",
+      "isCorrect": true,
+      "resultLog": "after prune: ['Ada', 'Linus']",
+      "rationale": "The comprehension iterates the *original* list and produces a **new** list; we then rebind `users` to the new one. The thing being iterated and the thing being mutated are different — no index-shift trap. This is the canonical Python idiom for 'filter a sequence' and has the same performance as a hand-written loop, often better."
+    },
+    {
+      "key": "b",
+      "label": "Iterate a copy: `for u in users[:]`",
+      "patchCode": "users = [\"Ada\", \"Inactive_1\", \"Inactive_2\", \"Linus\"]\n\nfor u in users[:]:\n    if u.startswith(\"Inactive\"):\n        users.remove(u)\n\nprint(f\"after prune: {users}\")",
+      "isCorrect": false,
+      "resultLog": "after prune: ['Ada', 'Linus']",
+      "rationale": "Produces the right output today — `users[:]` is a shallow copy and the iterator walks the copy while `remove` mutates the original. But it's still the wrong mental model: `list.remove(x)` searches from the start for the first match, which is O(n) per call. With 1M inactives this is O(n²) — minutes turn into hours. The comprehension is shorter, faster, and doesn't need a hidden copy."
+    },
+    {
+      "key": "c",
+      "label": "Iterate by index, decrement the index after each removal",
+      "patchCode": "users = [\"Ada\", \"Inactive_1\", \"Inactive_2\", \"Linus\"]\n\ni = 0\nwhile i < len(users):\n    if users[i].startswith(\"Inactive\"):\n        del users[i]\n    else:\n        i += 1\n\nprint(f\"after prune: {users}\")",
+      "isCorrect": false,
+      "resultLog": "after prune: ['Ada', 'Linus']",
+      "rationale": "Functionally correct but error-prone — every reader has to verify your index-bookkeeping is right. Forget the `else` and you re-enter an infinite loop or skip the next item. Each `del users[i]` is also O(n) (elements shift left). The comprehension is half the lines, half the surface area for bugs, and faster."
+    }
+  ],
+  "hints": [
+    "Add `print(u, users)` inside the loop. You'll see the iterator skip `Inactive_2` because its position shifted left after `Inactive_1` was removed.",
+    "Don't mutate the sequence you're iterating. Build a new list with `[u for u in users if not u.startswith('Inactive')]`."
+  ],
+  "explanationMd": "### Why the bug occurs\nA `for` loop over a list keeps an **internal index** — 0, 1, 2, … — and reads `users[i]` each step. When the body calls `users.remove(\"Inactive_1\")`, it deletes index 1 and **everything to the right shifts left** by one. The loop's internal index moves to 2 next, but the item that *was* at index 2 (`Inactive_2`) is now at index 1 — **it gets skipped**.\n\nThis is one of the oldest known Python pitfalls and has the same shape in JavaScript, Java, and C# when you mutate a collection while iterating it. The fact that it produces a 'mostly right' answer (one survivor) makes it especially insidious — you can ship the bug and only catch it on the third run of a batch job.\n\n### Why the fix is correct\nA list comprehension iterates the *original* list, evaluates the filter on each element, and produces a **new** list. The variable `users` is then rebound to that new list. The original list is never modified during iteration, so the index-shift trap is structurally impossible. This is the canonical Python idiom for filtering a sequence — short, fast, and bug-free.\n\nFor in-place modification with very large lists where memory matters, the `users[:] = [u for u in users if ...]` form does the same work in-place. But 99% of the time a fresh list is fine and clearer.",
+  "recruiterReview": "Strong — you didn't reach for index bookkeeping or `users[:]` (which masks the smell). The comprehension is the right Python idiom; it's also the same shape you'd use in functional languages. Two follow-ups for production code: 1) when filtering a 100M-row dataset, switch to a generator (`(u for u in users if ...)`) and stream-process; 2) for set-like membership, build a `set` of names to remove first — `to_remove = {u for u in users if u.startswith('Inactive')}; users = [u for u in users if u not in to_remove]` — turns O(n×m) into O(n+m). Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Don't Mutate What You're Iterating\n\nThis is one of the oldest patterns in software bug-hunting. It's documented in *every* Python style guide and shows up in real production code on a regular cadence.\n\n### What actually happens\nA `for x in xs` loop holds an internal index and reads `xs[i]` each step. If your body modifies `xs` — `xs.remove(...)`, `xs.pop(...)`, `xs.append(...)` — the indices shift and the loop's bookkeeping is silently wrong. With `remove`, you usually get **skipped items**. With `append`, you can get an **infinite loop**. With `pop(0)` from the front, you get both wrong and slow.\n\nQuick demonstration:\n```python\nxs = [1, 2, 3, 4, 5]\nfor x in xs:\n    if x % 2 == 0:\n        xs.remove(x)\nprint(xs)\n# [1, 3, 5]    # looks right ...\n```\nBut try `[2, 2, 3, 4]`:\n```python\nxs = [2, 2, 3, 4]\nfor x in xs:\n    if x % 2 == 0:\n        xs.remove(x)\nprint(xs)\n# [2, 3]       # second 2 survived\n```\nThis is the same bug as the mission. The bug only manifests on certain layouts of data, so unit tests miss it constantly.\n\n### The five fixes, ranked\n\n#### 1) Comprehension (rebind)\n```python\nusers = [u for u in users if not u.startswith(\"Inactive\")]\n```\nClean, fast, idiomatic. Use unless there's a specific reason not to.\n\n#### 2) Slice-assignment (in place)\n```python\nusers[:] = [u for u in users if not u.startswith(\"Inactive\")]\n```\nSame work, but the original list object is preserved — useful if other references to `users` exist and you want them all to see the update.\n\n#### 3) `filter()`\n```python\nusers = list(filter(lambda u: not u.startswith(\"Inactive\"), users))\n```\nFunctional flavour. Less idiomatic in Python; comprehensions almost always read better.\n\n#### 4) Build a set of indexes to remove, then delete in reverse\n```python\nto_drop = {i for i, u in enumerate(users) if u.startswith(\"Inactive\")}\nfor i in sorted(to_drop, reverse=True):\n    del users[i]\n```\nUseful when you need to mutate in place *and* care about index integrity. Verbose; use only when needed.\n\n#### 5) Iterate a copy (`users[:]`)\n```python\nfor u in users[:]:\n    if u.startswith(\"Inactive\"):\n        users.remove(u)\n```\nWorks but is O(n²): each `remove` is O(n). Don't use for large lists.\n\n### Other shapes of the same bug\n- **Dict mid-iteration**: `for k in d: del d[k]` raises `RuntimeError: dictionary changed size during iteration` in modern Python (a *good* failure mode — the bug is loud). Older Python and some JavaScript engines fail silently.\n- **Set mid-iteration**: same as dict — raises in modern Python.\n- **Async iteration with concurrent writers**: `async for` over a queue while another coroutine appends — race conditions galore.\n- **Database cursors**: deleting rows while iterating a cursor in the same transaction breaks many drivers.\n\nThe general rule is: **don't change a collection while iterating it.** Build a new one, or collect changes and apply them after the loop.\n\n### Common beginner mistakes\n- Calling `.remove(x)` inside a `for` loop and being surprised by skips.\n- Using `del xs[i]` and incrementing `i` anyway.\n- Appending to a list inside `for x in xs` and getting an infinite loop.\n- Doing the same shape in JavaScript with `splice()` inside `forEach`.\n\n### You just learned…\n**Don't mutate the sequence you're iterating.** The canonical Python fix is a comprehension; for in-place needs, slice assignment preserves the object identity. The same lesson applies across languages — every language has a flavour of this bug, and the fix is always 'don't.'",
+      "videos": [
+        { "title": "Don't mutate the list you're iterating", "searchQuery": "python modify list during iteration mistake tutorial" },
+        { "title": "List comprehensions deep dive", "searchQuery": "python list comprehension tutorial beginner advanced" }
+      ]
+  },
+  "estMinutes": 6,
+  "version": 1,
+  "conceptCard": "This mission is about **mutating during iteration**.\n\n- `for x in xs` holds an internal index; mutating `xs` shifts the indices and the loop quietly skips items.\n- The canonical fix is a comprehension: `xs = [x for x in xs if keep(x)]`.\n- For in-place needs, slice assignment: `xs[:] = [...]`.\n\nThe code removes inactive users inside a `for` loop and one slips through. Switch to a comprehension.",
+  "lineNotes": [
+    { "line": 1, "noteMd": "Four users — two should be pruned." },
+    { "line": 3, "noteMd": "The `for` loop holds an internal index. **The mutation below makes it lie**." },
+    { "line": 5, "noteMd": "**The bug.** `users.remove(u)` shifts everything to the right left by one; the next iteration *skips* the now-shifted item." },
+    { "line": 7, "noteMd": "Prints the result. Buggy: `['Ada', 'Inactive_2', 'Linus']`. Fixed: `['Ada', 'Linus']`." }
+  ],
+  "takeaway": "Never mutate the sequence you're iterating — build a new list with a comprehension."
+}

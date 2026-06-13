@@ -294,6 +294,8 @@ export async function lockedChallengeOfDifficulty(
 export const ML_001 = "ml-001-kmeans-scaling";
 /** Data Analyst on-ramp (ungated sector); correct option "a". */
 export const DA_001 = "da-001-read-csv-delimiter";
+/** Python Fundamentals on-ramp (ungated sector); correct option "a". */
+export const PY_001 = "py-001-unterminated-string";
 export const ML_002 = "ml-002-test-set-leakage";
 export const DL_001 = "dl-001-device-mismatch";
 export const DL_002 = "dl-002-missing-zero-grad";

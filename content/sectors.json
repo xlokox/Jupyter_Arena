@@ -1,7 +1,8 @@
 [
-  { "id": "da", "name": "Data Analyst", "position": 0, "isGated": false },
-  { "id": "ml", "name": "Machine Learning", "position": 1, "isGated": true },
-  { "id": "dl", "name": "Deep Learning", "position": 2, "isGated": true },
-  { "id": "fullstack", "name": "Full Stack", "position": 3, "isGated": true },
-  { "id": "db", "name": "Databases", "position": 4, "isGated": true }
+  { "id": "py", "name": "Python Fundamentals", "position": 0, "isGated": false },
+  { "id": "da", "name": "Data Analyst", "position": 1, "isGated": false },
+  { "id": "ml", "name": "Machine Learning", "position": 2, "isGated": true },
+  { "id": "dl", "name": "Deep Learning", "position": 3, "isGated": true },
+  { "id": "fullstack", "name": "Full Stack", "position": 4, "isGated": true },
+  { "id": "db", "name": "Databases", "position": 5, "isGated": true }
 ]

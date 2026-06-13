@@ -1,0 +1,83 @@
+{
+  "id": "da-039-stakeholder-framing",
+  "sector": "da",
+  "difficulty": "easy",
+  "title": "39_did_the_feature_work.ipynb",
+  "language": "python",
+  "icon": "list-todo",
+  "conceptTags": [
+    "stakeholder-framing",
+    "metric-design",
+    "reasoning"
+  ],
+  "descriptionMd": "## Mission: 'Did The Feature Work?'\n\nA PM Slacks: *\"Did the new save-to-cart button work?\"* You can't answer 'yes' or 'no' from a single chart — the question is **under-specified**. Before opening a notebook, you need to translate the PM's ask into three questions whose answers, together, tell the story. Pick the trio that does the work.\n\nThe wrong options each fail in a real, common way: vanity metric, no counterfactual, or a fishing expedition through every metric in the warehouse. The right trio is small, specific, and decision-supporting.",
+  "initialCode": "# Scenario: PM ask — 'did the new save-to-cart button work?'\n# Before opening a notebook, define the three questions that\n# together answer the PM's question. Pick the right trio.\nfeature = 'save-to-cart button'\nlaunched = '2025-05-15'",
+  "buggyLineStart": 4,
+  "buggyLineEnd": 5,
+  "traceback": "Junior analyst's draft: 'I'll send a chart of total saves over time — that shows whether it worked, right?'",
+  "correctOutput": "Senior analyst's verdict: 'Three questions: (1) what does \"work\" mean — saves, conversions, revenue? (2) Compared to what — pre-launch users, a holdout, an A/B test? (3) What size effect would change a decision?'",
+  "options": [
+    {
+      "key": "a",
+      "label": "(1) What does 'work' mean? (2) Compared to what? (3) What effect size matters?",
+      "patchCode": "# Scenario: PM ask — 'did the new save-to-cart button work?'\n# Before opening a notebook, define the three questions that\n# together answer the PM's question. Pick the right trio.\nfeature = 'save-to-cart button'\nlaunched = '2025-05-15'",
+      "isCorrect": true,
+      "resultLog": "Acting on this reading: the three answers tell the PM not just 'did it work?' but 'should we double down, iterate, or kill it?'",
+      "rationale": "This trio pins down the three things the PM left vague. **(1) Definition**: 'work' could mean saves, save-then-buy conversion, revenue, or retention — different metrics will say different things. **(2) Counterfactual**: change vs *what*? A naked time series shows the *what*, not the *why* (the da-040 / da-038 lesson). You need a comparison: an A/B holdout, a pre/post with a control, etc. **(3) Effect size that matters**: a 0.1% lift might be 'positive' and irrelevant. Name what would be big enough to act on. With these three answered, the resulting analysis supports a decision."
+    },
+    {
+      "key": "b",
+      "label": "(1) Total saves. (2) Save trend over time. (3) Top users by saves.",
+      "patchCode": "# Scenario: PM ask — 'did the new save-to-cart button work?'\n# Before opening a notebook, define the three questions that\n# together answer the PM's question. Pick the right trio.\nfeature = 'save-to-cart button'\nlaunched = '2025-05-15'",
+      "isCorrect": false,
+      "resultLog": "Acting on this reading: the PM gets three charts that all answer the same shallow question (\"are people saving?\") and zero that compare against an alternative.",
+      "rationale": "Three views of the **same** metric is not three questions. This trio answers 'how many saves are there?' three ways — and never asks 'compared to what?' or 'is this enough?' Without a counterfactual the analysis can't distinguish 'the feature worked' from 'we'd have had this growth anyway' (the da-040 trap). Without a decision threshold the PM is left with numbers and no recommendation."
+    },
+    {
+      "key": "c",
+      "label": "Pull every metric the warehouse has and report which ones moved.",
+      "patchCode": "# Scenario: PM ask — 'did the new save-to-cart button work?'\n# Before opening a notebook, define the three questions that\n# together answer the PM's question. Pick the right trio.\nfeature = 'save-to-cart button'\nlaunched = '2025-05-15'",
+      "isCorrect": false,
+      "resultLog": "Acting on this reading: out of 40 metrics looked at, 5 'moved significantly' by chance — the PM cherry-picks one for the deck, and the next launch fails to reproduce it.",
+      "rationale": "This is the **multiple-comparisons / cherry-picked-metric** failure mode (da-048). If you check 40 metrics at p<0.05, you expect ~2 to look 'significant' by pure chance. Reporting whichever ones moved guarantees a confident-looking but unreliable story. Specify the metric(s) you care about *before* looking — pre-registration, not post-hoc selection."
+    }
+  ],
+  "hints": [
+    "What's vague in 'did the feature work?' Three things — name them in the three sub-questions.",
+    "Definition. Counterfactual. Effect size that matters. The PM left all three implicit."
+  ],
+  "explanationMd": "### Why this is the right framing\nStakeholder questions like 'did X work?' are almost always **three nested questions in a trench coat**. Surface them explicitly and the analysis writes itself.\n\n1. **What does 'work' mean?** — a metric definition. Saves? Save-then-buy conversion? Lift in 30-day retention? Pick one (or a small set) *before* you look. Otherwise you'll subconsciously pick whichever moved most.\n2. **Compared to what?** — a counterfactual. A naked 'after launch' number can't be a verdict. You need a comparison: an A/B holdout, a difference-in-differences vs an unaffected segment, a pre/post with proper controls. The chart of 'saves over time' from the wrong trio answers what happened, not whether the feature caused it.\n3. **What effect size would change a decision?** — the action threshold. 'Worked' implies a decision: ship it broader, iterate, kill it. Different decisions need different evidence bars. Naming the threshold up front prevents 'statistically significant but commercially trivial' results from getting credit.\n\n### What makes the other two reasonings weak\n- **'Three views of saves'** is the same question three ways. Without a counterfactual or a definition of success, you can show how many people saved without ever knowing whether the feature *worked*.\n- **'Pull every metric and report movers'** is the multiple-comparisons trap (da-048): with 40 metrics and p<0.05, ~2 will move 'significantly' by chance alone. Pre-register the metrics you care about; don't go hunting after the fact.\n\n### The general principle\nWhen a stakeholder asks an under-specified question, **the analysis starts with framing, not data**. The three questions to surface every time: definition, counterfactual, action threshold. Many wasted analyses are wasted because one of those three was assumed instead of asked.",
+  "recruiterReview": "Strong — you didn't dive into the data; you stopped to frame the question. That's the senior-analyst move. Defining 'work' before measuring it prevents the metric-roulette problem. Naming the counterfactual prevents post-hoc storytelling. Naming the effect size that matters prevents 'statistically significant but business-irrelevant' results from carrying credit they don't deserve. Two refinements: 1) write these three things into the analysis brief *before* SQL hits the warehouse — share it with the PM for sign-off; 2) if a true A/B isn't possible, propose a difference-in-differences or interrupted time series and be explicit about the limitations.",
+  "tutorial": {
+    "bodyMd": "## Framing Before Analysing\n\nThe single biggest leverage point in analyst work isn't a better tool — it's a better question. Most asks come in vague: 'did it work?', 'how is X doing?', 'should we keep doing Y?'. Framing surfaces the three implicit sub-questions every such ask hides.\n\n### The three questions hidden in every 'did X work?'\n#### 1) What does 'work' mean?\nThis is a metric-definition question. 'Save-to-cart button works' could mean:\n- People click the button more often (engagement).\n- People who click eventually buy more often (conversion).\n- Total order value goes up (revenue).\n- People come back to find their saves later (retention).\n\nDifferent metrics may give different answers. **Pick the metric(s) you'll evaluate *before* looking at the data.** This is the simplest defense against subconscious cherry-picking.\n\n#### 2) Compared to what?\nA post-launch number alone can't prove the feature did anything. You need a comparison:\n- **A/B test**: users randomly assigned to see the feature vs not.\n- **Holdout**: a fraction never sees the feature; compare against them.\n- **Difference-in-differences**: compare the *change* in feature users vs a matched non-feature group, controlling for seasonal trends.\n- **Pre/post with controls**: weaker, only works when no other factor changed in the window.\n\nNo counterfactual = no causal claim. You can describe what happened; you can't say the feature did it (the da-040 lesson).\n\n#### 3) What effect size would change a decision?\nDecisions are binary or near-binary: ship/kill/iterate. Different decisions tolerate different evidence bars.\n- Shipping a small UI experiment widely: a 1% lift on a primary metric might be enough.\n- Doubling down a $1M investment: needs a much bigger, well-confirmed effect.\n\nName the threshold up front: 'we'd ship if conversion lifts ≥X% with p<0.05 and a 95% CI excluding 0.' Then the result is a decision, not a narrative.\n\n### Why this framing matters\nWithout framing:\n- You measure whatever's easy and call it 'evidence.'\n- You skip the counterfactual and write a confident story about correlation.\n- You pick the metric that moved most after the fact.\n- The decision turns on whoever argues loudest in the meeting.\n\nWith framing:\n- The metric is defined ahead of time.\n- The comparison is explicit and defensible.\n- The threshold for action is agreed upon.\n- The decision falls out of the data.\n\n### The pre-analysis brief\nA one-paragraph brief, signed by the PM before any SQL, will save you days of post-hoc argument:\n> 'We're evaluating whether the save-to-cart button works. Primary metric: 30-day save→buy conversion. Comparison: A/B holdout (50% see the button, 50% don't). Decision rule: ship widely if conversion lifts ≥X% with p<0.05; iterate if smaller; kill if negative.'\n\nThree sentences. Frames the entire downstream analysis. Prevents 40-metric fishing expeditions and confident-but-unsupported attribution.\n\n### Common reasoning mistakes\n- 'Total saves went up, so it worked.' — no comparison, no decision threshold.\n- 'Let me look at all the metrics and see what moved.' — multiple-comparisons + cherry-picking (da-048).\n- 'It must have worked — usage went up afterwards.' — post hoc, not because of (the da-040 correlation/causation trap).\n- Picking the metric that gave the best result *after* seeing the data.\n\n### You just learned…\nThe three questions hidden in every 'did X work?': **definition**, **counterfactual**, **action threshold**. Surface them *before* opening the notebook. The analysis becomes a clean decision instead of a fishing expedition with a deck attached.",
+    "videos": [
+      {
+        "title": "Framing analyst questions",
+        "searchQuery": "data analyst stakeholder question framing tutorial"
+      },
+      {
+        "title": "Pre-registration and A/B testing basics",
+        "searchQuery": "pre-registration analysis hypothesis a/b test beginner"
+      }
+    ]
+  },
+  "estMinutes": 7,
+  "version": 1,
+  "conceptCard": "This mission is about **framing the question before opening the data**.\n\n- 'Did X work?' is three questions hiding: **definition**, **counterfactual**, **action threshold**.\n- Define the metric *before* looking — otherwise you'll subconsciously cherry-pick.\n- Without a counterfactual you can describe what happened but can't say the feature did it.\n\nThe PM's ask is under-specified — surface the three sub-questions and the analysis falls into place.",
+  "lineNotes": [
+    {
+      "line": 1,
+      "noteMd": "The PM's ask, verbatim — the vagueness is the problem."
+    },
+    {
+      "line": 4,
+      "noteMd": "The feature in question."
+    },
+    {
+      "line": 5,
+      "noteMd": "The launch date — relevant to choosing a pre/post window."
+    }
+  ],
+  "takeaway": "Frame three sub-questions before any SQL: definition, counterfactual, action threshold.",
+  "track": "reasoning"
+}

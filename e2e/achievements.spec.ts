@@ -2,6 +2,15 @@ import { expect, test, type Page } from "@playwright/test";
 
 /** Phase 5.6b acceptance — badges, daily-goal ring, sector rings, rank ladder. */
 
+/** Beginner sectors gate the notebook behind a concept card; click past it if shown. */
+async function dismissConceptCard(page: Page) {
+  const begin = page.getByRole("button", { name: "Begin challenge" });
+  const runCell = page.locator("[data-run-cell]");
+  // Wait for the mission to render as either the concept card or the notebook.
+  await expect(begin.or(runCell).first()).toBeVisible();
+  if (await begin.isVisible()) await begin.click();
+}
+
 async function solveKmeans(page: Page) {
   await page
     .getByRole("button", { name: /01_kmeans_customer_segmentation\.ipynb/ })
@@ -53,9 +62,33 @@ test("the Data Analyst sector is ungated — a level-1 user opens a medium missi
     .first()
     .click();
 
+  // Beginner sectors may show a learn-first concept card first; proceed past it.
+  await dismissConceptCard(page);
+
   // No lock for a fresh level-1 player: the Run cell renders, not the locked panel.
   await expect(page.locator("[data-run-cell]")).toBeVisible();
   await expect(page.getByRole("region", { name: "This mission is locked" })).toHaveCount(0);
+});
+
+test("a Python Fundamentals mission shows the learn-first concept card", async ({ page }) => {
+  await page.goto("/app");
+  await page.getByRole("button", { name: "Python Fundamentals", exact: true }).click();
+  await page
+    .getByRole("button", { name: /01_hello_world\.ipynb/ })
+    .first()
+    .click();
+
+  // Concept card gates the notebook: Begin button is shown, Run cell is not yet.
+  const begin = page.getByRole("button", { name: "Begin challenge" });
+  await expect(begin).toBeVisible();
+  await expect(page.locator("[data-run-cell]")).toHaveCount(0);
+
+  await begin.click();
+  await expect(page.locator("[data-run-cell]")).toBeVisible();
+
+  // The "What does this code do?" line-notes toggle reveals plain-language notes.
+  await page.getByRole("button", { name: "What does this code do?" }).click();
+  await expect(page.getByText(/A line starting with/)).toBeVisible();
 });
 
 test("the rank ladder highlights the current rank", async ({ page }) => {

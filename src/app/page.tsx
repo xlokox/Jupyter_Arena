@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowDown, ArrowRight, Calendar, FlaskConical } from "lucide-react";
+import { ArrowRight, Calendar, FlaskConical } from "lucide-react";
 import { en } from "@/i18n/en";
-import { HeroCell } from "@/components/landing/hero-cell";
+import { HeroV2 } from "@/components/landing/hero-v2";
+import { WhyChanged } from "@/components/landing/why-changed";
 import { HowItWorks } from "@/components/landing/how-it-works";
 import { Features } from "@/components/landing/features";
 import { ProgressionTeaser } from "@/components/landing/progression-teaser";
@@ -15,11 +16,11 @@ export const dynamic = "force-static";
 export const metadata: Metadata = {
   title: en.app.name,
   description:
-    "75 realistic broken notebooks across Data Analyst, ML, Deep Learning, Full Stack, and Databases. Read the traceback, pick the fix, watch it run. Free forever.",
+    "AI writes the code — the valuable skill is fixing it. A free debugging arena: 90 realistic broken notebooks across 6 sectors. Read the traceback, pick the fix, watch it run. Free forever.",
   openGraph: {
     title: en.app.name,
     description:
-      "Master debugging — the untaught interview skill. 75 real broken notebooks, recruiter code reviews, XP progression. Free forever.",
+      "AI writes the code. Can you fix it? A free debugging arena — 90 broken notebooks, recruiter-grade code reviews, XP progression. Free forever.",
   },
 };
 
@@ -58,63 +59,17 @@ export default function LandingPage() {
       </header>
 
       <main>
-        {/* ── Hero ─────────────────────────────────────────────────────────── */}
-        <section
-          aria-label={en.landing.heroAria}
-          className="mx-auto max-w-6xl px-4 pb-12 pt-16 md:pb-20 md:pt-24"
-        >
-          <div className="grid items-center gap-12 md:grid-cols-2">
-            {/* Copy */}
-            <div>
-              <p className="mb-3 font-mono text-xs font-semibold uppercase tracking-widest text-accent">
-                {en.landing.heroEyebrow}
-              </p>
-              <h1 className="mb-5 font-mono text-4xl font-bold leading-tight text-text md:text-5xl">
-                {en.landing.heroHeadline}
-              </h1>
-              <p className="mb-8 max-w-lg leading-relaxed text-muted md:text-lg">
-                {en.landing.heroSubheadline}
-              </p>
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <Link
-                  href="/app"
-                  className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-lg bg-accent px-6 font-semibold text-bg transition-colors hover:bg-accent-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                >
-                  {en.landing.heroPrimaryCta}
-                  <ArrowRight className="size-4" aria-hidden />
-                </Link>
-                <a
-                  href="#how-it-works"
-                  className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-lg border border-border px-6 text-sm text-muted transition-colors hover:border-accent/60 hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                >
-                  {en.landing.heroSecondaryCta}
-                  <ArrowDown className="size-4" aria-hidden />
-                </a>
-              </div>
-              <p className="mt-4 text-sm text-muted">
-                {en.landing.beginnerCuePrefix}{" "}
-                <Link
-                  href="/app"
-                  className="text-accent underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                >
-                  {en.landing.beginnerCueLink}
-                </Link>{" "}
-                {en.landing.beginnerCueSuffix}
-              </p>
-            </div>
+        {/* ── Hero V2 — the product debugs itself as you scroll ───────────── */}
+        <HeroV2 />
 
-            {/* Animated hero cell */}
-            <div className="flex justify-center">
-              <HeroCell />
-            </div>
-          </div>
-        </section>
+        {/* ── Why programming changed forever (3-beat story) ─────────────── */}
+        <WhyChanged />
 
         {/* ── The problem ──────────────────────────────────────────────────── */}
         <Reveal>
           <section
             aria-label={en.landing.problemHeading}
-            className="border-t border-border bg-panel py-16 md:py-20"
+            className="border-b border-border bg-panel py-16 md:py-20"
           >
             <div className="mx-auto max-w-3xl px-4 text-center">
               <h2 className="mb-4 font-mono text-xl font-bold text-text md:text-2xl">
@@ -126,7 +81,7 @@ export default function LandingPage() {
         </Reveal>
 
         {/* ── How it works ─────────────────────────────────────────────────── */}
-        <div id="how-it-works">
+        <div id="how-it-works" className="scroll-mt-20">
           <Reveal>
             <HowItWorks />
           </Reveal>

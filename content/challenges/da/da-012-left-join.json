@@ -58,5 +58,17 @@
     ]
   },
   "estMinutes": 7,
-  "version": 1
+  "version": 1,
+  "conceptCard": "This mission is about **joining two tables** and a silent data-loss trap.\n\n- `merge` lines up rows from two tables on a shared key.\n- The default is an **inner** join — it keeps only keys present in *both*, silently dropping the rest.\n- `how=\"left\"` keeps every row of the left table; unmatched values become `NaN`.\n\nThe report loses customers who never ordered. Pick the join type — and direction — that keeps everyone.",
+  "lineNotes": [
+    {
+      "line": 7,
+      "noteMd": "Merges customers with orders. With no `how=`, it's an **inner** join, so customers who never ordered are silently dropped. Use `how=\"left\"` with `customers` on the left."
+    },
+    {
+      "line": 8,
+      "noteMd": "Totals each customer's spend. With a left join, non-buyers have `NaN` amounts that sum to 0 — so they show up with 0 spend."
+    }
+  ],
+  "takeaway": "merge defaults to an inner join (drops unmatched rows); use how=\"left\" to keep every left-table row."
 }

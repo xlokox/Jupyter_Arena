@@ -1,0 +1,86 @@
+{
+  "id": "py-034-set-comprehension",
+  "sector": "py",
+  "difficulty": "medium",
+  "title": "34_unique_tags.ipynb",
+  "language": "python",
+  "icon": "boxes",
+  "conceptTags": ["comprehensions", "sets", "deduplication"],
+  "descriptionMd": "## Mission: Unique Tags Across Posts\n\nYou have a list of blog posts, each with a list of tags. You want the **unique** tags across all posts. Your loop produces `[\"python\", \"web\", \"python\", \"web\", \"ml\", \"web\"]` — duplicates everywhere — because you used a nested `for` and appended without dedup.\n\nA set comprehension does this in one line and dedupes for free. Three options. One uses the right container (a `set`). One uses a nested loop with an `in` check (which is **`O(n²)`** — a real performance trap on 100k posts). One tries `dict.fromkeys` (works but expresses 'no duplicates' less directly than a set).",
+  "initialCode": "posts = [\n    {\"id\": 1, \"tags\": [\"python\", \"web\"]},\n    {\"id\": 2, \"tags\": [\"python\", \"ml\"]},\n    {\"id\": 3, \"tags\": [\"web\", \"ml\"]},\n]\n\ntags = []\nfor p in posts:\n    for t in p[\"tags\"]:\n        tags.append(t)\n\nprint(\"tags collected:\", tags)\nprint(\"unique count :\", len(tags))",
+  "buggyLineStart": 7,
+  "buggyLineEnd": 10,
+  "traceback": "tags collected: ['python', 'web', 'python', 'ml', 'web', 'ml']\nunique count : 6\n# expected unique count: 3 — python, web, ml",
+  "correctOutput": "tags collected: {'python', 'web', 'ml'}\nunique count : 3",
+  "options": [
+    {
+      "key": "a",
+      "label": "Use a set comprehension: `tags = {t for p in posts for t in p['tags']}`",
+      "patchCode": "posts = [\n    {\"id\": 1, \"tags\": [\"python\", \"web\"]},\n    {\"id\": 2, \"tags\": [\"python\", \"ml\"]},\n    {\"id\": 3, \"tags\": [\"web\", \"ml\"]},\n]\n\ntags = {t for p in posts for t in p[\"tags\"]}\n\nprint(\"tags collected:\", tags)\nprint(\"unique count :\", len(tags))",
+      "isCorrect": true,
+      "resultLog": "tags collected: {'python', 'web', 'ml'}\nunique count : 3",
+      "rationale": "A **set comprehension** (`{... for ... in ...}`) builds a `set` directly — duplicates are dropped automatically because `set` adds are O(1) and reject existing members. The double `for` is read left-to-right: outer loop walks posts, inner loop walks tags. For N posts × K tags each, this is `O(NK)`. Compare to the nested-loop with `in` check (option B) which is `O(NK × U)` where U is the unique-tag count — on 100k posts this is the difference between milliseconds and minutes."
+    },
+    {
+      "key": "b",
+      "label": "Keep the list but skip duplicates: `if t not in tags: tags.append(t)`",
+      "patchCode": "posts = [\n    {\"id\": 1, \"tags\": [\"python\", \"web\"]},\n    {\"id\": 2, \"tags\": [\"python\", \"ml\"]},\n    {\"id\": 3, \"tags\": [\"web\", \"ml\"]},\n]\n\ntags = []\nfor p in posts:\n    for t in p[\"tags\"]:\n        if t not in tags:\n            tags.append(t)\n\nprint(\"tags collected:\", tags)\nprint(\"unique count :\", len(tags))",
+      "isCorrect": false,
+      "resultLog": "tags collected: ['python', 'web', 'ml']\nunique count : 3",
+      "rationale": "Produces the right tags but at **O(n²)** because `t in tags` is a linear scan of a list. On 3 posts it's instant; on 100k posts with 1k unique tags it's a million list scans of a thousand-element list — minutes vs the milliseconds the set version takes. The membership check is what `set` is optimised for. Reach for the data structure that matches the operation."
+    },
+    {
+      "key": "c",
+      "label": "Collect into a list, then `list(set(tags))` to dedupe at the end",
+      "patchCode": "posts = [\n    {\"id\": 1, \"tags\": [\"python\", \"web\"]},\n    {\"id\": 2, \"tags\": [\"python\", \"ml\"]},\n    {\"id\": 3, \"tags\": [\"web\", \"ml\"]},\n]\n\ntags = []\nfor p in posts:\n    for t in p[\"tags\"]:\n        tags.append(t)\ntags = list(set(tags))\n\nprint(\"tags collected:\", tags)\nprint(\"unique count :\", len(tags))",
+      "isCorrect": false,
+      "resultLog": "tags collected: ['python', 'web', 'ml']\nunique count : 3",
+      "rationale": "Output is right and performance is fine (`O(NK)` amortised). But you're building a list you'll immediately discard, and the **intent** — 'collect unique tags' — is spread across three lines instead of one. The set comprehension says exactly what you mean; `list(set(...))` says 'I built a list and then realised I wanted unique things.' For multi-step pipelines, the directness of the comprehension is what makes long pipelines readable. (If you want **ordered** unique, `list(dict.fromkeys(...))` preserves first-seen order; `set` doesn't.)"
+    }
+  ],
+  "hints": [
+    "What container drops duplicates automatically? Hint: it has `.add()` and `O(1)` membership tests.",
+    "Use a **set comprehension**: `{t for p in posts for t in p['tags']}`. The double `for` reads left-to-right."
+  ],
+  "explanationMd": "### Why the bug occurs\nThe original code appends every tag from every post to a list. There's no dedup step — every tag that appears in K posts shows up K times. The list grows past the unique count and the downstream `len()` is wrong by exactly the duplication factor.\n\n### Why the fix is correct\nA `set` is the Python container that **enforces uniqueness**. Adding a duplicate to a set is a no-op. Membership checks (`x in s`) are O(1) amortised. The set comprehension `{... for ... in ...}` builds a set directly, walking the source iterable once. For the two-level walk in this mission — posts × tags — the syntax is `{t for p in posts for t in p['tags']}`. Read it left-to-right: outer loop first, then inner.\n\n### The general principle: pick the data structure for the operation\n- **Need order, allow duplicates** → `list`. O(1) append; O(n) `in`.\n- **Need uniqueness, don't care about order** → `set`. O(1) `add` and `in`.\n- **Need key→value lookup** → `dict`. O(1) `get` and `in`.\n- **Need uniqueness AND order** → `dict.fromkeys(iterable).keys()` or (Python 3.7+) `list(dict.fromkeys(...))`. Insertion order is preserved.\n\nReaching for `list` and writing an `in` check inside is the most common Python performance trap. Senior reviewers spot it instantly; juniors are surprised when their 'simple loop' takes minutes on a real dataset.\n\n### Comprehension syntax — the four flavours\n```python\n[x for x in xs if cond]            # list\n{x for x in xs if cond}            # set\n{k: v for k, v in pairs if cond}   # dict\n(x for x in xs if cond)            # generator (lazy)\n```\nThe brackets pick the container; the body is the same. Comprehensions are usually faster than the equivalent hand-rolled loop because the iteration happens in C-level code in CPython.",
+  "recruiterReview": "Strong — you picked `set` and used a comprehension. Two things to mention for production: 1) when the source iterable is huge, switch from set comprehension to a generator pipeline (`set(t for p in posts for t in p['tags'])`) — the temporary list never materialises and memory is lower. 2) For multi-million-tag tag-clouds, consider `collections.Counter` instead — you get both unique-tag and frequency in one pass. Knowing when to reach for `set` vs `Counter` vs `defaultdict(int)` is a hallmark of fluent Python. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Set Comprehensions and Picking the Right Container\n\nA shocking amount of slow Python code traces to one decision: storing the wrong thing in a `list`. The fix is usually to reach for `set` or `dict` instead.\n\n### The four comprehension flavours\nA comprehension is `{container syntax}([expression] for ... in ... [if ...])`. The brackets pick the container.\n```python\n[x*2 for x in nums]                    # list — order preserved, duplicates allowed\n{x*2 for x in nums}                    # set — unique, order undefined\n{k: v for k, v in pairs}               # dict — key/value, unique keys\n(x*2 for x in nums)                    # generator — lazy, single-pass\n```\nThe body — the expression and the filter — is the same in all four. Pick the container for what you'll do downstream.\n\n### Nested comprehensions\nMultiple `for` clauses iterate in order, left to right (like nested loops):\n```python\nflat = [t for p in posts for t in p[\"tags\"]]\n# equivalent to:\nflat = []\nfor p in posts:\n    for t in p[\"tags\"]:\n        flat.append(t)\n```\nThe `if` clauses also stack:\n```python\n[t for p in posts if p[\"published\"]\n   for t in p[\"tags\"] if t != \"draft\"]\n```\nFor more than two `for`/`if` clauses, prefer a function — the comprehension stops being more readable than a loop.\n\n### Container choice — performance reality\nFor N elements, here's what each container costs:\n| Operation | `list` | `set` | `dict` |\n|---|---|---|---|\n| Add one | O(1) amortised | O(1) amortised | O(1) amortised |\n| `x in c` | **O(n)** | O(1) | O(1) on keys |\n| Iterate | O(n) | O(n) | O(n) |\n| Get unique | sort + unique = O(n log n) | already unique | already unique |\n\n**The trap:** `list` membership is linear. If you write `if x not in seen: seen.append(x)`, you've built an O(n²) loop. On 10k items it's 50M operations and visibly slow. On 100k items it's 5 billion operations and you've made the loop minutes long. Use a `set` and the same logic is O(n).\n\n### When you need *ordered* uniqueness\nAs of Python 3.7, **dict preserves insertion order** by language guarantee. So:\n```python\nseen = list(dict.fromkeys(items))   # unique, in first-seen order\n```\nIs the idiomatic way to dedupe while preserving order. `set` doesn't promise order; don't rely on it.\n\n### `collections.Counter` — when you need counts too\nFor tag-clouds, leaderboards, log-line histograms:\n```python\nfrom collections import Counter\ncount = Counter(t for p in posts for t in p[\"tags\"])\ncount.most_common(10)   # top 10 by frequency\n```\nOne pass; unique tags as keys; counts as values.\n\n### `collections.defaultdict` — auto-initialising buckets\nFor grouping:\n```python\nfrom collections import defaultdict\nby_tag = defaultdict(list)\nfor p in posts:\n    for t in p[\"tags\"]:\n        by_tag[t].append(p[\"id\"])\n```\nReplaces the `if k not in d: d[k] = []` boilerplate.\n\n### Generator pipelines — when memory matters\nFor very large iterables, swap `[...]` for `(...)`:\n```python\nbig = (process(x) for x in giant_iterable)\nresult = sum(big)\n```\nNothing materialises in memory; the generator is consumed once by `sum`. Pair with `itertools` for the full functional toolkit (`chain`, `islice`, `groupby`).\n\n### Common reasoning mistakes\n- `list` + `not in` check (O(n²)) when `set` would be O(n).\n- Building a list, then casting to set (works, but says the intent twice).\n- Three-`for` comprehensions that should be a function.\n- Returning a generator from a function and consuming it twice (the second time is empty).\n- Sets when you needed ordered uniqueness.\n\n### You just learned…\nComprehensions come in four flavours — list, set, dict, generator — each builds a different container with the same body. **Set comprehensions dedupe for free** at O(n) where the list-with-`in` trick is O(n²). Pick the container for the downstream operation; the right container makes the right thing fast and the wrong thing impossible.",
+    "videos": [
+      { "title": "Python comprehensions explained", "searchQuery": "python list set dict comprehension tutorial beginner" },
+      { "title": "Sets and dedup performance", "searchQuery": "python set vs list performance dedup tutorial" }
+    ]
+  },
+  "estMinutes": 6,
+  "version": 1,
+  "conceptCard": "This mission is about **set comprehensions and picking the right container**.\n\n- A `set` enforces uniqueness automatically; `set` `in` is **O(1)**, `list` `in` is **O(n)**.\n- Set comprehension syntax: `{expr for x in xs if cond}` — same body as a list comprehension, different brackets.\n- For ordered uniqueness, use `list(dict.fromkeys(items))` — dict preserves insertion order since Python 3.7.\n\nThe code appends to a list without dedup. Switch to a set comprehension and duplicates disappear at O(n).",
+  "lineNotes": [
+    { "line": 7, "noteMd": "**The bug.** A plain list — no dedup. Switch to `set` (or a set comprehension)." },
+    { "line": 8, "noteMd": "Outer loop over posts." },
+    { "line": 9, "noteMd": "Inner loop over tags." },
+    { "line": 10, "noteMd": "Append — but every duplicate goes in. A `set.add(t)` would silently drop existing ones." }
+  ],
+  "takeaway": "Use a set comprehension to dedupe at O(n); list-with-`not in` is O(n²).",
+  "glossary": [
+    {
+      "term": "list comprehension",
+      "definitionMd": "Python expression `[f(x) for x in xs if cond]` that builds a list in one pass. Equivalent to a hand-rolled `for` loop but runs in C-level code in CPython, so often faster."
+    },
+    {
+      "term": "set comprehension",
+      "definitionMd": "Like a list comprehension but with `{...}` — builds a `set`. Duplicates are dropped automatically because sets enforce uniqueness."
+    },
+    {
+      "term": "dict comprehension",
+      "definitionMd": "`{k: v for k, v in pairs}` — builds a dict in one pass. Later keys overwrite earlier ones, so duplicates collapse to the last seen value."
+    },
+    {
+      "term": "generator expression",
+      "definitionMd": "`(f(x) for x in xs)` — like a list comprehension but **lazy**: produces values one at a time, never materialising the full sequence in memory. Consumed exactly once."
+    },
+    {
+      "term": "`collections.Counter`",
+      "definitionMd": "Dict subclass that counts elements: `Counter(['a', 'b', 'a'])` → `Counter({'a': 2, 'b': 1})`. Has `.most_common(n)` for top-n queries. The right tool for tag-clouds, frequency tables, and log-line histograms."
+    }
+  ]
+}

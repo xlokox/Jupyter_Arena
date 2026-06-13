@@ -1,0 +1,85 @@
+{
+  "id": "da-036-chart-choice-biggest",
+  "sector": "da",
+  "difficulty": "easy",
+  "title": "36_which_chart_biggest.ipynb",
+  "language": "python",
+  "icon": "bar-chart-3",
+  "conceptTags": [
+    "chart-choice",
+    "judgment",
+    "reasoning"
+  ],
+  "descriptionMd": "## Mission: Pick the Chart\n\nA stakeholder asks: *\"Which product is selling the most this quarter?\"* You've got five products and one number per product — units sold. You can pick any of three chart types to answer the question. Which one lets the audience read the answer fastest, without translation?\n\nThe reasoning track isn't about which chart *can* show this — multiple can. It's about which chart **matches the question's shape**: a single comparison across discrete categories. Pick the chart that lets the eye do the work, and name what makes the other two worse.",
+  "initialCode": "# Scenario: a Slack message from the head of merch.\n# > \"Hey — which product is selling the most this quarter?\n# >  Drop a chart in the channel when you have a sec.\"\n#\n# Data: five products, units sold this quarter (illustrative numbers).\nproducts = ['mug', 'tee', 'pen', 'cap', 'bag']\nunits    = [340, 290, 250, 220, 180]",
+  "buggyLineStart": 6,
+  "buggyLineEnd": 6,
+  "traceback": "Junior analyst's draft: 'I'll do a line chart so the comparison feels dynamic — the line will go from highest to lowest.'",
+  "correctOutput": "Senior analyst's verdict: 'Bar chart, sorted descending — discrete categories, single comparison, label each bar with the unit count.'",
+  "options": [
+    {
+      "key": "a",
+      "label": "Bar chart, sorted descending, one bar per product",
+      "patchCode": "# Scenario: a Slack message from the head of merch.\n# > \"Hey — which product is selling the most this quarter?\n# >  Drop a chart in the channel when you have a sec.\"\n#\n# Data: five products, units sold this quarter (illustrative numbers).\nproducts = ['mug', 'tee', 'pen', 'cap', 'bag']\nunits    = [340, 290, 250, 220, 180]",
+      "isCorrect": true,
+      "resultLog": "Acting on this reading: a 30-second chart anyone can read at a glance — the longest bar IS the answer.",
+      "rationale": "Bar lengths are the most accurate visual encoding the eye does for discrete categories. Sorting descending puts the answer first; labelling each bar with the count removes the need to read the axis. This is what the stakeholder actually asked for — one comparison across five discrete things."
+    },
+    {
+      "key": "b",
+      "label": "Line chart with products on the x-axis",
+      "patchCode": "# Scenario: a Slack message from the head of merch.\n# > \"Hey — which product is selling the most this quarter?\n# >  Drop a chart in the channel when you have a sec.\"\n#\n# Data: five products, units sold this quarter (illustrative numbers).\nproducts = ['mug', 'tee', 'pen', 'cap', 'bag']\nunits    = [340, 290, 250, 220, 180]",
+      "isCorrect": false,
+      "resultLog": "Acting on this reading: the chart implies a trend across products that doesn't exist; readers ask 'why does pen come after tee?'",
+      "rationale": "A line chart implies an ordered/continuous x-axis — the eye reads the slope as 'change over time.' Products are not a sequence, so the line *manufactures* a story that isn't in the data. This is the same anti-pattern as the da-020 bar-vs-line bug, in reverse: wrong chart type for the shape of the question."
+    },
+    {
+      "key": "c",
+      "label": "Pie chart — five slices, each labelled with the product name",
+      "patchCode": "# Scenario: a Slack message from the head of merch.\n# > \"Hey — which product is selling the most this quarter?\n# >  Drop a chart in the channel when you have a sec.\"\n#\n# Data: five products, units sold this quarter (illustrative numbers).\nproducts = ['mug', 'tee', 'pen', 'cap', 'bag']\nunits    = [340, 290, 250, 220, 180]",
+      "isCorrect": false,
+      "resultLog": "Acting on this reading: stakeholders argue about which slice is bigger; bottom two (220 vs 180) look identical at this size.",
+      "rationale": "Humans can't compare angles accurately, especially for similar values — that's why every viz textbook warns off pie charts with more than 3–4 slices. Bar lengths beat pie angles every time. Use pie only for one-or-two-clear-dominator stories with very few slices."
+    }
+  ],
+  "hints": [
+    "What is the question asking for? A single ordering across discrete categories. What visual encoding maps best to that?",
+    "Bar lengths beat angles and beat manufactured slopes. Sort descending and label the bars."
+  ],
+  "explanationMd": "### Why this is the right reading\nThe question is *comparison across discrete categories*. The visual encoding that maps to that question most directly is **length**, not angle (pie) and not slope (line). Bars sorted descending make the answer the leftmost bar; labelling each bar removes axis-translation work for the reader.\n\n### What makes the other two reasonings weak\n- **Line over categories** manufactures a trend by drawing a slope between adjacent bars. The slope has no meaning — pen isn't \"between\" tee and cap in any real sense — but the eye will read it as one.\n- **Pie chart with five slices** asks the reader to compare angles for similar values. Two-eighths vs three-tenths look identical at a glance. Bars are strictly better for this shape.\n\n### The general principle\nMatch the chart type to the question's *shape*. Discrete categorical comparison → bar. Change over an ordered axis → line. Two-or-three-slice part-of-whole with one dominator → bar still wins, but pie won't actively mislead.",
+  "recruiterReview": "Good — you didn't fall for the 'line feels dynamic' instinct or the pie-by-default habit. You picked the chart whose visual encoding matches the question's shape, and you named *why* the other two are worse. Two refinements for next time: 1) for >10 categories, prefer a horizontal bar chart with sorted bars so the long category labels don't overlap; 2) when bars are very close in height, annotate them with the exact value — don't make the reader compare bar tops to axis ticks.",
+  "tutorial": {
+    "bodyMd": "## Matching Chart Type to the Question's Shape\n\nThe single most-impactful viz skill: knowing what shape your question wants. The chart should let the reader's eye answer the question without translation.\n\n### The mapping that covers 90% of business charts\n| Question's shape | Right chart |\n|---|---|\n| Which category is biggest? (discrete, one comparison) | **Bar** (sorted) |\n| How is X changing over an ordered axis (time, date, age)? | **Line** |\n| What's the distribution of X? | **Histogram** or **box-and-whisker** |\n| How does X relate to Y across many observations? | **Scatter** |\n| How does X break down into parts? | **Stacked bar** or **treemap** (rarely pie) |\n| How does X vary across two dimensions? | **Heatmap** |\n\n### Why bar wins this question\n- **Bar lengths** are the most accurate visual encoding humans use. We're great at saying \"this bar is about twice that one.\"\n- **Sorting descending** puts the answer first — the eye doesn't have to scan to find the biggest.\n- **Labels on bars** remove the need to look up at an axis.\n\n### Why the alternatives are weaker\n- **Pie/donut**: angle comparison is imprecise. Two slices that differ by 10% look identical. Pies are also hard to label cleanly once you have more than 3–4 slices.\n- **Line over categories**: the line *implies an order* that isn't real. Readers ask \"why is pen between tee and cap?\" and assume there's structure where there isn't.\n- **3-D bars**: depth distortion makes them unreadable — never use them.\n- **Bubble chart**: useful when each row has 3+ dimensions (x, y, size). Overkill for a single comparison.\n\n### The horizontal bar variant\nFor long category labels (\"Q4 2024 enterprise retention\") or for >8 categories, rotate to a horizontal bar chart with `ax.barh(...)`. The label fits on its own line and the eye still reads length correctly.\n\n### Practical authoring checklist\n1. Sort the bars (descending for \"biggest first\", ascending for \"smallest first\" if that matches the question).\n2. Annotate values directly on the bars when precision matters.\n3. Anchor the x-axis (the value axis) at zero — same lesson as da-018, length should equal magnitude.\n4. Pick a single accent colour; don't rainbow-colour discrete categories with no ordering meaning.\n5. The chart title should *be the question being answered*, not the file name (\"Which product sold most in Q2?\").\n\n### Common reasoning mistakes\n- 'Line feels dynamic' → drawing slopes through categorical data. Slope = lie.\n- 'Pie for percentages' → angles fail for >3 similar values.\n- 'Sort alphabetically by product name' → forces the eye to do work the chart should do (sort by the value being compared).\n- 'One chart for many questions' → a chart that tries to answer 'which is biggest AND how have they changed AND who buys them' answers none well. Make multiple charts.\n\n### You just learned…\nThe chart type is part of the message. **Discrete categorical comparison → sorted bar.** A line over categories invents a trend; a pie with too many slices makes the eye compare angles it can't compare. Match the chart's shape to the question's shape, and the reader's eye does the work.",
+    "videos": [
+      {
+        "title": "Picking the right chart type",
+        "searchQuery": "data visualization chart type selection beginner"
+      },
+      {
+        "title": "Why pie charts are bad",
+        "searchQuery": "why pie charts are bad data visualization explained"
+      }
+    ]
+  },
+  "estMinutes": 5,
+  "version": 1,
+  "conceptCard": "This mission is about **matching chart type to question shape**.\n\n- Discrete categorical comparison → **sorted bar chart**.\n- A line over categories *invents* a trend; pie angles can't be compared accurately.\n- The chart type should let the eye answer the question without translation.\n\nThe stakeholder asks 'which product is biggest?' — three discrete categories with one number each. Bars sorted descending are the cleanest answer.",
+  "lineNotes": [
+    {
+      "line": 1,
+      "noteMd": "The stakeholder ask — short, casual, single question."
+    },
+    {
+      "line": 5,
+      "noteMd": "Five discrete categories with one number each — perfect for a bar chart."
+    },
+    {
+      "line": 6,
+      "noteMd": "The values, ordered however the data came in. Always sort *before* you plot."
+    }
+  ],
+  "takeaway": "Discrete categorical comparison → sorted bar — lines invent trends, pies hide differences.",
+  "track": "reasoning",
+  "figureSvg": "<svg viewBox=\"0 0 700 400\" xmlns=\"http://www.w3.org/2000/svg\" preserveAspectRatio=\"xMidYMid meet\" width=\"100%\" height=\"auto\"><rect x=\"0\" y=\"0\" width=\"700\" height=\"400\" fill=\"var(--code-bg, #11161D)\" rx=\"6\"/><text x=\"64\" y=\"22\" fill=\"var(--text, #E6E8EC)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"13\" font-weight=\"600\">units_by_product_q2.png</text><line x1=\"64\" y1=\"36\" x2=\"64\" y2=\"344\" stroke=\"var(--muted, #8B9099)\" stroke-width=\"1\"/><line x1=\"64\" y1=\"344\" x2=\"676\" y2=\"344\" stroke=\"var(--muted, #8B9099)\" stroke-width=\"1\"/><rect x=\"73.2\" y=\"64.0\" width=\"85.7\" height=\"280.0\" fill=\"#7CD992\" opacity=\"0.85\"/><text x=\"116.0\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">mug</text><rect x=\"195.6\" y=\"105.2\" width=\"85.7\" height=\"238.8\" fill=\"#7CD992\" opacity=\"0.85\"/><text x=\"238.4\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">tee</text><rect x=\"318.0\" y=\"138.1\" width=\"85.7\" height=\"205.9\" fill=\"#7CD992\" opacity=\"0.85\"/><text x=\"360.8\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">pen</text><rect x=\"440.4\" y=\"162.8\" width=\"85.7\" height=\"181.2\" fill=\"#7CD992\" opacity=\"0.85\"/><text x=\"483.2\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">cap</text><rect x=\"562.8\" y=\"195.8\" width=\"85.7\" height=\"148.2\" fill=\"#7CD992\" opacity=\"0.85\"/><text x=\"605.6\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">bag</text><text x=\"56\" y=\"347\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">0</text><text x=\"56\" y=\"285.4\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">75</text><text x=\"56\" y=\"223.8\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">150</text><text x=\"56\" y=\"162.20000000000002\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">224</text><text x=\"56\" y=\"100.6\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">299</text><text x=\"56\" y=\"39\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">374</text><text x=\"370\" y=\"386\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"11\" text-anchor=\"middle\">product</text><text transform=\"translate(20, 190) rotate(-90)\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"11\" text-anchor=\"middle\">units sold</text></svg>",
+  "figureCaption": "Data the stakeholder is asking about — five products, one quarter, units sold."
+}

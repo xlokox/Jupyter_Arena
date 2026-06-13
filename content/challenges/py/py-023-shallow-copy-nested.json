@@ -1,0 +1,82 @@
+{
+  "id": "py-023-shallow-copy-nested",
+  "sector": "py",
+  "difficulty": "hard",
+  "title": "23_save_a_snapshot.ipynb",
+  "language": "python",
+  "icon": "layers",
+  "conceptTags": ["lists", "copying", "deep-copy"],
+  "descriptionMd": "## Mission: Save the Original\n\nYou have a small 3×3 grid of scores. You make a copy to play with — `snapshot = list(grid)` — modify the copy's middle row, then print both. You expect the original to be unchanged. It isn't: the original's middle row changed too.\n\n`list(grid)` does copy the outer list — but the *inner* lists are still the same objects, shared between `grid` and `snapshot`. That's a **shallow copy**. To preserve a nested structure you need a **deep copy**.",
+  "initialCode": "grid = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]\nsnapshot = list(grid)\nsnapshot[1][1] = 999  # change the middle of the copy\nprint(\"snapshot:\", snapshot)\nprint(\"grid:    \", grid)",
+  "buggyLineStart": 2,
+  "buggyLineEnd": 2,
+  "traceback": "snapshot: [[1, 2, 3], [4, 999, 6], [7, 8, 9]]\ngrid:     [[1, 2, 3], [4, 999, 6], [7, 8, 9]]",
+  "correctOutput": "snapshot: [[1, 2, 3], [4, 999, 6], [7, 8, 9]]\ngrid:     [[1, 2, 3], [4, 5, 6], [7, 8, 9]]",
+  "options": [
+    {
+      "key": "a",
+      "label": "Deep-copy the grid with `copy.deepcopy(grid)`",
+      "patchCode": "import copy\n\ngrid = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]\nsnapshot = copy.deepcopy(grid)\nsnapshot[1][1] = 999  # change the middle of the copy\nprint(\"snapshot:\", snapshot)\nprint(\"grid:    \", grid)",
+      "isCorrect": true,
+      "resultLog": "snapshot: [[1, 2, 3], [4, 999, 6], [7, 8, 9]]\ngrid:     [[1, 2, 3], [4, 5, 6], [7, 8, 9]]",
+      "rationale": "`copy.deepcopy(grid)` walks the whole structure and rebuilds each level — outer list **and** every inner list — so `snapshot` and `grid` share *nothing*. Mutating any cell of the snapshot leaves the original alone. For any nested structure (list of lists, dict of dicts, lists of dicts), `deepcopy` is the safe default."
+    },
+    {
+      "key": "b",
+      "label": "Use slice assignment: `snapshot = grid[:]`",
+      "patchCode": "grid = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]\nsnapshot = grid[:]\nsnapshot[1][1] = 999\nprint(\"snapshot:\", snapshot)\nprint(\"grid:    \", grid)",
+      "isCorrect": false,
+      "resultLog": "snapshot: [[1, 2, 3], [4, 999, 6], [7, 8, 9]]\ngrid:     [[1, 2, 3], [4, 999, 6], [7, 8, 9]]",
+      "rationale": "`grid[:]` (and `list(grid)`, and `grid.copy()`) all do the same thing: a **shallow** copy. The outer list is new, but the inner lists are still the same three objects. Mutating any inner list shows up in both. `slice` looks like a fix but isn't."
+    },
+    {
+      "key": "c",
+      "label": "Comprehension that copies each inner list: `[row.copy() for row in grid]`",
+      "patchCode": "grid = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]\nsnapshot = [row.copy() for row in grid]\nsnapshot[1][1] = 999\nprint(\"snapshot:\", snapshot)\nprint(\"grid:    \", grid)",
+      "isCorrect": false,
+      "resultLog": "snapshot: [[1, 2, 3], [4, 999, 6], [7, 8, 9]]\ngrid:     [[1, 2, 3], [4, 5, 6], [7, 8, 9]]",
+      "rationale": "This works for *this* grid because the inner lists hold immutable `int`s, so a one-level deeper copy is enough. But it fails the moment the inner items become lists themselves (a 3-D grid, a list of dicts holding lists, …) — you'd be back to shared references one level lower. `copy.deepcopy` is the general answer; reach for it when the nesting can grow."
+    }
+  ],
+  "hints": [
+    "Add `print(id(grid[1]), id(snapshot[1]))` after the copy. They print the same id — same object.",
+    "Import `copy` and use `copy.deepcopy(grid)`. It recursively rebuilds every nested container so the two structures share nothing."
+  ],
+  "explanationMd": "### Why the bug occurs\nA `list` holds references — pointers to other objects, not the values themselves. When you do `list(grid)`, Python builds a *new* outer list whose three slots point to the same three inner lists that `grid` already pointed at. The outer container is new; the contents are still shared.\n\nDiagram-style:\n```\ngrid     →  [ →row0, →row1, →row2 ]\nsnapshot →  [ →row0, →row1, →row2 ]   # same arrows\n```\nMutating `snapshot[1]` follows the arrow to `row1` — the *same* `row1` `grid` is also pointing at — and changes it. Both see the change.\n\n### Why the fix is correct\n`copy.deepcopy(grid)` walks the structure and **rebuilds every level**. Each inner list becomes a brand-new list with copied numbers; the new outer list points only at those new inner lists. Now no arrow from `snapshot` lands on anything `grid` points at, so mutations are isolated.\n\n### When shallow is enough\nIf the inner items are immutable (`int`, `str`, `tuple`, `frozenset`, …), a one-level copy works because the items can't be mutated in place at all. As soon as a level can be mutated, you need to copy it. For *anything you don't fully control*, prefer `deepcopy` — it costs a little more memory and a little time, and it correctly handles nesting, cycles, and most custom classes via `__deepcopy__`.",
+  "recruiterReview": "Strong — you didn't just patch the output for this 2-D grid, you reached for `deepcopy`, which is the correct general answer. The shallow-copy trap is one of the most-Googled Python bugs in real codebases (it shows up wherever there are nested data structures: config trees, JSON-like dicts, ML record lists). Two follow-ups: `copy.deepcopy` is slow on huge structures, so for hot paths consider designing your data to be immutable from the start (tuples, frozen dataclasses); and for plain JSON-shaped data, `json.loads(json.dumps(obj))` is a serviceable fast-and-dirty deep copy. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Shallow vs Deep Copy\n\nThis is one of the easiest bugs to write and one of the trickiest to spot, because the symptom appears *somewhere else* than the copy itself. Internalising the model pays off.\n\n### Python variables hold references\n```python\na = [1, 2, 3]\nb = a\nb.append(4)\nprint(a)  # [1, 2, 3, 4]\n```\n`b = a` doesn't copy anything — both names point at the same list. Mutating through one shows up through the other.\n\n### Shallow copy: new outer container, shared contents\n```python\na = [[1, 2], [3, 4]]\nb = list(a)        # or a[:], a.copy()\nb.append([5, 6])\nprint(a)  # [[1, 2], [3, 4]]      ← outer is independent\nb[0].append(99)\nprint(a)  # [[1, 2, 99], [3, 4]]  ← inner is SHARED\n```\nThe outer list is new (good — `append` to one doesn't affect the other), but the inner lists are the same objects (bad — mutating an inner shows everywhere).\n\nAll of these do shallow copies:\n- `list(x)`\n- `x[:]`\n- `x.copy()`\n- `copy.copy(x)`\n\n### Deep copy: rebuild every level\n```python\nimport copy\nb = copy.deepcopy(a)\n```\n`deepcopy` walks the entire structure and creates a fresh copy at every level. For lists of lists, dicts of dicts, lists of objects with mutable attributes — it's the safe default.\n\n### When shallow is enough\nIf every \"leaf\" is immutable (`int`, `str`, `tuple` of immutables, `frozenset`), a shallow copy is fine because the leaves can't be mutated. If the leaves are mutable (or *could be* — you're not sure what the source data is), use `deepcopy`.\n\n### Cost\n`deepcopy` allocates one new object per node — slow on huge structures (think: 100k-row DataFrames). If that's your bottleneck, consider:\n- **Immutable data:** use `tuple`/`frozenset`/`dataclass(frozen=True)`, then no copy is ever needed.\n- **JSON round-trip:** `json.loads(json.dumps(x))` is a fast, deep clone for plain JSON-shaped data.\n- **Targeted copy:** if you only mutate one level, copy just that level: `[row[:] for row in grid]`.\n\n### Custom classes\n`deepcopy` knows how to copy most standard classes. For your own classes you can define `__deepcopy__(self, memo)` to take control (rare).\n\n### Common beginner mistakes\n- `b = a` and then mutating one — both names see the change.\n- `list(a)` on a nested list — outer copied, inner shared. The mission's exact bug.\n- Using `deepcopy` on a class with file handles or DB connections — copying those is at best meaningless, often broken.\n\n### Mental model\nThink of variables as labels stuck to boxes. `b = a` puts a second label on the same box. `b = list(a)` builds a new outer box that holds the same inner boxes. `b = copy.deepcopy(a)` builds a new tree of boxes the whole way down.\n\n### You just learned…\nAssignment is a reference, `list(x)`/`x[:]`/`x.copy()` are **shallow** copies (new outer, shared inner), and `copy.deepcopy(x)` is the **deep** copy. For nested data, `deepcopy` is the safe default; for performance-critical paths, prefer immutable data.",
+    "videos": [
+      {
+        "title": "Shallow vs deep copy in Python",
+        "searchQuery": "python shallow deep copy nested list tutorial"
+      },
+      {
+        "title": "Why list() doesn't really copy a nested list",
+        "searchQuery": "python list copy nested reference shared beginner"
+      }
+    ]
+  },
+  "estMinutes": 8,
+  "version": 1,
+  "conceptCard": "This mission is about **deep vs shallow copies**.\n\n- `list(x)`, `x[:]`, `x.copy()` are all **shallow**: new outer list, shared inner objects.\n- For a nested structure, mutating the copy mutates the original.\n- `import copy; copy.deepcopy(x)` rebuilds every level — true isolation.\n\nThe code uses `list(grid)` so the inner rows are still shared. Switch to `copy.deepcopy(grid)`.",
+  "lineNotes": [
+    {
+      "line": 1,
+      "noteMd": "A grid of three lists. The inner lists are the objects that will be aliased."
+    },
+    {
+      "line": 2,
+      "noteMd": "**The bug.** `list(grid)` copies only the outer list; the inner rows are shared. Use `copy.deepcopy(grid)`."
+    },
+    {
+      "line": 3,
+      "noteMd": "Writes through the shared middle row — `grid[1]` and `snapshot[1]` are the same list."
+    },
+    {
+      "line": 4,
+      "noteMd": "Both prints show the mutation because both names point at the same inner list."
+    }
+  ],
+  "takeaway": "list(x) / x[:] are shallow — for nested data use copy.deepcopy(x)."
+}

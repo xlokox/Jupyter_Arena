@@ -1,0 +1,74 @@
+{
+  "id": "py-011-dict-keyerror",
+  "sector": "py",
+  "difficulty": "easy",
+  "title": "11_read_profile.ipynb",
+  "language": "python",
+  "icon": "braces",
+  "conceptTags": ["dictionaries", "keys", "key-error"],
+  "descriptionMd": "## Mission: Read a Value from a Profile\n\nA user profile is stored as a dictionary — pairs of labels and values. You want the name, so you asked for `user[\"Name\"]`. Python raises a `KeyError: 'Name'`.\n\nDictionary keys are looked up **exactly**, capital letters included. The profile's key is `name` (lowercase), but you asked for `Name`. Use the exact key so the name comes back.",
+  "initialCode": "# Print the user's name from their profile\nuser = {\"name\": \"Ada\", \"age\": 30}\nprint(\"The user's name is:\", user[\"Name\"])",
+  "buggyLineStart": 3,
+  "buggyLineEnd": 3,
+  "traceback": "---------------------------------------------------------------------------\nKeyError                                  Traceback (most recent call last)\nCell In[1], line 3\n      2 user = {\"name\": \"Ada\", \"age\": 30}\n----> 3 print(\"The user's name is:\", user[\"Name\"])\n\nKeyError: 'Name'",
+  "correctOutput": "The user's name is: Ada",
+  "options": [
+    {
+      "key": "a",
+      "label": "Use the exact key: \"name\"",
+      "patchCode": "# Print the user's name from their profile\nuser = {\"name\": \"Ada\", \"age\": 30}\nprint(\"The user's name is:\", user[\"name\"])",
+      "isCorrect": true,
+      "resultLog": "The user's name is: Ada",
+      "rationale": "A dictionary finds values by an exact key match. The profile was built with the key `\"name\"` (all lowercase), so `user[\"Name\"]` — with a capital N — matches nothing and raises `KeyError`. Asking for `user[\"name\"]` uses the real key and returns `Ada`."
+    },
+    {
+      "key": "b",
+      "label": "Use .get(\"Name\") to avoid the error",
+      "patchCode": "# Print the user's name from their profile\nuser = {\"name\": \"Ada\", \"age\": 30}\nprint(\"The user's name is:\", user.get(\"Name\"))",
+      "isCorrect": false,
+      "resultLog": "The user's name is: None",
+      "rationale": "`.get()` does stop the crash — but it returns `None` when the key isn't found, and `\"Name\"` still isn't a real key, so you print `None` instead of the name. `.get()` is great for keys that might be missing, but here you just have the wrong key: use `\"name\"`."
+    },
+    {
+      "key": "c",
+      "label": "Drop the quotes: user[name]",
+      "patchCode": "# Print the user's name from their profile\nuser = {\"name\": \"Ada\", \"age\": 30}\nprint(\"The user's name is:\", user[name])",
+      "isCorrect": false,
+      "resultLog": "---------------------------------------------------------------------------\nNameError                                 Traceback (most recent call last)\nCell In[1], line 3\n----> 3 print(\"The user's name is:\", user[name])\n\nNameError: name 'name' is not defined",
+      "rationale": "Without quotes, Python thinks `name` is a *variable*, looks for one, and finds none — `NameError`. The dictionary's keys here are text, so the key must be quoted: `user[\"name\"]`."
+    }
+  ],
+  "hints": [
+    "Read the error: `KeyError: 'Name'`. Python looked for a key called `Name` and the dictionary doesn't have one. Look at how the dictionary was built — what is the name key spelled like?",
+    "Keys match exactly, capitals included. The profile uses `\"name\"` (lowercase). Use that exact text in the square brackets."
+  ],
+  "explanationMd": "### Why the bug occurs\nA **dictionary** stores values under labels called **keys**, and looking up a value requires matching the key *exactly* — including capitalization. The profile was created with the key `\"name\"`, but the code asked for `\"Name\"`. Since no key called `Name` exists, Python raises `KeyError: 'Name'`.\n\n### Why the fix is correct\nUsing the real key, `user[\"name\"]`, matches the stored pair and returns `Ada`. Two related points: keys are case-sensitive (`\"name\"` ≠ `\"Name\"`), and string keys must be quoted (`user[\"name\"]`, not `user[name]`, which would look for a variable). When a key might legitimately be missing, `user.get(\"name\")` returns `None` (or a default you supply) instead of raising — but that's for optional keys, not for fixing a typo.",
+  "recruiterReview": "Good — you matched the `KeyError` to a casing mismatch and used the exact key rather than masking the problem with `.get()`. Understanding that dictionaries are exact-match lookups (and that `.get()` is for *expected* misses, not wrong keys) is an important distinction. In real data work you'll often normalize keys (lowercase them) right after loading so this class of bug can't happen. Clean fix. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Dictionaries and Keys\n\nWhen you need to look something up by a label — a user's name, a product's price — you reach for a dictionary.\n\n### What is a dictionary?\nA **dictionary** stores **key → value** pairs in curly braces. Each key is a label; each value is what it points to:\n```python\nuser = {\"name\": \"Ada\", \"age\": 30}\n```\nHere the key `\"name\"` points to `\"Ada\"`, and `\"age\"` points to `30`.\n\n### Looking up a value\nYou fetch a value by putting its key in square brackets:\n```python\nuser[\"name\"]   # 'Ada'\nuser[\"age\"]    # 30\n```\nThe key must match **exactly** — same spelling, same capitalization. `user[\"Name\"]` (capital N) doesn't match `\"name\"` and raises `KeyError: 'Name'`.\n\n### Quote your string keys\n```python\nuser[\"name\"]   # correct: a text key\nuser[name]     # wrong: Python looks for a variable called name → NameError\n```\nKeys that are text must be in quotes.\n\n### When a key might be missing: .get()\nIf you're not sure a key exists, `.get()` returns `None` (or a default) instead of crashing:\n```python\nuser.get(\"email\")          # None — no crash\nuser.get(\"email\", \"n/a\")   # 'n/a' — your chosen default\n```\nUse `[ ]` when the key should be there, and `.get()` when it's genuinely optional. (Don't use `.get()` to paper over a typo — fix the key.)\n\n### A tiny worked example\n```python\nprices = {\"apple\": 1.2, \"banana\": 0.8}\nprint(prices[\"banana\"])        # 0.8\nprint(prices.get(\"cherry\"))    # None\n```\n\n### How to spot it\n`KeyError: 'X'` means the dictionary has no key `X` — check spelling and capitalization. `NameError` after a bracket usually means you forgot the quotes around a text key.\n\n### Common beginner mistakes\n- Wrong capitalization in a key (`\"Name\"` vs `\"name\"`).\n- Forgetting quotes, so Python looks for a variable.\n- Using `[ ]` on a key that might be missing (use `.get()` instead).\n\n### You just learned…\nA **dictionary** holds `key → value` pairs in `{ }`, you fetch values by an **exact** quoted key with `[ ]`, and `.get()` safely handles keys that might be missing. Dictionaries are one of the most useful tools in Python.",
+    "videos": [
+      {
+        "title": "Python dictionaries for beginners",
+        "searchQuery": "python dictionary keys values beginner tutorial"
+      },
+      {
+        "title": "KeyError and dict.get() explained",
+        "searchQuery": "python keyerror dictionary get default beginner"
+      }
+    ]
+  },
+  "estMinutes": 4,
+  "version": 1,
+  "conceptCard": "This mission is about **dictionaries**.\n\n- A dictionary stores `key → value` pairs in curly braces: `{\"name\": \"Ada\"}`.\n- You fetch a value by its key in square brackets: `user[\"name\"]`.\n- Keys match **exactly**, capital letters included — `\"Name\"` ≠ `\"name\"`.\n\nThe code asks for a key that doesn't quite match the one stored. Use the exact key.",
+  "lineNotes": [
+    {
+      "line": 2,
+      "noteMd": "Creates a **dictionary** with two keys, `\"name\"` and `\"age\"` (both lowercase), each pointing to a value."
+    },
+    {
+      "line": 3,
+      "noteMd": "Looks up `\"Name\"` with a capital N — but the stored key is lowercase `\"name\"`, so there's no match. Keys are case-sensitive."
+    }
+  ],
+  "takeaway": "Dictionary keys must match exactly, capitalization included — use the precise key."
+}

@@ -1,0 +1,85 @@
+{
+  "id": "da-048-window-row-number-dedup",
+  "sector": "da",
+  "difficulty": "medium",
+  "title": "48_latest_address_per_user.ipynb",
+  "language": "sql",
+  "icon": "list-ordered",
+  "conceptTags": ["sql", "window-function", "deduplication"],
+  "descriptionMd": "## Mission: Latest Address Per User\n\nYou have an `addresses` table with one row per change (`user_id`, `address`, `updated_at`). The CRM team wants the **most recent address per user** — one row per user, the latest one. Your first attempt — `SELECT user_id, MAX(updated_at) FROM addresses GROUP BY user_id` — gives you the timestamp but not the address itself. A self-join 'works' but is the slow road.\n\nThe right tool is **`ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY updated_at DESC)`** — a window function that ranks rows *within each group* by the order you specify, so `row_number = 1` is the latest. This pattern shows up in every analytics codebase: 'most recent purchase per customer,' 'latest status per ticket,' 'top product per region.' Once you can write it in your sleep, hundreds of dedup-by-most-recent problems become one-liners.",
+  "initialCode": "-- Sample data\n-- addresses:\n--   user_id | address       | updated_at\n--   1       | 12 Oak St     | 2025-01-15\n--   1       | 88 Pine Ave   | 2025-03-10   ← latest for user 1\n--   2       | 4 Maple Ln    | 2025-02-01   ← latest for user 2\n--   3       | 7 Birch Rd    | 2025-01-20\n--   3       | 33 Elm Way    | 2025-04-22   ← latest for user 3\n\n-- The buggy attempt: returns user_id + max(updated_at) but NOT the address column.\nSELECT user_id, MAX(updated_at) AS latest\nFROM   addresses\nGROUP BY user_id;",
+  "buggyLineStart": 11,
+  "buggyLineEnd": 13,
+  "traceback": " user_id |   latest\n---------+------------\n       1 | 2025-03-10\n       2 | 2025-02-01\n       3 | 2025-04-22\n# expected: user_id, address, updated_at — the actual address column is missing",
+  "correctOutput": " user_id |  address    | updated_at\n---------+-------------+------------\n       1 | 88 Pine Ave | 2025-03-10\n       2 | 4 Maple Ln  | 2025-02-01\n       3 | 33 Elm Way  | 2025-04-22",
+  "options": [
+    {
+      "key": "a",
+      "label": "ROW_NUMBER() partitioned by user, ordered DESC, then filter row_number = 1",
+      "patchCode": "WITH ranked AS (\n  SELECT user_id,\n         address,\n         updated_at,\n         ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY updated_at DESC) AS rn\n  FROM   addresses\n)\nSELECT user_id, address, updated_at\nFROM   ranked\nWHERE  rn = 1;",
+      "isCorrect": true,
+      "resultLog": " user_id |  address    | updated_at\n---------+-------------+------------\n       1 | 88 Pine Ave | 2025-03-10\n       2 | 4 Maple Ln  | 2025-02-01\n       3 | 33 Elm Way  | 2025-04-22",
+      "rationale": "The `OVER (PARTITION BY user_id ORDER BY updated_at DESC)` window assigns `ROW_NUMBER` 1, 2, 3, … *within each user*, with the most recent first. Filtering `rn = 1` keeps exactly one row per user — the latest. This is the canonical 'most recent per group' pattern. The CTE around the window is just for readability; you could equivalently use a subquery in the FROM clause. **Note:** if two rows share the same `updated_at` for a user, `ROW_NUMBER` will pick one arbitrarily; if you want all of them tied at the top, use `RANK()` or `DENSE_RANK()` instead."
+    },
+    {
+      "key": "b",
+      "label": "Self-join: find each row whose `updated_at` matches the MAX per user",
+      "patchCode": "SELECT a.user_id, a.address, a.updated_at\nFROM   addresses a\nJOIN ( SELECT user_id, MAX(updated_at) AS latest\n       FROM   addresses\n       GROUP BY user_id\n     ) m\n  ON a.user_id = m.user_id\n AND a.updated_at = m.latest;",
+      "isCorrect": false,
+      "resultLog": " user_id |  address    | updated_at\n---------+-------------+------------\n       1 | 88 Pine Ave | 2025-03-10\n       2 | 4 Maple Ln  | 2025-02-01\n       3 | 33 Elm Way  | 2025-04-22\n-- correct rows, but two scans of addresses + a join — slower and breaks on ties",
+      "rationale": "Returns the same rows, but the query plan does **two scans** of `addresses` (one for the inner GROUP BY, one for the outer JOIN) plus the join itself. On a 100M-row table this is materially slower than the single window-function scan. There's also a subtler bug: if any user has **two rows with the same `updated_at`**, this query returns **both** — and the upstream CRM dedup logic now has to handle that surprise. The window-function version with `ROW_NUMBER` guarantees one row per user; you choose `RANK`/`DENSE_RANK` only if ties matter."
+    },
+    {
+      "key": "c",
+      "label": "DISTINCT ON (Postgres-specific): `SELECT DISTINCT ON (user_id) ... ORDER BY user_id, updated_at DESC`",
+      "patchCode": "SELECT DISTINCT ON (user_id) user_id, address, updated_at\nFROM   addresses\nORDER BY user_id, updated_at DESC;",
+      "isCorrect": false,
+      "resultLog": " user_id |  address    | updated_at\n---------+-------------+------------\n       1 | 88 Pine Ave | 2025-03-10\n       2 | 4 Maple Ln  | 2025-02-01\n       3 | 33 Elm Way  | 2025-04-22\n-- correct rows on PostgreSQL; ERROR: syntax error at or near \"ON\" on most other engines",
+      "rationale": "**Correct on PostgreSQL only.** `DISTINCT ON` is a Postgres-specific extension; it's not in ANSI SQL and doesn't exist on MySQL, SQLite, MSSQL, BigQuery, Snowflake (well, Snowflake added `QUALIFY` instead), or most other engines. It's also slightly subtle: the columns after `DISTINCT ON` define the dedup key, then the `ORDER BY` must start with those columns and the tie-breaker comes after. The window-function pattern (option A) works on **every** SQL engine that has window functions (everything since SQL:2003) — that's the portable choice."
+    }
+  ],
+  "hints": [
+    "GROUP BY can only return aggregates and the group keys. You can't get the row's `address` from `MAX(updated_at)` directly.",
+    "Use a window function: `ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY updated_at DESC)`. Filter where the row number equals 1."
+  ],
+  "explanationMd": "### Why the bug occurs\n`GROUP BY user_id` collapses many rows per user into one — every non-grouped column has to be inside an aggregate (`MAX`, `MIN`, `SUM`, `COUNT`, …). The aggregate gives you the *value* you asked for (`MAX(updated_at)`) but discards the rest of the row. You can't get the `address` that **goes with** that max timestamp from `GROUP BY` alone — that's a separate question, and aggregates don't carry their source row along.\n\n### Why the fix is correct\nWindow functions are the SQL feature for **per-row computation that depends on a group**. The syntax `OVER (PARTITION BY x ORDER BY y)` says: 'group the rows by `x`, sort each group by `y`, and assign a rank within the group.' `ROW_NUMBER()` then assigns 1, 2, 3, … within each partition.\n\nThe canonical 'latest per group' shape:\n```sql\nWITH ranked AS (\n  SELECT *,\n         ROW_NUMBER() OVER (PARTITION BY group_col ORDER BY order_col DESC) AS rn\n  FROM   t\n)\nSELECT * FROM ranked WHERE rn = 1;\n```\nReplace `group_col` with whatever 'per' means (user, customer, region, ticket, session) and `order_col` with whatever 'most recent' means (`updated_at`, `created_at`, `event_time`, `version`). This pattern is in every analytics codebase you'll ever touch.\n\n### `ROW_NUMBER`, `RANK`, `DENSE_RANK` — pick by tie behaviour\n- **`ROW_NUMBER`** — always returns `1, 2, 3, …` even on ties. The tiebreaker is implementation-defined (typically the physical order of the rows). Use when you want exactly one row per group.\n- **`RANK`** — returns `1, 1, 3, 4, …` on ties (skips numbers). Use when 'all rows tied at the top' should survive.\n- **`DENSE_RANK`** — returns `1, 1, 2, 3, …` on ties (doesn't skip). Use when you need a compact ranking for display.\n\n### Window functions are an ANSI SQL feature since 2003\nWindow functions are not vendor-specific. They work on:\n- PostgreSQL (since 8.4, 2009)\n- MySQL (since 8.0, 2018 — earlier MySQL didn't have them)\n- SQLite (since 3.25, 2018)\n- SQL Server (since 2005)\n- Oracle (since 8i)\n- BigQuery, Snowflake, Redshift (full support)\n- DuckDB (full support)\n\nThe pattern is portable across all of them. Once you know the syntax, you can lift the same query to any modern engine.",
+  "recruiterReview": "Strong — you reached for the window function, used a CTE for readability, and named the gotcha about ties. The reason this matters for production: 'most recent per group' is the most-common shape in analytics and the easiest place for a junior to write something that's *correct on the small dev table and wrong at scale or under ties*. Two follow-ups for next time: 1) when ordering by a timestamp, **explicitly handle nulls** (`ORDER BY updated_at DESC NULLS LAST`) — different engines default different ways. 2) For very large tables, consider `QUALIFY` (BigQuery / Snowflake / DuckDB) — it lets you filter on a window result without a CTE: `SELECT * FROM t QUALIFY ROW_NUMBER() OVER (...) = 1`. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Window Functions and the 'Latest Per Group' Pattern\n\nWindow functions are the single most-impactful SQL feature most juniors are slow to learn. Once you have them, dozens of common queries collapse from messy self-joins into clean one-liners.\n\n### The mental model\nA window function computes a value for **each row** based on a **group of rows** related to it. Unlike `GROUP BY`, the original rows are **preserved** — you get per-row results alongside the grouped computation.\n\nThe syntax is:\n```sql\n<function>() OVER (\n    [PARTITION BY <group columns>]\n    [ORDER BY <sort columns>]\n    [<window frame>]\n)\n```\n- `PARTITION BY` defines the group (like `GROUP BY` but doesn't collapse the rows).\n- `ORDER BY` sorts within the partition.\n- The optional window frame is `ROWS BETWEEN ... AND ...` for sliding windows (running totals, moving averages).\n\n### The 'latest per group' canon\nWritten as a CTE for readability:\n```sql\nWITH ranked AS (\n  SELECT *,\n         ROW_NUMBER() OVER (\n           PARTITION BY user_id\n           ORDER BY updated_at DESC\n         ) AS rn\n  FROM   addresses\n)\nSELECT user_id, address, updated_at\nFROM   ranked\nWHERE  rn = 1;\n```\nFor BigQuery / Snowflake / DuckDB, the `QUALIFY` shortcut is even cleaner:\n```sql\nSELECT user_id, address, updated_at\nFROM   addresses\nQUALIFY ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY updated_at DESC) = 1;\n```\nNote: `QUALIFY` isn't in standard SQL; Postgres and MySQL still need the CTE.\n\n### Other patterns the same shape unlocks\n- **First N per group** — `WHERE rn <= 5` for top-5 per category.\n- **Median per group** — `PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY x) OVER (PARTITION BY g)`.\n- **Running totals** — `SUM(amount) OVER (PARTITION BY user_id ORDER BY ts ROWS UNBOUNDED PRECEDING)`.\n- **Rolling averages** — `AVG(x) OVER (PARTITION BY g ORDER BY t ROWS BETWEEN 6 PRECEDING AND CURRENT ROW)`.\n- **Time-since-last-event** — `LAG(event_time) OVER (PARTITION BY user_id ORDER BY event_time)`.\n- **Next-event** — `LEAD(event_time) OVER (...)` for funnels.\n- **Percentile bands** — `NTILE(10) OVER (ORDER BY revenue)` for deciles.\n\n### The three rank functions, summarized\n```\nORDER BY revenue DESC:    100  100  80   60   60   60   40\n   ROW_NUMBER:              1    2    3    4    5    6    7\n   RANK:                    1    1    3    4    4    4    7\n   DENSE_RANK:              1    1    2    3    3    3    4\n```\n- Use **`ROW_NUMBER`** when you want exactly one winner.\n- Use **`RANK`** when ties should all be at the same position; subsequent positions skip.\n- Use **`DENSE_RANK`** when ties tie but subsequent positions don't skip.\n\n### `PARTITION BY` is optional\nIf you omit `PARTITION BY`, the whole result set is one window:\n```sql\nROW_NUMBER() OVER (ORDER BY revenue DESC)  -- 1..N over all rows\n```\nUseful for 'top 10 globally' or 'percentile across the whole table.'\n\n### Window frames — the second tier of complexity\nThe frame clause defines *which* rows in the partition contribute:\n```sql\nSUM(amount) OVER (\n    PARTITION BY user_id\n    ORDER BY ts\n    ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n) AS running_total\n```\nor a sliding window:\n```sql\nAVG(price) OVER (\n    ORDER BY ts\n    ROWS BETWEEN 6 PRECEDING AND CURRENT ROW\n) AS rolling_7day_avg\n```\nFrames default to `RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW` when you have `ORDER BY` — usually what you want for cumulative metrics, but read the spec for your engine.\n\n### Performance notes\n- Window functions typically need **one sort per partition** — efficient if the engine can use an existing index on the partition+sort columns.\n- Compared to the self-join 'find rows whose timestamp == max per group' pattern, window functions are usually 2–3× faster on tables of any size.\n- **`QUALIFY`** (where supported) avoids the CTE/subquery boundary, letting the planner optimize end-to-end.\n\n### Common reasoning mistakes\n- Using `GROUP BY` when the question is 'per row given a group' (not 'one row per group').\n- Using `ROW_NUMBER` when you needed `RANK` for ties.\n- Forgetting that `ORDER BY` inside `OVER` is separate from the outer `ORDER BY`.\n- `LAG`/`LEAD` without `PARTITION BY` — picks up the wrong neighbour across users.\n- Window functions inside `WHERE` — illegal in standard SQL; use CTE or `QUALIFY`.\n\n### You just learned…\nWindow functions are the SQL feature for **per-row computation that depends on a group**. `ROW_NUMBER() OVER (PARTITION BY g ORDER BY t DESC)` is the 'latest per group' canon. The same shape generalizes to top-N, running totals, rolling averages, LAG/LEAD funnels, percentile bands. Memorise the pattern; you'll write it weekly.",
+    "videos": [
+      { "title": "SQL window functions tutorial", "searchQuery": "sql window function row_number partition by tutorial beginner" },
+      { "title": "Most recent per group SQL pattern", "searchQuery": "sql latest record per group window function tutorial" }
+    ]
+  },
+  "estMinutes": 8,
+  "version": 1,
+  "conceptCard": "This mission is about **the 'latest per group' SQL pattern**.\n\n- `GROUP BY` collapses rows; you can't return non-aggregated columns alongside the aggregate.\n- A **window function** with `ROW_NUMBER() OVER (PARTITION BY ... ORDER BY ... DESC)` ranks rows within each group.\n- Filter `rn = 1` to keep the latest row per group — exactly one row per group, no ties.\n\nThe code uses `GROUP BY` and only gets the timestamp. Switch to `ROW_NUMBER` partitioned by user.",
+  "lineNotes": [
+    { "line": 1, "noteMd": "Comments illustrating the sample data." },
+    { "line": 11, "noteMd": "**The bug.** `GROUP BY user_id` returns one row per user but only the aggregate column. `address` is lost." },
+    { "line": 12, "noteMd": "Reading `MAX(updated_at)` doesn't carry the address that was on that row." }
+  ],
+  "takeaway": "ROW_NUMBER() OVER (PARTITION BY x ORDER BY y DESC) + filter rn=1 — the canonical 'latest per group' SQL pattern.",
+  "glossary": [
+    {
+      "term": "window function",
+      "definitionMd": "SQL function that computes a value per row based on a related group of rows defined by `OVER (PARTITION BY ... ORDER BY ...)`. Unlike `GROUP BY`, the source rows are preserved — you get per-row results alongside the group computation. Standardised in SQL:2003."
+    },
+    {
+      "term": "`PARTITION BY`",
+      "definitionMd": "Inside an `OVER (...)`, defines the group within which the window function computes. Like `GROUP BY` for the window — but the rows themselves don't collapse."
+    },
+    {
+      "term": "`ROW_NUMBER`",
+      "definitionMd": "Assigns a unique sequence `1, 2, 3, …` to rows within each partition, ordered by the window's `ORDER BY`. Always exactly one row per number; ties are broken arbitrarily by the engine."
+    },
+    {
+      "term": "`RANK` vs `DENSE_RANK`",
+      "definitionMd": "Rank functions that respect ties. `RANK` skips numbers after a tie (`1, 1, 3, …`); `DENSE_RANK` doesn't (`1, 1, 2, …`). Choose by whether downstream code expects gaps in the ranks."
+    },
+    {
+      "term": "`QUALIFY`",
+      "definitionMd": "BigQuery / Snowflake / DuckDB extension that lets you filter on a window function result directly: `SELECT ... QUALIFY ROW_NUMBER() OVER (...) = 1`. Not in standard SQL; Postgres and MySQL still need a CTE or subquery."
+    }
+  ]
+}

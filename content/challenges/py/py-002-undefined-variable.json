@@ -1,0 +1,78 @@
+{
+  "id": "py-002-undefined-variable",
+  "sector": "py",
+  "difficulty": "easy",
+  "title": "02_add_two_prices.ipynb",
+  "language": "python",
+  "icon": "variable",
+  "conceptTags": ["variables", "name-error", "spelling"],
+  "descriptionMd": "## Mission: Add Two Prices\n\nYou store two prices in labels, add them into a `total`, and print the result — it should say `Total price: 20 dollars`. Instead Python stops with a `NameError` complaining about a name it has never seen.\n\nA variable only exists if you spelled it exactly the same way everywhere. Somewhere the name you're printing doesn't match the name you created. Spot the mismatch and make the two spellings agree.",
+  "initialCode": "# Add up the prices of two items\nprice_one = 12\nprice_two = 8\ntotal = price_one + price_two\nprint(\"Total price:\", totl, \"dollars\")",
+  "buggyLineStart": 5,
+  "buggyLineEnd": 5,
+  "traceback": "---------------------------------------------------------------------------\nNameError                                 Traceback (most recent call last)\nCell In[1], line 5\n      4 total = price_one + price_two\n----> 5 print(\"Total price:\", totl, \"dollars\")\n\nNameError: name 'totl' is not defined",
+  "correctOutput": "Total price: 20 dollars",
+  "options": [
+    {
+      "key": "a",
+      "label": "Fix the spelling to match the variable: total",
+      "patchCode": "# Add up the prices of two items\nprice_one = 12\nprice_two = 8\ntotal = price_one + price_two\nprint(\"Total price:\", total, \"dollars\")",
+      "isCorrect": true,
+      "resultLog": "Total price: 20 dollars",
+      "rationale": "You created the variable `total` on line 4, but line 5 asked for `totl` — a name that was never defined, so Python raised `NameError`. Computers don't guess at near-misses; the name has to match character-for-character. Spelling it `total` makes the print use the value you computed."
+    },
+    {
+      "key": "b",
+      "label": "Put quotes around it so it's not undefined",
+      "patchCode": "# Add up the prices of two items\nprice_one = 12\nprice_two = 8\ntotal = price_one + price_two\nprint(\"Total price:\", \"totl\", \"dollars\")",
+      "isCorrect": false,
+      "resultLog": "Total price: totl dollars",
+      "rationale": "Quoting it stops the error, but now you're printing the literal word `totl` as text instead of the number you added up. Quotes mean \"this is plain text\"; without quotes a name refers to a variable's value. You want the value, so fix the spelling, not by quoting."
+    },
+    {
+      "key": "c",
+      "label": "Capitalize it to Total",
+      "patchCode": "# Add up the prices of two items\nprice_one = 12\nprice_two = 8\ntotal = price_one + price_two\nprint(\"Total price:\", Total, \"dollars\")",
+      "isCorrect": false,
+      "resultLog": "---------------------------------------------------------------------------\nNameError                                 Traceback (most recent call last)\nCell In[1], line 5\n----> 5 print(\"Total price:\", Total, \"dollars\")\n\nNameError: name 'Total' is not defined",
+      "rationale": "Python is case-sensitive: `Total` and `total` are two completely different names. You defined `total` (lowercase), so `Total` is still undefined and you get the same error. Match the exact capitalization you used when creating the variable."
+    }
+  ],
+  "hints": [
+    "Read the error: `name 'totl' is not defined`. Now look at line 4 where the total is created — is it spelled the same way as on line 5?",
+    "A variable must be spelled identically every time, including capital letters. Compare `totl` (line 5) with the name you defined on line 4 and make them match."
+  ],
+  "explanationMd": "### Why the bug occurs\nWhen you write `total = ...`, Python creates a label called exactly `total`. Asking for `totl` later refers to a label that was never created, so Python raises `NameError: name 'totl' is not defined`. The computer can't tell it was a typo — it only knows that name doesn't exist.\n\n### Why the fix is correct\nSpelling the name `total` on line 5 makes it match the variable you defined on line 4, so Python finds the value (20) and prints it. Two rules to carry forward: a name must be spelled **identically** everywhere, and Python is **case-sensitive** (`total` and `Total` are different). Quoting the name (`\"total\"`) would silence the error but print the literal word instead of the value, so that's not a real fix.",
+  "recruiterReview": "Good — you matched the error message to the line that raised it and fixed the spelling at the source. `NameError` is almost always a typo or a name used before it's created, and learning to read \"name X is not defined\" as \"check your spelling and order\" will save you constant time. A habit worth building early: pick clear, consistent names and let your editor's autocomplete fill them in, which kills typos before they happen. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Variables and Names\n\nThis lesson is about the labels we put on values — and the single most common beginner error, the typo.\n\n### What is a variable?\nA **variable** is a name that points to a value. You create one with `=`, which means \"store the value on the right under the name on the left\":\n```python\nprice = 12\n```\nNow the name `price` stands for `12`. You can use it anywhere you'd use the number, and you can combine variables:\n```python\nprice_one = 12\nprice_two = 8\ntotal = price_one + price_two   # total is now 20\n```\n\n### The rule: names must match exactly\nA variable only exists once you've created it, and every later mention has to spell it the **same way**. Two things trip up beginners:\n1. **Typos** — `totl` is not `total`. Python won't guess.\n2. **Capital letters** — Python is *case-sensitive*, so `Total`, `total`, and `TOTAL` are three different names.\nIf you ask for a name that was never created, you get `NameError: name '...' is not defined`.\n\n### A tiny worked example\n```python\ncity = \"Pisa\"\nprint(city)\n```\nprints:\n```\nPisa\n```\nBut `print(City)` (capital C) would raise `NameError`, because you defined `city`, not `City`.\n\n### Text vs. a name\nNotice the difference:\n```python\nprint(total)     # the value stored in total → 20\nprint(\"total\")   # the literal word → total\n```\nQuotes mean \"plain text\". No quotes means \"the value of this variable\".\n\n### Common beginner mistakes\n- Misspelling a variable somewhere (`totl` vs `total`).\n- Changing the capitalization (`Total` vs `total`).\n- Using a variable before the line that creates it.\n- Quoting a variable name to dodge the error, which prints the word instead of the value.\n\n### You just learned…\nA **variable** is a named label set with `=`, names must be spelled **exactly** the same everywhere (capitals included), and a `NameError` means \"that name doesn't exist — check your spelling.\" You're building the core vocabulary of programming.",
+    "videos": [
+      {
+        "title": "Python variables and NameError for beginners",
+        "searchQuery": "python variables nameerror not defined beginner tutorial"
+      },
+      {
+        "title": "Why Python is case-sensitive",
+        "searchQuery": "python case sensitive variable names explained beginner"
+      }
+    ]
+  },
+  "estMinutes": 3,
+  "version": 1,
+  "conceptCard": "This mission is about **variables** — names that hold values.\n\n- You create a variable with `=`, e.g. `price = 12`.\n- You can combine them: `total = price_one + price_two`.\n- Every time you use a variable, spell it **exactly** the same — Python won't guess at typos, and capital letters matter.\n\nThe code adds two prices but prints a name that doesn't quite match. Find the mismatch.",
+  "lineNotes": [
+    {
+      "line": 2,
+      "noteMd": "Creates a **variable** called `price_one` and stores the number `12` in it. `=` means \"store the value on the right under the name on the left\"."
+    },
+    {
+      "line": 4,
+      "noteMd": "Adds the two prices and stores the result in a new variable named `total`."
+    },
+    {
+      "line": 5,
+      "noteMd": "Tries to print `totl` — but no variable by that name was ever created. Compare it carefully with the name on line 4."
+    }
+  ],
+  "takeaway": "A variable must be spelled exactly the same everywhere it's used, capital letters included."
+}

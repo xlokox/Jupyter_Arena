@@ -1,0 +1,82 @@
+{
+  "id": "py-024-is-vs-equals",
+  "sector": "py",
+  "difficulty": "hard",
+  "title": "24_threshold_check.ipynb",
+  "language": "python",
+  "icon": "scale",
+  "conceptTags": ["is", "equality", "identity"],
+  "descriptionMd": "## Mission: Threshold Check\n\nYou wrote a guard `if score is 256: raise ValueError(\"reserved value\")` and tested it. For `score = 256` from a literal, the check fires. For `score = int(\"256\")` read from a config, the check **silently doesn't fire** — same number, different result.\n\nYou hit one of Python's quietest traps. `is` checks whether two names point to the **same object**; `==` checks whether they hold the **same value**. CPython caches small integers (`-5..256`), so two literal `256`s often happen to be the same object — but anything coming from arithmetic, parsing, or a function may *not* be. Use `==` for equality.",
+  "initialCode": "def is_reserved(score):\n    if score is 256:\n        return True\n    return False\n\na = 256\nb = int(\"256\")\nc = 200 + 56\n\nprint(f\"literal 256:    {is_reserved(a)}\")\nprint(f\"int('256'):     {is_reserved(b)}\")\nprint(f\"200 + 56:       {is_reserved(c)}\")",
+  "buggyLineStart": 2,
+  "buggyLineEnd": 2,
+  "traceback": "literal 256:    True\nint('256'):     False\n200 + 56:       True\n# expected all three to be True — the value 256 is the value 256",
+  "correctOutput": "literal 256:    True\nint('256'):     True\n200 + 56:       True",
+  "options": [
+    {
+      "key": "a",
+      "label": "Use value equality: `if score == 256`",
+      "patchCode": "def is_reserved(score):\n    if score == 256:\n        return True\n    return False\n\na = 256\nb = int(\"256\")\nc = 200 + 56\n\nprint(f\"literal 256:    {is_reserved(a)}\")\nprint(f\"int('256'):     {is_reserved(b)}\")\nprint(f\"200 + 56:       {is_reserved(c)}\")",
+      "isCorrect": true,
+      "resultLog": "literal 256:    True\nint('256'):     True\n200 + 56:       True",
+      "rationale": "`==` checks **value equality** — for ints that's the only thing you ever want. `is` checks **identity** (same object in memory), which happens to coincide for small CPython-cached ints (`-5..256`) but not in general. The rule: `is` is for `None`/`True`/`False`/singletons; `==` is for everything else."
+    },
+    {
+      "key": "b",
+      "label": "Force identity by interning: `if score is sys.intern(256)`",
+      "patchCode": "import sys\n\ndef is_reserved(score):\n    if score is sys.intern(str(score)) and score == 256:\n        return True\n    return False\n\na = 256\nb = int(\"256\")\nc = 200 + 56\n\nprint(f\"literal 256:    {is_reserved(a)}\")\nprint(f\"int('256'):     {is_reserved(b)}\")\nprint(f\"200 + 56:       {is_reserved(c)}\")",
+      "isCorrect": false,
+      "resultLog": "---------------------------------------------------------------------------\nTypeError                                 Traceback (most recent call last)\nCell In[1], line 4\n----> 4     if score is sys.intern(str(score)) and score == 256:\n\nTypeError: sys.intern() argument 1 must be str, not int",
+      "rationale": "Several mistakes folded into one: `sys.intern` only works on strings, not ints; and even if it did, you'd still be checking identity. The whole detour exists only because the first instinct (`is`) is wrong for value comparison. `==` is the right tool, period."
+    },
+    {
+      "key": "c",
+      "label": "Wrap both values in `id(...)` and compare those",
+      "patchCode": "def is_reserved(score):\n    if id(score) == id(256):\n        return True\n    return False\n\na = 256\nb = int(\"256\")\nc = 200 + 56\n\nprint(f\"literal 256:    {is_reserved(a)}\")\nprint(f\"int('256'):     {is_reserved(b)}\")\nprint(f\"200 + 56:       {is_reserved(c)}\")",
+      "isCorrect": false,
+      "resultLog": "literal 256:    True\nint('256'):     False\n200 + 56:       True",
+      "rationale": "This is literally the same thing as `is` — `id(x) == id(y)` is the definition of identity. Same bug, more typing. The intent here is *value equality*, and Python spells that `==`. Don't fight the language."
+    }
+  ],
+  "hints": [
+    "Add `print(score is 256, score == 256)` inside the function. The first depends on what built `score`; the second is always honest.",
+    "Use `==` for value equality. Save `is` for `None`, `True`, `False`, and other named singletons."
+  ],
+  "explanationMd": "### Why the bug occurs\n`is` returns `True` only when the two names refer to the **same object in memory** — `id(a) == id(b)`. `==` checks **value equality** — `a.__eq__(b)`. For mutable values (lists, dicts) these are very different; for immutable values like ints they often coincide, but only because CPython caches small ints (`-5..256`) and short strings. Two `256`s from literals reuse the cached object, so `is` is `True`. `int(\"256\")` builds a *new* int and gets a *new* object, so `is` is `False`. From the program's point of view they're the same number, but `is` doesn't ask that.\n\nThe arithmetic case (`200 + 56`) being `True` is its own surprise: small results often hit the int cache, but you should never rely on it. Tomorrow's interpreter might cache different values; PyPy and MicroPython already do.\n\n### Why the fix is correct\n`==` always compares value. For two `int`s holding 256, `==` is `True` regardless of how either was built. The general rule, worth tattooing on the inside of your eyelid:\n\n- `==` for value equality (numbers, strings, lists, dicts, dataclasses, …).\n- `is` for **identity** with **singletons**: `if x is None`, `if flag is True` *(only when you really mean \"True the singleton\" and not \"truthy\")*.\n\nLinters like `ruff` and `pylint` will warn on `is 256` for exactly this reason.",
+  "recruiterReview": "Strong — you recognised that `is` is identity, not equality, and reached for `==`. The trap you avoided here is the source of a recurring bug class: code that 'works in tests' (literals match the cache) but breaks in production (data comes in via JSON parsing, network calls, or arithmetic). A nuance to file away: Python guarantees `x is None` works for `None`, but does **not** guarantee `x is 0` works for `0`. Use `is` only for `None`, `True`, `False`, and explicit `Enum`/sentinel singletons. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## `is` vs `==`\n\nThis is one of Python's most-asked questions — and the answer is short.\n\n### The rule\n- `==` compares **values** — \"do these mean the same thing?\"\n- `is` compares **identity** — \"are these literally the same object in memory?\"\n\nNinety-five percent of the time you want `==`.\n\n### Why the confusion exists\nCPython (the interpreter you almost certainly use) caches small integers (`-5..256`) and short strings. So:\n```python\na = 256\nb = 256\nprint(a is b)   # True — both names point at the cached object\n\na = 257\nb = 257\nprint(a is b)   # False — past the cache, two new int objects\n```\nIt looks like `is` and `==` are the same for small ints — but only by accident.\n\n### When `is` is right\n- `if x is None:` — the **only** correct way to check for `None`. There is exactly one `None` object in a running Python program.\n- `if x is True:` / `if x is False:` — rarely useful, and usually you want truthiness (`if x:`) or value equality. Use this only when you specifically need to distinguish `True` from \"any truthy value.\"\n- Comparing to singletons you defined yourself: an `Enum` member, a sentinel object like `MISSING = object()`. Identity is the whole point of a singleton.\n\n### When `is` is wrong\nLiteral values you're testing equality against:\n```python\nif name is \"admin\":     # WRONG\nif response is 200:     # WRONG\nif role is \"viewer\":    # WRONG\n```\nUse `==`.\n\n### A tiny lab\n```python\nimport sys\nx = 200 + 57   # 257\ny = 257\nprint(x is y, x == y)  # (False, True)\n\ns = \"hello\" * 1  # short, may be interned\nt = \"hello world\"[:5]\nprint(s is t, s == t)  # implementation-defined for is, True for ==\n```\nThe only sure thing across interpreters is `==`.\n\n### Mutable values\nFor lists, dicts, sets, custom classes: `is` is almost never what you want.\n```python\n[1, 2] == [1, 2]   # True  — same value\n[1, 2] is [1, 2]   # False — built two separate lists\n```\n\n### `None` is the standout\nThere is **one** `None` for the lifetime of the program (it's a singleton in the C runtime). `x is None` is faster than `x == None` and also doesn't accidentally call a custom `__eq__` on a weird object. Use `x is None` and `x is not None`.\n\n### Common beginner mistakes\n- Using `is` for value comparison and getting away with it on tiny integers (the bug).\n- `if x == None:` — works but `is None` is the idiom.\n- Comparing strings with `is` because some short strings *also* happen to be interned in CPython.\n\n### A two-second rule\nIf the value on the right is a literal that names a thing (`None`, `True`, `False`, a class, an enum member), `is` may be right. If it's a value (`256`, `\"admin\"`, a list), use `==`.\n\n### You just learned…\n`is` is identity, `==` is value. CPython's small-int cache makes `is` look right for `-5..256`, but it isn't. Use `is` for `None`/`True`/`False`/named singletons; use `==` for every value comparison.",
+    "videos": [
+      {
+        "title": "is vs == in Python — the small-int cache trap",
+        "searchQuery": "python is vs equals integer cache identity tutorial"
+      },
+      {
+        "title": "When to use is, when to use ==",
+        "searchQuery": "python is None identity equality beginner"
+      }
+    ]
+  },
+  "estMinutes": 8,
+  "version": 1,
+  "conceptCard": "This mission is about **`is` vs `==`**.\n\n- `==` compares **values** (what most code wants).\n- `is` compares **identity** — same object in memory.\n- CPython caches small ints (`-5..256`), so `is` *accidentally* works for them sometimes.\n\nThe code uses `is 256` and silently fails on values built at runtime. Switch to `== 256`.",
+  "lineNotes": [
+    {
+      "line": 2,
+      "noteMd": "**The bug.** `score is 256` asks \"is this *the same object* as the literal `256`?\" — not \"does it equal 256?\" Use `==`."
+    },
+    {
+      "line": 6,
+      "noteMd": "A literal `256` — re-uses the cached int object, so `is` happens to match."
+    },
+    {
+      "line": 7,
+      "noteMd": "`int(\"256\")` builds a **new** int object. Same value, different identity — `is` misses it."
+    },
+    {
+      "line": 8,
+      "noteMd": "Arithmetic result. Often hits the cache for small numbers, but that's an implementation accident."
+    }
+  ],
+  "takeaway": "Use == for value equality; reserve is for None, True, False, and named singletons."
+}

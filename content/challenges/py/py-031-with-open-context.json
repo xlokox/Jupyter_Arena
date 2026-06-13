@@ -1,0 +1,81 @@
+{
+  "id": "py-031-with-open-context",
+  "sector": "py",
+  "difficulty": "easy",
+  "title": "31_open_many_logs.ipynb",
+  "language": "python",
+  "icon": "file-warning",
+  "conceptTags": ["file-io", "context-manager", "with-statement"],
+  "descriptionMd": "## Mission: Read a Thousand Logs\n\nYour script walks a folder of 1,000 log files and grabs the first line of each. The code looks fine for the first ~250 files. Around file 256 the script crashes with `OSError: [Errno 24] Too many open files`. You haven't opened any sockets, started no threads, just `open(...)` and `.readline()`.\n\nThis is one of the oldest POSIX traps: **every `open()` consumes a file descriptor, and the OS hands them out from a tiny pool** (typically `ulimit -n` = 256 or 1024). You never closed the files. Python's garbage collector *might* close them eventually — but you can't bet your job on that. Use the `with` statement so each file closes the moment you're done with it.",
+  "initialCode": "import os\n\ndef first_line(path: str) -> str:\n    f = open(path)\n    return f.readline().strip()\n\nlog_dir = \"/var/log/myapp\"\nfor name in os.listdir(log_dir):\n    if not name.endswith(\".log\"):\n        continue\n    line = first_line(os.path.join(log_dir, name))\n    print(name, line)",
+  "buggyLineStart": 4,
+  "buggyLineEnd": 5,
+  "traceback": "00001.log first line of log one\n00002.log first line of log two\n... (many lines) ...\n00255.log first line of log 255\n---------------------------------------------------------------------------\nOSError                                   Traceback (most recent call last)\nCell In[1], line 11\n     10     line = first_line(os.path.join(log_dir, name))\n     11     print(name, line)\n\nCell In[1], line 4, in first_line(path)\n----> 4     f = open(path)\n      5     return f.readline().strip()\n\nOSError: [Errno 24] Too many open files: '/var/log/myapp/00256.log'",
+  "correctOutput": "00001.log first line of log one\n00002.log first line of log two\n... (1000 lines) ...\n01000.log first line of log 1000\n# all files processed; descriptors closed cleanly after each open",
+  "options": [
+    {
+      "key": "a",
+      "label": "Use `with open(path) as f:` so the file closes when the block exits",
+      "patchCode": "import os\n\ndef first_line(path: str) -> str:\n    with open(path) as f:\n        return f.readline().strip()\n\nlog_dir = \"/var/log/myapp\"\nfor name in os.listdir(log_dir):\n    if not name.endswith(\".log\"):\n        continue\n    line = first_line(os.path.join(log_dir, name))\n    print(name, line)",
+      "isCorrect": true,
+      "resultLog": "00001.log first line of log one\n... all 1000 logs processed cleanly ...\n01000.log first line of log 1000",
+      "rationale": "The `with` statement turns `open` into a **context manager** — Python guarantees `f.close()` runs the moment the `with` block exits, *even if an exception is raised inside it*. So each file's descriptor goes back to the OS immediately and the loop never holds more than one open file at a time. This is the canonical Python pattern and the reason `open()` is so frequently shown wrapped in `with` in the docs."
+    },
+    {
+      "key": "b",
+      "label": "Add an explicit `f.close()` after `f.readline()`",
+      "patchCode": "import os\n\ndef first_line(path: str) -> str:\n    f = open(path)\n    line = f.readline().strip()\n    f.close()\n    return line\n\nlog_dir = \"/var/log/myapp\"\nfor name in os.listdir(log_dir):\n    if not name.endswith(\".log\"):\n        continue\n    line = first_line(os.path.join(log_dir, name))\n    print(name, line)",
+      "isCorrect": false,
+      "resultLog": "00001.log first line of log one\n... (all files OK in this run) ...\n01000.log first line of log 1000",
+      "rationale": "Works today — but fragile. If `f.readline()` ever raises (corrupted file, permission denied), the explicit `close()` is **skipped** and the descriptor leaks again. A `try/finally` would fix that, but it's already what `with` does for you. The whole point of `with` is to make 'close-on-exit' impossible to forget. Reach for `with` first."
+    },
+    {
+      "key": "c",
+      "label": "Trust the garbage collector — Python will close the file eventually",
+      "patchCode": "import os\nimport gc\n\ndef first_line(path: str) -> str:\n    f = open(path)\n    return f.readline().strip()\n\nlog_dir = \"/var/log/myapp\"\nfor name in os.listdir(log_dir):\n    if not name.endswith(\".log\"):\n        continue\n    line = first_line(os.path.join(log_dir, name))\n    gc.collect()\n    print(name, line)",
+      "isCorrect": false,
+      "resultLog": "00001.log first line of log one\n... still crashes around file ~256 — OSError ...",
+      "rationale": "CPython's reference-counting *usually* closes the file when `f` goes out of scope, but `gc.collect()` doesn't change that — it runs the cyclic GC, which has nothing to do with reference-counted file objects. More importantly, the file may be closed *late* — after another `open()` has already failed. **Never rely on GC for resource lifetime**; that's exactly what `with` exists to make explicit."
+    }
+  ],
+  "hints": [
+    "Each `open()` reserves a file descriptor. `ulimit -n` on your system shows the cap (often 256 or 1024). Where do they get released in your code?",
+    "Wrap `open()` in a `with` block: `with open(path) as f: ...`. The file closes the moment the block exits."
+  ],
+  "explanationMd": "### Why the bug occurs\nEvery `open()` consumes a **file descriptor** — a small integer the OS assigns to track the open file. The OS limits how many a process can hold simultaneously (`ulimit -n`, typically 256–1024 in dev environments, sometimes much more in production). When you exceed the limit, the next `open()` raises `OSError: [Errno 24] Too many open files`.\n\nIn the buggy code, each call to `first_line` opens a file and returns the line — but never explicitly closes the file. CPython's reference counter *might* close it when `f` goes out of scope, but the timing is implementation-dependent (PyPy delays GC; Jython runs on the JVM's GC). Around file 256, the OS denies the open and the script crashes.\n\n### Why the fix is correct\nThe `with` statement turns `open()` into a **context manager**. Python guarantees `f.__exit__()` runs the instant control leaves the `with` block — whether by normal return, `break`, `return`, or an exception. `f.__exit__()` calls `f.close()`, which returns the descriptor to the OS. So each file is closed before the next one opens, and the program holds at most one descriptor at a time.\n\nThis pattern generalizes far beyond files. **Anything that holds a finite resource** — database connections, network sockets, locks, GPU memory — should support the context-manager protocol so users can write `with resource() as r:`. The `contextlib` standard library helps you build your own (`@contextmanager`).",
+  "recruiterReview": "Strong — you reached straight for `with`. That's the right Python instinct and it survives every edge case (exceptions, early returns, generator pauses) without you thinking about them. Two things to file for production: 1) when opening many files in parallel, prefer `pathlib.Path.read_text()` / `read_bytes()` — they wrap `open`+`close` in a single call and the intent is obvious. 2) When you really do need long-lived file handles (a streaming writer, a tailed log), use `try/finally` *explicitly* so a reader can see the resource lifecycle without scrolling. The descriptor-leak class of bug has shipped major production incidents (memory-mapped fd leaks, log-rotation crashes); the `with` habit is your immune system. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## File Descriptors and the `with` Statement\n\nThe `with` statement is one of Python's most-used pieces of syntax, and once you understand *why* it exists, you'll use it everywhere a resource has a lifetime.\n\n### What a file descriptor is\nWhen the OS gives you a file, it actually gives you a tiny integer — the **file descriptor**. The OS maintains a per-process table mapping that integer to the underlying file. Stdin is 0, stdout is 1, stderr is 2; subsequent opens get 3, 4, 5, …\n\nThe table is finite. On Linux, `ulimit -n` shows the cap — commonly 256 in containers, 1024 on dev machines, 1,048,576 on tuned servers. Cross the cap and the next `open()` raises `OSError: Too many open files`. Sockets, pipes, and inotify watches all consume descriptors too, so the budget isn't just files.\n\n### Why `open()` without a `close()` is a bug\nReference-counted Python (CPython) *usually* closes the file when the variable goes out of scope:\n```python\ndef read_one(path):\n    f = open(path)        # opens fd N\n    return f.read()       # returns string; `f` is unreferenced after return\n```\nWhen `f` goes out of scope, its refcount drops to zero and CPython calls `f.__del__()` which calls `f.close()`. That works *most* of the time, but:\n- **PyPy** uses a generational GC; closes may be delayed seconds.\n- **Jython** runs on the JVM and never reference-counts.\n- **CPython under exceptions**: if `f.read()` raises, the local `f` is held by the traceback object until the exception is handled. Long-running scripts have leaked descriptors for hours from this.\n- **Loops over many files** finish each iteration faster than GC can run.\n\nThe explicit fix `f.close()` works but is **easy to skip** under exceptions. So Python introduced the `with` statement.\n\n### The context manager protocol\n```python\nwith open(path) as f:\n    line = f.readline()\n```\n`open()` returns an object with `__enter__()` (called at the `with`) and `__exit__()` (called when the block exits — by return, break, exception, anything). `__exit__()` calls `close()`. Even an unhandled exception inside the block triggers `__exit__()` first, then re-raises.\n\nYou can stack multiple resources:\n```python\nwith open(\"a.txt\") as a, open(\"b.txt\") as b:\n    ...\n```\nAll close in reverse order on exit.\n\n### Where this matters beyond files\nAnything with a finite resource:\n- **Locks**: `with lock:` releases on exit, even on exception. Forgetting this is a top deadlock source.\n- **Database connections**: `with sqlite3.connect(db) as conn:` — `commit()` or `rollback()` on exit.\n- **HTTP sessions**: `with requests.Session() as s:` returns the connection pool.\n- **GPU memory**: PyTorch's `torch.no_grad()` is a context manager; `with torch.cuda.stream(s):` schedules ops to a stream.\n- **Threads/asyncio**: `with concurrent.futures.ThreadPoolExecutor() as pool:` shuts the pool down.\n\nMost APIs that hand out lifecycled objects implement `__enter__/__exit__` for you.\n\n### Build your own with `contextlib`\nThe simplest pattern:\n```python\nfrom contextlib import contextmanager\n\n@contextmanager\ndef timing(label):\n    import time\n    t0 = time.time()\n    yield\n    print(f\"{label}: {time.time() - t0:.3f}s\")\n\nwith timing(\"data load\"):\n    df = pd.read_parquet(\"big.parquet\")\n```\nThe code before `yield` runs at `__enter__`; the code after runs at `__exit__`. `try/finally` around the `yield` makes cleanup run on exceptions.\n\n### `pathlib` for one-liners\nIf you only need a single read or write, `pathlib` wraps it for you:\n```python\nfrom pathlib import Path\ntext = Path(\"data.txt\").read_text()\nPath(\"out.txt\").write_text(text.upper())\n```\nThese open, read/write, and close in one call. Use them when you don't need the file object for anything else.\n\n### Common beginner mistakes\n- `f = open(path); ... return f.read()` and trusting GC.\n- `try/except` swallowing the close — leaks accumulate silently.\n- Opening in a tight loop without a context manager.\n- Forgetting that **sockets, pipes, locks** are all descriptors too.\n\n### You just learned…\nEvery `open()` consumes a finite resource (a file descriptor). The `with` statement guarantees the resource is released — exception-safe, return-safe, break-safe. The pattern extends to locks, connections, sessions, GPU contexts, and anything else with a lifetime. Once you internalise `with`, descriptor leaks stop happening in your code.",
+    "videos": [
+      { "title": "Python with statement and context managers", "searchQuery": "python with statement context manager open close tutorial" },
+      { "title": "What is a file descriptor?", "searchQuery": "linux file descriptor explained ulimit beginner" }
+    ]
+  },
+  "estMinutes": 6,
+  "version": 1,
+  "conceptCard": "This mission is about **closing files — and other lifecycled resources — deterministically**.\n\n- Every `open()` consumes a **file descriptor** from a finite pool (`ulimit -n`).\n- `f.close()` works but is easy to skip under exceptions or early returns.\n- The `with` statement runs `close()` automatically, exception-safe, on every exit path.\n\nThe code opens a file per log and never closes it. After ~256 files the OS denies new opens. Wrap `open()` in `with open(path) as f:` and descriptors are released the moment the block exits.",
+  "lineNotes": [
+    { "line": 4, "noteMd": "**The bug.** `open()` returns a file object; without a `with` or explicit `close()`, the descriptor stays open." },
+    { "line": 5, "noteMd": "Returns the line and exits the function. CPython *might* close the file when `f` goes out of scope — but timing is implementation-dependent." },
+    { "line": 8, "noteMd": "1000 iterations × 1 open() each → descriptor pool exhausted around file 256 when `ulimit -n == 256`." }
+  ],
+  "takeaway": "Use `with open(path) as f:` — the file closes deterministically on every exit path.",
+  "glossary": [
+    {
+      "term": "file descriptor",
+      "definitionMd": "A small integer the operating system uses to track an open file (or socket, pipe, lock). Each process has a finite pool; on Linux see `ulimit -n`. Exhausting it raises `OSError: Too many open files`."
+    },
+    {
+      "term": "context manager",
+      "definitionMd": "Any Python object that implements `__enter__()` and `__exit__()`. When used in a `with` block, `__enter__` runs at entry and `__exit__` runs at exit — **including when an exception is raised inside the block**. Files, locks, DB connections, and HTTP sessions all implement the protocol."
+    },
+    {
+      "term": "`with` statement",
+      "definitionMd": "Python syntax that binds the result of a context manager to a name and guarantees cleanup on exit. `with open(p) as f:` is shorthand for `f = open(p); try: ...; finally: f.close()` — but exception-safe and impossible to skip."
+    },
+    {
+      "term": "ulimit -n",
+      "definitionMd": "Linux/macOS shell command that shows the per-process limit on open file descriptors. Common defaults: 256 (containers), 1024 (dev machines), 1,048,576 (tuned production)."
+    }
+  ]
+}

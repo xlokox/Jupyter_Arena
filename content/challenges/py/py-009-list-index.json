@@ -1,0 +1,74 @@
+{
+  "id": "py-009-list-index",
+  "sector": "py",
+  "difficulty": "easy",
+  "title": "09_last_fruit.ipynb",
+  "language": "python",
+  "icon": "list-ordered",
+  "conceptTags": ["lists", "indexing", "index-error"],
+  "descriptionMd": "## Mission: Get the Last Item\n\nYou have a list of three fruits and want to print the last one, `cherry`. You asked for `fruits[3]` — and Python raises an `IndexError: list index out of range`.\n\nLists in Python are numbered starting at **0**, not 1. So a three-item list has positions 0, 1, and 2 — there is no position 3. Reach for the right index so the last fruit prints.",
+  "initialCode": "# Print the last fruit in the list\nfruits = [\"apple\", \"banana\", \"cherry\"]\nprint(\"The last fruit is:\", fruits[3])",
+  "buggyLineStart": 3,
+  "buggyLineEnd": 3,
+  "traceback": "---------------------------------------------------------------------------\nIndexError                                Traceback (most recent call last)\nCell In[1], line 3\n      2 fruits = [\"apple\", \"banana\", \"cherry\"]\n----> 3 print(\"The last fruit is:\", fruits[3])\n\nIndexError: list index out of range",
+  "correctOutput": "The last fruit is: cherry",
+  "options": [
+    {
+      "key": "a",
+      "label": "Use index 2 for the third item",
+      "patchCode": "# Print the last fruit in the list\nfruits = [\"apple\", \"banana\", \"cherry\"]\nprint(\"The last fruit is:\", fruits[2])",
+      "isCorrect": true,
+      "resultLog": "The last fruit is: cherry",
+      "rationale": "Lists are numbered from 0, so `fruits[0]` is `apple`, `fruits[1]` is `banana`, and `fruits[2]` is `cherry`. With three items the valid positions are 0, 1, and 2 — there is no `[3]`, which is why it was out of range. (A handy shortcut: `fruits[-1]` always means the last item.)"
+    },
+    {
+      "key": "b",
+      "label": "Use the list's length as the index",
+      "patchCode": "# Print the last fruit in the list\nfruits = [\"apple\", \"banana\", \"cherry\"]\nprint(\"The last fruit is:\", fruits[len(fruits)])",
+      "isCorrect": false,
+      "resultLog": "---------------------------------------------------------------------------\nIndexError                                Traceback (most recent call last)\nCell In[1], line 3\n----> 3 print(\"The last fruit is:\", fruits[len(fruits)])\n\nIndexError: list index out of range",
+      "rationale": "`len(fruits)` is 3 (there are three items), but because counting starts at 0, the last *index* is one less than the length — 2. So `fruits[3]` is still out of range. Use `len(fruits) - 1`, or simply `fruits[-1]`."
+    },
+    {
+      "key": "c",
+      "label": "Use index 1",
+      "patchCode": "# Print the last fruit in the list\nfruits = [\"apple\", \"banana\", \"cherry\"]\nprint(\"The last fruit is:\", fruits[1])",
+      "isCorrect": false,
+      "resultLog": "The last fruit is: banana",
+      "rationale": "Index 1 is the *second* item, `banana`, not the last. Counting from 0: position 0 is the first, 1 is the second, 2 is the third. The last item of this list is at index 2."
+    }
+  ],
+  "hints": [
+    "The list has three items but Python says index 3 is out of range. Count the positions starting from 0 — what number is the *third* item at?",
+    "First item is `[0]`, so the last of three items is `[2]` (that's `len - 1`). Or use `[-1]`, which always grabs the last item."
+  ],
+  "explanationMd": "### Why the bug occurs\nPython numbers list positions starting at **0**. A list of three items therefore has indexes 0, 1, and 2 — and nothing at index 3. Asking for `fruits[3]` reaches past the end, so Python raises `IndexError: list index out of range`. This 'off-by-one' is one of the most common beginner surprises because everyday counting starts at 1.\n\n### Why the fix is correct\nThe third (and last) item lives at index 2, so `fruits[2]` returns `cherry`. In general the last index is `len(list) - 1`. Even simpler, Python lets you count from the end with negative indexes: `fruits[-1]` is always the last item, `fruits[-2]` the second-to-last — no length arithmetic needed, which is why experienced programmers reach for `[-1]` to get the last element.",
+  "recruiterReview": "Good — you internalized zero-based indexing, which underpins lists, strings, and arrays across almost every language. The off-by-one (`len` vs `len - 1`) is a perennial source of bugs, so knowing that the last index is one less than the length — and that `[-1]` sidesteps the arithmetic entirely — is genuinely useful. Clean fix that matches how Python is meant to be used. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Lists and Indexing from Zero\n\nLists are how you hold a collection of things, and indexing is how you reach into them — with one twist that catches everyone once.\n\n### What is a list?\nA **list** is an ordered collection of values, written in square brackets:\n```python\nfruits = [\"apple\", \"banana\", \"cherry\"]\n```\nIt can hold numbers, text, or a mix, and it remembers the order.\n\n### Indexing starts at 0\nYou reach an item by its **position (index)**, in square brackets. Crucially, positions start at **0**:\n```python\nfruits[0]   # 'apple'   ← first\nfruits[1]   # 'banana'  ← second\nfruits[2]   # 'cherry'  ← third / last\n```\nSo a list of 3 items has valid indexes 0, 1, 2. There is no index 3 — asking for it raises `IndexError: list index out of range`.\n\n### The length vs. the last index\n`len(fruits)` tells you how many items there are (3 here). But because counting starts at 0, the **last index is `len - 1`** (2 here). Mixing these up is the classic off-by-one error.\n\n### Counting from the end\nNegative indexes count backward from the end:\n```python\nfruits[-1]   # 'cherry'  ← last\nfruits[-2]   # 'banana'  ← second to last\n```\n`[-1]` is the easiest, safest way to get the last item.\n\n### A tiny worked example\n```python\ncolors = [\"red\", \"green\", \"blue\"]\nprint(colors[0])    # red\nprint(colors[-1])   # blue\nprint(len(colors))  # 3\n```\n\n### How to spot it\n`IndexError: list index out of range` means you asked for a position that doesn't exist — usually an off-by-one (using `len` instead of `len - 1`, or counting from 1).\n\n### Common beginner mistakes\n- Thinking the first item is `[1]` (it's `[0]`).\n- Using `[len(list)]` for the last item instead of `[len(list) - 1]` or `[-1]`.\n- Going one past the end in a loop.\n\n### You just learned…\nA **list** is an ordered collection in `[ ]`, item positions start at **0**, the last index is `len - 1`, and `[-1]` always grabs the last item. Zero-based indexing is everywhere in programming — this is a big one.",
+    "videos": [
+      {
+        "title": "Python lists and indexing for beginners",
+        "searchQuery": "python list indexing zero based beginner tutorial"
+      },
+      {
+        "title": "Negative indexing and IndexError explained",
+        "searchQuery": "python negative index list index out of range beginner"
+      }
+    ]
+  },
+  "estMinutes": 4,
+  "version": 1,
+  "conceptCard": "This mission is about **lists** and **indexing**.\n\n- A list holds items in order, in square brackets: `[\"a\", \"b\", \"c\"]`.\n- You reach an item by its position — and positions start at **0**, not 1.\n- So a 3-item list has positions 0, 1, 2; `[-1]` always means the last item.\n\nThe code asks for a position that doesn't exist. Pick the right index for the last fruit.",
+  "lineNotes": [
+    {
+      "line": 2,
+      "noteMd": "Creates a **list** of three fruits. Their positions are 0 (`apple`), 1 (`banana`), and 2 (`cherry`)."
+    },
+    {
+      "line": 3,
+      "noteMd": "Asks for `fruits[3]` — but the highest position is 2, so 3 is out of range. The last item is at index 2 (or `-1`)."
+    }
+  ],
+  "takeaway": "List positions start at 0, so the last of N items is index N-1 — or just use [-1]."
+}

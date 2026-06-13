@@ -1,0 +1,74 @@
+{
+  "id": "py-006-input-is-text",
+  "sector": "py",
+  "difficulty": "easy",
+  "title": "06_double_a_number.ipynb",
+  "language": "python",
+  "icon": "key-round",
+  "conceptTags": ["input", "type-conversion", "int"],
+  "descriptionMd": "## Mission: Double a Number\n\nYou ask the user for a number and double it. The tester types `5`, expecting `10` — but the program prints `Doubled: 55`.\n\nWhatever `input()` gives back is always **text**, even when the user types digits. So `\"5\" * 2` isn't 5 doubled — it's the text `\"5\"` repeated twice. Convert the input to a real number *before* doing the maths.",
+  "initialCode": "# Ask for a number and double it\nnumber = input(\"Enter a number: \")\ndoubled = number * 2\nprint(\"Doubled:\", doubled)",
+  "buggyLineStart": 2,
+  "buggyLineEnd": 3,
+  "traceback": "Enter a number: 5\nDoubled: 55\n\n# input() returned the text \"5\", and \"5\" * 2 repeats the text instead of multiplying.",
+  "correctOutput": "Enter a number: 5\nDoubled: 10",
+  "options": [
+    {
+      "key": "a",
+      "label": "Convert the input to an integer with int()",
+      "patchCode": "# Ask for a number and double it\nnumber = int(input(\"Enter a number: \"))\ndoubled = number * 2\nprint(\"Doubled:\", doubled)",
+      "isCorrect": true,
+      "resultLog": "Enter a number: 5\nDoubled: 10",
+      "rationale": "`input()` always returns a **string**, so `number` held the text `\"5\"`, and multiplying text by 2 *repeats* it (`\"5\" * 2` = `\"55\"`). Wrapping the input in `int(...)` converts the text to the whole number 5 before the maths, so `5 * 2` correctly gives 10."
+    },
+    {
+      "key": "b",
+      "label": "Add the number to itself instead of multiplying",
+      "patchCode": "# Ask for a number and double it\nnumber = input(\"Enter a number: \")\ndoubled = number + number\nprint(\"Doubled:\", doubled)",
+      "isCorrect": false,
+      "resultLog": "Enter a number: 5\nDoubled: 55",
+      "rationale": "`number` is still the text `\"5\"`, and `+` joins text end-to-end, so `\"5\" + \"5\"` is `\"55\"` — the same wrong answer. Switching the operator doesn't help; the value is text. You must convert it to a number first with `int()`."
+    },
+    {
+      "key": "c",
+      "label": "Convert to a number after doubling",
+      "patchCode": "# Ask for a number and double it\nnumber = input(\"Enter a number: \")\ndoubled = int(number * 2)\nprint(\"Doubled:\", doubled)",
+      "isCorrect": false,
+      "resultLog": "Enter a number: 5\nDoubled: 55",
+      "rationale": "This doubles the *text* first — `\"5\" * 2` is already `\"55\"` — and only then converts it to the number 55. The damage is done before the conversion. Convert *before* the maths: `int(input(...))`, not `int(number * 2)`."
+    }
+  ],
+  "hints": [
+    "The output `55` is `5` written twice, not 5 times 2. That happens because multiplying *text* by a number repeats it. What type does `input()` always return?",
+    "Convert the input to a whole number with `int()` *around* the `input(...)` call, before any maths: `int(input(\"Enter a number: \"))`."
+  ],
+  "explanationMd": "### Why the bug occurs\n`input()` always returns a **string** — text — no matter what the user types. So `number` held the text `\"5\"`, not the number 5. And `*` does different things by type: number times number multiplies, but text times a number *repeats* the text. `\"5\" * 2` is `\"55\"`, which is why doubling looked broken.\n\n### Why the fix is correct\n`int(...)` converts text that looks like a whole number into an actual number. Wrapping the input — `int(input(\"Enter a number: \"))` — turns `\"5\"` into `5` *before* the maths, so `5 * 2` gives 10. The key is order: convert as soon as you read the input, so every later calculation works on a real number. (For decimals you'd use `float(...)` instead.)",
+  "recruiterReview": "Good catch — the `55` was the tell that text was being repeated, and you fixed it at the source by converting on input rather than patching downstream. \"`input()` returns a string\" is one of those facts that, once it clicks, prevents a whole category of bugs. Defensive next step for real programs: a non-numeric entry will make `int()` raise, so production code wraps it in a try/except and asks again — but converting early is exactly the right foundation. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Input Is Always Text\n\nThe moment your program talks to a person, this lesson matters: whatever the user types comes in as text, and you usually have to convert it.\n\n### What input() does\n`input(prompt)` shows your prompt, waits for the user to type something and press Enter, and hands back **what they typed — as a string**. Always a string, even if they typed digits:\n```python\nage = input(\"Your age? \")   # if they type 30, age is the text \"30\", not 30\n```\n\n### Why that causes trouble\nText and numbers behave differently with `*` and `+`:\n```python\n\"5\" * 2    # '55'  ← repeats the text\n5 * 2      # 10    ← multiplies\n\"5\" + \"5\"  # '55'  ← joins the text\n5 + 5      # 10    ← adds\n```\nSo doing maths on raw input gives surprising results.\n\n### The fix: convert with int() or float()\n- `int(text)` turns `\"5\"` into the whole number `5`.\n- `float(text)` turns `\"3.5\"` into the decimal `3.5`.\nConvert **as you read the input**, by wrapping the call:\n```python\nnumber = int(input(\"Enter a number: \"))\nprint(number * 2)   # now correct\n```\n\n### A tiny worked example\n```python\nprice = float(input(\"Price: \"))   # user types 4.50\nprint(price * 3)                  # 13.5\n```\n\n### Order matters\nConvert *before* the maths. `int(input(...))` is right; `int(number * 2)` would double the text first and convert the mess afterward.\n\n### Common beginner mistakes\n- Forgetting that `input()` returns text, then doing maths on it.\n- Converting too late (after the calculation instead of before).\n- Using `int()` on something with a decimal point (`int(\"3.5\")` errors — use `float`).\n\n### You just learned…\n`input()` always returns a **string**, multiplying or adding text behaves differently from numbers, and you fix it by converting early with `int()` (whole numbers) or `float()` (decimals). This is the bridge between your program and its user.",
+    "videos": [
+      {
+        "title": "Python input() and int() conversion for beginners",
+        "searchQuery": "python input int convert string to number beginner tutorial"
+      },
+      {
+        "title": "Why input always returns a string",
+        "searchQuery": "python input returns string type conversion explained beginner"
+      }
+    ]
+  },
+  "estMinutes": 4,
+  "version": 1,
+  "conceptCard": "This mission is about reading **input** from a person.\n\n- `input(...)` always hands back **text**, even when the user types digits.\n- Text behaves differently from numbers: `\"5\" * 2` is `\"55\"`, not `10`.\n- Convert text to a number with `int(...)` before doing maths.\n\nThe code doubles what the user types but forgets to convert it. Fix the conversion.",
+  "lineNotes": [
+    {
+      "line": 2,
+      "noteMd": "`input(...)` shows the prompt and returns whatever the user types — **as text**. So `number` holds `\"5\"`, not the number 5."
+    },
+    {
+      "line": 3,
+      "noteMd": "Multiplies that text by 2. Multiplying text *repeats* it, so `\"5\" * 2` is `\"55\"` — the bug. Convert with `int()` first."
+    }
+  ],
+  "takeaway": "input() always returns text — wrap it in int() before doing any maths."
+}

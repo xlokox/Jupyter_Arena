@@ -1,0 +1,78 @@
+{
+  "id": "py-016-input-to-int",
+  "sector": "py",
+  "difficulty": "easy",
+  "title": "16_age_in_days.ipynb",
+  "language": "python",
+  "icon": "mouse-pointer-click",
+  "conceptTags": ["input", "type-conversion", "int"],
+  "descriptionMd": "## Mission: Age in Days\n\nYou wrote a tiny program that asks the user for an age in years and prints the age in days. You typed `30` at the prompt — and instead of getting `10950` you got back the bigger-than-the-age-of-the-universe string `30303030...365 copies` of `30`.\n\nThat's because `input()` always returns **text**, even when you typed digits. Multiplying text by an integer in Python repeats the text — that's where the long line of `30`s comes from. Convert the user's input to a number before multiplying.",
+  "initialCode": "# Ask for an age in years, print it in days\nage = input(\"Your age in years: \")\ndays = age * 365\nprint(f\"You are roughly {days} days old\")",
+  "buggyLineStart": 3,
+  "buggyLineEnd": 3,
+  "traceback": "Your age in years: 30\nYou are roughly 303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030 days old",
+  "correctOutput": "Your age in years: 30\nYou are roughly 10950 days old",
+  "options": [
+    {
+      "key": "a",
+      "label": "Convert the input to an int before multiplying",
+      "patchCode": "# Ask for an age in years, print it in days\nage = int(input(\"Your age in years: \"))\ndays = age * 365\nprint(f\"You are roughly {days} days old\")",
+      "isCorrect": true,
+      "resultLog": "Your age in years: 30\nYou are roughly 10950 days old",
+      "rationale": "`input()` returns a **string** (text) no matter what the user types — so `age` was `\"30\"`, and `\"30\" * 365` is text repeated 365 times. Wrapping it in `int(...)` parses the text into a real integer (`30`), and `30 * 365` is the multiplication you wanted: `10950`."
+    },
+    {
+      "key": "b",
+      "label": "Convert days to int afterwards",
+      "patchCode": "# Ask for an age in years, print it in days\nage = input(\"Your age in years: \")\ndays = int(age * 365)\nprint(f\"You are roughly {days} days old\")",
+      "isCorrect": false,
+      "resultLog": "Your age in years: 30\n---------------------------------------------------------------------------\nValueError                                Traceback (most recent call last)\nCell In[1], line 3\n----> 3 days = int(age * 365)\n\nValueError: invalid literal for int() with base 10: '303030303030303030303030303030303030...'",
+      "rationale": "Too late: the multiplication ran first on text, producing a 365-copy string of `30`. `int()` then tries to parse that 730-character monster as a single integer and refuses. Conversion has to happen *before* the multiplication, not after."
+    },
+    {
+      "key": "c",
+      "label": "Cast the multiplier 365 to a string so the types match",
+      "patchCode": "# Ask for an age in years, print it in days\nage = input(\"Your age in years: \")\ndays = age * str(365)\nprint(f\"You are roughly {days} days old\")",
+      "isCorrect": false,
+      "resultLog": "Your age in years: 30\n---------------------------------------------------------------------------\nTypeError                                 Traceback (most recent call last)\nCell In[1], line 3\n----> 3 days = age * str(365)\n\nTypeError: can't multiply sequence by non-int of type 'str'",
+      "rationale": "Now both sides are text, and Python can only repeat text by an **integer** — multiplying two strings is meaningless, so it raises `TypeError`. The mental fix is the opposite direction: turn the *user's text* into a number, don't turn the number into text."
+    }
+  ],
+  "hints": [
+    "Read what `input()` returns. The Python docs are blunt: it's always a string, even when the user types `30`. What does `\"30\" * 365` do in Python?",
+    "Wrap the `input(...)` call in `int(...)` so `age` is a real integer before the multiplication: `age = int(input(\"...\"))`."
+  ],
+  "explanationMd": "### Why the bug occurs\n`input()` reads what the user typed and returns it as a **string** — `\"30\"`, not `30`. Strings support `*` with integers, but it means *repeat*: `\"30\" * 365` produces the digit pair `30` written 365 times in a row. There's no error, just nonsense output.\n\n### Why the fix is correct\n`int(\"30\")` parses the text and gives you back the integer `30`. Doing this **before** the multiplication means `age * 365` is now plain integer multiplication, which is what the program meant all along. The pattern `int(input(...))` (or `float(input(...))` for decimals) is the standard way to read a number from the console.",
+  "recruiterReview": "Good catch — you traced the output back to *what type was each variable* instead of stopping at \"the multiplication is wrong.\" Wrapping `input()` in `int()` is the idiomatic fix and shows you understand that `input()` is text-only. One thing to watch in real programs: `int(\"abc\")` raises `ValueError`, so once you start taking real user input you'll want a small try/except or a check. For now this is exactly right. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Reading Numbers from `input()`\n\nWhen a program needs information from a person — an age, a price, a count — you reach for `input()`. It opens a prompt, waits for the user to type and press Enter, and hands back what they typed.\n\n### `input()` always returns text\nThat last word matters: **text**, not a number. Even if the user types `30`, you get back the string `\"30\"`. The two look identical when printed, but they behave completely differently.\n\n```python\nage = input(\"Your age: \")\nprint(type(age))  # <class 'str'>\n```\n\n### Why `\"30\" * 365` is not 10950\nIn Python, `*` between a string and an integer means **repeat**. `\"ha\" * 3` is `\"hahaha\"`. So `\"30\" * 365` is the digits `3` and `0` written 365 times in a row — a 730-character string. No error is raised; you just get a bizarre answer.\n\n### The fix: convert before you compute\nWrap the `input()` call in `int()` (or `float()` for decimal numbers):\n\n```python\nage = int(input(\"Your age in years: \"))\ndays = age * 365  # 10950\n```\n\nNow `age` is a real integer, so `*` does arithmetic.\n\n### A worked example\n```python\nyears = int(input(\"Years until vacation? \"))\nhours = years * 365 * 24\nprint(f\"That's {hours} hours away.\")\n```\nIf the user types `2`, the program prints `That's 17520 hours away.` If the user types `two`, `int()` raises `ValueError: invalid literal for int() with base 10: 'two'` — Python can't parse the word as a number.\n\n### A safety habit (for later)\nReal programs check before they convert:\n```python\nraw = input(\"Years: \")\nif raw.isdigit():\n    years = int(raw)\nelse:\n    print(\"Please type a whole number.\")\n```\n\n### Common beginner mistakes\n- Forgetting to convert and getting repeated-string output (the bug here).\n- Converting *after* the multiplication, when the damage is already done.\n- Using `int()` on text that contains a decimal point — use `float()` instead (`int(\"3.14\")` raises `ValueError`).\n\n### You just learned…\n`input()` returns a string; `*` between a string and an int repeats the string. Convert with `int()` (or `float()`) **before** doing arithmetic, and read the type of every variable when you're debugging surprising output.",
+    "videos": [
+      {
+        "title": "Python input() and type conversion for beginners",
+        "searchQuery": "python input function int conversion beginners tutorial"
+      },
+      {
+        "title": "Why input always returns a string",
+        "searchQuery": "python input returns string typeerror int convert"
+      }
+    ]
+  },
+  "estMinutes": 4,
+  "version": 1,
+  "conceptCard": "This mission is about **what `input()` actually returns**.\n\n- `input()` always hands back a **string**, even when the user types digits.\n- `\"30\" * 365` doesn't multiply — it *repeats* the text 365 times.\n- Convert with `int(...)` (or `float(...)`) **before** doing arithmetic.\n\nThe code multiplies a string by a number and gets a 730-character mess instead of `10950`. Wrap the input in `int(...)` and the math works.",
+  "lineNotes": [
+    {
+      "line": 2,
+      "noteMd": "Reads what the user typed. `input()` returns a **string** (`\"30\"`), not a number."
+    },
+    {
+      "line": 3,
+      "noteMd": "`*` between a string and an int **repeats the text** — `\"30\" * 365` is `30` written 365 times. This is the bug."
+    },
+    {
+      "line": 4,
+      "noteMd": "Prints the result. With the fix in place, `days` is the integer `10950`."
+    }
+  ],
+  "takeaway": "input() always returns text — wrap it in int(...) before doing arithmetic."
+}

@@ -58,5 +58,17 @@
     ]
   },
   "estMinutes": 4,
-  "version": 1
+  "version": 1,
+  "conceptCard": "This mission is about **selecting a column** from a table.\n\n- A DataFrame's columns have names (headers); you pick one with `df[\"name\"]`.\n- pandas matches the name **exactly** — including any stray spaces.\n- Spreadsheet exports often leave invisible spaces in headers.\n\nThe code selects `\"Price\"` but the real header has a hidden trailing space. Clean the headers first.",
+  "lineNotes": [
+    {
+      "line": 3,
+      "noteMd": "Reads the inventory file into a **DataFrame** (a table) called `inventory`."
+    },
+    {
+      "line": 7,
+      "noteMd": "Selects the `\"Price\"` column to compute a markup. It fails because the real header is `\"Price \"` with a trailing space — clean the headers with `.str.strip()` first."
+    }
+  ],
+  "takeaway": "Strip whitespace from headers (df.columns = df.columns.str.strip()); a hidden space breaks column selection."
 }

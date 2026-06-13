@@ -58,6 +58,31 @@ export function checkLineRange(challenge: Challenge): string[] {
   return errors;
 }
 
+/**
+ * Beginner sectors (py, da) run the learn-first flow, so every challenge there
+ * must ship a concept card and line-by-line notes. Note line numbers must be
+ * within the code (mirrors checkLineRange). Other sectors are unconstrained.
+ */
+const LEARN_FIRST_SECTORS = new Set(["py", "da"]);
+
+export function checkBeginnerLearnFirst(challenge: Challenge): string[] {
+  if (!LEARN_FIRST_SECTORS.has(challenge.sector)) return [];
+  const errors: string[] = [];
+  if (!challenge.conceptCard || challenge.conceptCard.trim().length === 0) {
+    errors.push(`sector "${challenge.sector}" requires a conceptCard (learn-first layer)`);
+  }
+  if (!challenge.lineNotes || challenge.lineNotes.length === 0) {
+    errors.push(`sector "${challenge.sector}" requires non-empty lineNotes (learn-first layer)`);
+  }
+  const lineCount = challenge.initialCode.split("\n").length;
+  for (const note of challenge.lineNotes ?? []) {
+    if (note.line > lineCount) {
+      errors.push(`lineNotes line ${note.line} exceeds initialCode length (${lineCount} lines)`);
+    }
+  }
+  return errors;
+}
+
 export function checkFileConsistency(
   challenge: Challenge,
   sectorDir: string,
@@ -97,6 +122,7 @@ export function validateChallengeFile(input: ChallengeFileInput): ChallengeFileR
     ...checkExactlyOneCorrect(challenge),
     ...checkLineRange(challenge),
     ...checkFileConsistency(challenge, input.sectorDir, input.fileName),
+    ...checkBeginnerLearnFirst(challenge),
   );
   return { errors, challenge };
 }

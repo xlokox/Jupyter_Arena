@@ -36,6 +36,13 @@ interface ChallengeRow {
   explanation_md: string;
   est_minutes: number;
   version: number;
+  concept_card?: string | null;
+  line_notes?: Array<{ line: number; noteMd: string }> | null;
+  takeaway?: string | null;
+  figure_svg?: string | null;
+  figure_caption?: string | null;
+  track?: string | null;
+  glossary?: Array<{ term: string; definitionMd: string }> | null;
   challenge_options: Array<{
     option_key: string;
     label: string;
@@ -43,6 +50,7 @@ interface ChallengeRow {
     is_correct: boolean;
     result_log: string;
     rationale: string;
+    result_figure_svg?: string | null;
   }>;
   challenge_hints: Array<{ hint_order: number; hint_md: string }>;
   tutorials: {
@@ -91,6 +99,7 @@ export function mapChallengeRow(row: ChallengeRow): Challenge {
         isCorrect: option.is_correct,
         resultLog: option.result_log,
         rationale: option.rationale,
+        resultFigureSvg: option.result_figure_svg ?? undefined,
       })),
     hints: [hints[0]?.hint_md ?? "", hints[1]?.hint_md ?? ""],
     explanationMd: row.explanation_md,
@@ -104,6 +113,14 @@ export function mapChallengeRow(row: ChallengeRow): Challenge {
     },
     estMinutes: row.est_minutes,
     version: row.version,
+    conceptCard: row.concept_card ?? undefined,
+    lineNotes: row.line_notes ?? undefined,
+    takeaway: row.takeaway ?? undefined,
+    figureSvg: row.figure_svg ?? undefined,
+    figureCaption: row.figure_caption ?? undefined,
+    track:
+      row.track === "debugging" || row.track === "reasoning" ? row.track : undefined,
+    glossary: row.glossary ?? undefined,
   });
 }
 
@@ -113,7 +130,7 @@ function supabaseEnv(): { url: string; anonKey: string } | null {
   return url && anonKey ? { url, anonKey } : null;
 }
 
-const SECTOR_ORDER: Record<string, number> = { da: 0, ml: 1, dl: 2, fullstack: 3, db: 4 };
+const SECTOR_ORDER: Record<string, number> = { py: 0, da: 1, ml: 2, dl: 3, fullstack: 4, db: 5 };
 
 export async function getChallenges(): Promise<Challenge[]> {
   const env = supabaseEnv();
@@ -131,7 +148,7 @@ export async function getChallenges(): Promise<Challenge[]> {
 }
 
 const META_SELECT =
-  "id, sector_id, difficulty, title, language, icon, concept_tags, est_minutes, unlock_level_override";
+  "id, sector_id, difficulty, title, language, icon, concept_tags, est_minutes, unlock_level_override, track";
 
 interface MetaRow {
   id: string;
@@ -143,6 +160,7 @@ interface MetaRow {
   concept_tags: string[];
   est_minutes: number;
   unlock_level_override: number | null;
+  track: string | null;
 }
 
 /** List views ship metadata only (Section 11); bodies come via getChallenge. */
@@ -167,6 +185,7 @@ export async function getChallengeMetas(): Promise<ChallengeMeta[]> {
       unlockLevel: ungated.has(row.sector_id)
         ? 1
         : (row.unlock_level_override ?? UNLOCK_LEVELS[row.difficulty] ?? 1),
+      track: row.track === "reasoning" ? ("reasoning" as const) : ("debugging" as const),
     }))
     .sort(
       (a, b) =>

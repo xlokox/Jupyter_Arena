@@ -58,5 +58,17 @@
     ]
   },
   "estMinutes": 4,
-  "version": 1
+  "version": 1,
+  "conceptCard": "This mission is about **sorting** a table — and a pandas habit that surprises beginners.\n\n- `df.sort_values(by=\"col\")` returns a **new**, sorted table; it doesn't change the original.\n- If you don't capture the result, the sort is thrown away.\n- `ascending=False` puts the largest first.\n\nThe code sorts but doesn't keep the result. Capture it so the order sticks.",
+  "lineNotes": [
+    {
+      "line": 6,
+      "noteMd": "Sorts the products — but the sorted table it returns isn't stored anywhere, so it's discarded. Assign it back: `products = products.sort_values(...)`."
+    },
+    {
+      "line": 7,
+      "noteMd": "Prints the first rows of `products` — which is still in its original, unsorted order because line 6's result was thrown away."
+    }
+  ],
+  "takeaway": "Most pandas methods return a new object — capture the result (df = df.sort_values(...))."
 }

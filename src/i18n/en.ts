@@ -121,6 +121,7 @@ export const en = {
   },
   sectors: {
     all: "All",
+    py: "Python Fundamentals",
     da: "Data Analyst",
     ml: "Machine Learning",
     dl: "Deep Learning",
@@ -151,8 +152,8 @@ export const en = {
     emptyTitle: "Select a notebook to begin",
     emptyBody:
       "Pick a mission from the file explorer. Read the briefing, study the broken cell, choose your fix, and run it.",
-    startBeginner: "New here? Start with Data Analyst",
-    startBeginnerHint: "The Data Analyst sector is open to everyone — no level required.",
+    startBeginner: "New here? Start with Python Fundamentals",
+    startBeginnerHint: "The Python Fundamentals sector is open to everyone — no level required.",
     briefingAria: "Mission briefing",
     inLabel: "In",
     outLabel: "Out",
@@ -176,6 +177,23 @@ export const en = {
     recruiterHeading: "Senior Tech Lead — Code Review",
     recruiterRole: "Staff Engineer, reviewing your patch",
     approvedStamp: "APPROVED",
+    conceptCardHeading: "Learn first",
+    conceptCardProceed: "Begin challenge",
+    conceptCardViewLesson: "Read the full lesson →",
+    lineNotesToggle: "What does this code do?",
+    lineNotesHide: "Hide line notes",
+    lineLabel: "Line",
+    takeawayHeading: "Key takeaway",
+    figurePanelAria: "Figure shown for this mission",
+    figureBeforeFix: "Before — this is the broken chart your code produces",
+    figureAfterFix: "After — your fix renders the corrected chart",
+    reasoningBadge: "Reasoning",
+    trackAll: "All",
+    trackDebugging: "Debugging",
+    trackReasoning: "Reasoning",
+    trackFilterAria: "Mission track",
+    glossaryAria: "Glossary for this mission",
+    glossaryHeading: "Glossary",
   },
   landing: {
     navAria: "Main navigation",
@@ -184,11 +202,11 @@ export const en = {
     heroEyebrow: "The debugging arena for engineers",
     heroHeadline: "Debug like a senior engineer.",
     heroSubheadline:
-      "Debugging is the most common skill in every interview and the least-taught. Jupyter Arena gives you 75 realistic broken notebooks — read the traceback, choose the fix, watch it run. Earn XP, rank up, unlock harder missions.",
+      "Debugging is the most common skill in every interview and the least-taught. Jupyter Arena gives you 90 realistic broken notebooks — read the traceback, choose the fix, watch it run. Earn XP, rank up, unlock harder missions.",
     heroPrimaryCta: "Enter the Arena",
     heroSecondaryCta: "See how it works",
-    beginnerCuePrefix: "Brand new to data?",
-    beginnerCueLink: "Start with the Data Analyst sector",
+    beginnerCuePrefix: "Brand new to code?",
+    beginnerCueLink: "Start with Python Fundamentals",
     beginnerCueSuffix: "— no experience needed, nothing locked.",
     heroAria: "Hero: notebook cell showing red traceback transitioning to green pass",
     problemHeading: "The skill everyone needs but nobody teaches",
@@ -221,8 +239,8 @@ export const en = {
     unlockTableDiff: "Difficulty",
     unlockTableUnlocks: "Unlocks at",
     statsHeading: "Built honestly",
-    statChallenges: "75 real debugging challenges",
-    statSectors: "5 technical sectors",
+    statChallenges: "90 real debugging challenges",
+    statSectors: "6 technical sectors",
     statFree: "Free forever — no paywall",
     dailyHeading: "Daily Challenge",
     dailyBody:
@@ -234,6 +252,46 @@ export const en = {
     finalCtaPrimary: "Enter the Arena",
     finalCtaSecondary: "Try today's challenge",
     footerTagline: "Jupyter Arena — sharpen your debugging instincts.",
+    // ── Landing V2 — scroll-driven hero ─────────────────────────────────
+    heroV2: {
+      eyebrow: "Free debugging arena",
+      headline: "AI writes the code. Can you fix it?",
+      subheadline:
+        "A free debugging arena — 90 missions across 6 sectors, from your first line of Python to production bugs. Solve, level up, unlock harder missions.",
+      primaryCta: "Enter the Arena — free, no signup",
+      secondaryCta: "See why this matters",
+      scrollCue: "Scroll to debug",
+      stageAria:
+        "Animated demo: a broken notebook cell is debugged as you scroll, and the game interface assembles around it.",
+      cellTab: "report.py",
+      statusError: "error",
+      statusRunning: "running",
+      statusFixed: "passed",
+      xpChip: "+10 XP",
+      // Demo HUD — illustrative product chrome, not the visitor's own stats.
+      hudLevel: "Level 3",
+      hudRank: "Traceback Hunter",
+      hudStreak: "5 day streak",
+      hudXpLabel: "30 / 50 XP",
+      hudAria: "Example game interface",
+    },
+    // ── Landing V2 — "Programming changed forever" story ────────────────
+    story: {
+      eyebrow: "Why this exists",
+      heading: "Programming changed forever",
+      sceneAria:
+        "Illustration of a developer and an AI robot. The robot writes code fast; the developer reads it, catches the bug, and proves the fix — the two end side by side as a team.",
+      beat1Label: "Then",
+      beat1: "For decades, developers were paid to write code. Line by line. By hand.",
+      beat2Label: "Now",
+      beat2:
+        "Now AI writes most of it — in seconds. But it ships bugs with the same confidence as working code.",
+      beat3Label: "The augmented future",
+      beat3:
+        "The next generation of developers won't be valued for typing — they'll be valued for understanding: reading code, catching the bug, proving the fix. That's the exact skill this arena trains.",
+      cta: "Train the skill AI can't replace",
+      progressAria: "Story progress",
+    },
   },
   lock: {
     lockedAria: "Locked — requires level",
@@ -257,6 +315,8 @@ export const en = {
     signupPageIntro:
       "Sync your XP and streak across devices, unlock a public portfolio, and appear on the leaderboard.",
     signupBenefits: "Sync XP across devices · Public portfolio · Leaderboard",
+    placementComingSoon:
+      "Heads up: the placement quiz that matches you to a starting sector isn't live yet. New to coding? Start with Python Fundamentals — it's open to everyone, no level required.",
     backToApp: "Back to arena",
     dialogTitle: "Sign in to Jupyter Arena",
     dialogIntro:

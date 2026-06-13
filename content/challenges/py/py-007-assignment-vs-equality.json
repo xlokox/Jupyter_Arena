@@ -1,0 +1,78 @@
+{
+  "id": "py-007-assignment-vs-equality",
+  "sector": "py",
+  "difficulty": "easy",
+  "title": "07_check_perfect_score.ipynb",
+  "language": "python",
+  "icon": "equal",
+  "conceptTags": ["comparison", "operators", "if-statements"],
+  "descriptionMd": "## Mission: Check for a Perfect Score\n\nYou want to print a message only when `score` is exactly 100. You wrote `if score = 100:` — and Python stops with a `SyntaxError`, even hinting that you might have meant `==`.\n\nIn Python, a single `=` *stores* a value, while a double `==` *compares* two values. An `if` needs a comparison, not a store. Make the swap so the check works.",
+  "initialCode": "# Check whether the player got a perfect score\nscore = 100\nif score = 100:\n    print(\"Perfect score! Well done.\")",
+  "buggyLineStart": 3,
+  "buggyLineEnd": 3,
+  "traceback": "  Cell In[1], line 3\n    if score = 100:\n             ^\nSyntaxError: invalid syntax. Maybe you meant '==' or ':=' instead of '='?",
+  "correctOutput": "Perfect score! Well done.",
+  "options": [
+    {
+      "key": "a",
+      "label": "Compare with double-equals: if score == 100:",
+      "patchCode": "# Check whether the player got a perfect score\nscore = 100\nif score == 100:\n    print(\"Perfect score! Well done.\")",
+      "isCorrect": true,
+      "resultLog": "Perfect score! Well done.",
+      "rationale": "A single `=` *assigns* — it stores a value in a variable — and that's not allowed inside an `if`, which needs a yes/no question. `==` *compares*: `score == 100` asks \"is score equal to 100?\" and answers True or False. Since score is 100, the condition is True and the message prints."
+    },
+    {
+      "key": "b",
+      "label": "Add a space between the equals signs",
+      "patchCode": "# Check whether the player got a perfect score\nscore = 100\nif score = = 100:\n    print(\"Perfect score! Well done.\")",
+      "isCorrect": false,
+      "resultLog": "  Cell In[1], line 3\n    if score = = 100:\n             ^\nSyntaxError: invalid syntax",
+      "rationale": "`==` is a single operator written as two characters with **no space** between them. `= =` is read as a stray `=` followed by another `=`, which is still invalid syntax. Write it as `==`, joined together."
+    },
+    {
+      "key": "c",
+      "label": "Compare against the text \"100\"",
+      "patchCode": "# Check whether the player got a perfect score\nscore = 100\nif score == \"100\":\n    print(\"Perfect score! Well done.\")",
+      "isCorrect": false,
+      "resultLog": "(nothing is printed)\n\n# score is the number 100, but \"100\" is text — a number never equals its text version, so the condition is False.",
+      "rationale": "Now the comparison is valid, but it asks if the *number* 100 equals the *text* `\"100\"` — and a number is never equal to its text form, so the result is False and nothing prints. Compare a number to a number: `score == 100`, no quotes."
+    }
+  ],
+  "hints": [
+    "Read Python's own hint in the error: \"Maybe you meant '==' instead of '='?\" One `=` stores a value; an `if` needs to *compare*. What's the comparison operator?",
+    "Use `==` (two equals signs, no space) to compare: `if score == 100:`. And compare a number to a number — don't put quotes around the 100."
+  ],
+  "explanationMd": "### Why the bug occurs\nIn Python `=` and `==` are completely different. A single `=` is **assignment** — it stores the value on the right into the variable on the left (`score = 100`). A double `==` is **comparison** — it asks whether two values are equal and gives back True or False. An `if` statement needs a True/False question, so putting an assignment there is a `SyntaxError` (recent Python even suggests `==`).\n\n### Why the fix is correct\n`if score == 100:` asks \"is score equal to 100?\". Because `score` holds 100, the answer is True, so the indented `print` runs. Remember the pair: **one equals stores, two equals compares.** And compare like with like — a number to a number (`100`), not a number to text (`\"100\"`), which are never equal.",
+  "recruiterReview": "Nice — and you used the interpreter's hint rather than fighting it, which is a great habit; modern Python error messages often tell you the fix. The `=` vs `==` distinction is one of the most common beginner trip-ups and the source of subtle bugs in languages that *don't* catch it, so building the reflex now is valuable. You also avoided the number-vs-text trap. Clean reasoning end to end. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Storing vs. Comparing: = and ==\n\nTwo of the most important symbols in Python look almost identical and do completely different things. Getting them straight is a milestone.\n\n### One equals: assignment\nA single `=` **stores** a value into a variable. Read it as \"becomes\" or \"is set to\":\n```python\nscore = 100      # score becomes 100\nname = \"Ada\"     # name is set to \"Ada\"\n```\nThe thing on the left must be a variable; the thing on the right is the value it now holds.\n\n### Two equals: comparison\nA double `==` **compares** two values and produces a True or False answer (a *boolean*):\n```python\nscore == 100     # True if score holds 100, else False\n5 == 6           # False\n```\nIt doesn't change anything — it just asks a question.\n\n### Where each belongs\n- Use `=` to **set** a variable.\n- Use `==` inside an **`if`** (or anywhere you're asking \"are these equal?\").\n```python\nif score == 100:\n    print(\"Perfect!\")\n```\nPython won't let you put an assignment (`=`) in an `if` condition — it raises a `SyntaxError`, often suggesting `==`.\n\n### Compare like with like\n`100 == \"100\"` is False: the number 100 is not the text `\"100\"`. Compare numbers to numbers and text to text.\n\n### A tiny worked example\n```python\nage = 18            # store\nif age == 18:       # compare\n    print(\"Just became an adult\")\n```\nprints:\n```\nJust became an adult\n```\n\n### Other comparisons\nYou also have `!=` (not equal), `<`, `>`, `<=`, `>=` — all of which give True or False.\n\n### Common beginner mistakes\n- Writing `=` in an `if` when you meant `==`.\n- Adding a space: `= =` is not the same as `==`.\n- Comparing a number to its text form (`100 == \"100\"` is False).\n\n### You just learned…\n**One equals stores, two equals compares.** Use `=` to set a variable and `==` to ask whether two values are equal inside an `if`. This single distinction unlocks decision-making in your programs.",
+    "videos": [
+      {
+        "title": "Python = vs == for absolute beginners",
+        "searchQuery": "python assignment vs equality equals double equals beginner tutorial"
+      },
+      {
+        "title": "if statements and comparison operators in Python",
+        "searchQuery": "python if statement comparison operators == beginner explained"
+      }
+    ]
+  },
+  "estMinutes": 4,
+  "version": 1,
+  "conceptCard": "This mission is about two look-alike symbols, `=` and `==`.\n\n- A single `=` **stores** a value in a variable: `score = 100`.\n- A double `==` **compares** two values and gives back True or False.\n- An `if` needs a comparison, so it uses `==`.\n\nThe code uses the wrong one inside an `if`. Swap it for the comparison.",
+  "lineNotes": [
+    {
+      "line": 2,
+      "noteMd": "A single `=` **stores** the value 100 in `score`. This line is correct."
+    },
+    {
+      "line": 3,
+      "noteMd": "Inside an `if` you must **compare**, not store. `=` is assignment — you need `==` to ask \"is score equal to 100?\". This is the bug."
+    },
+    {
+      "line": 4,
+      "noteMd": "Indented under the `if`, so it only runs when the condition above is true."
+    }
+  ],
+  "takeaway": "One equals (=) stores a value; two equals (==) compares — an if needs ==."
+}

@@ -58,5 +58,17 @@
     ]
   },
   "estMinutes": 4,
-  "version": 1
+  "version": 1,
+  "conceptCard": "This mission is about **filtering rows** on more than one condition.\n\n- A condition like `df.age > 30` returns a whole column of True/False values (a *mask*).\n- Putting a mask in brackets keeps the matching rows: `df[mask]`.\n- To combine masks use `&` (and) and `|` (or) — not Python's `and`/`or` — and wrap each condition in parentheses.\n\nThe code uses `and` to join two conditions and fails. Switch to `&`.",
+  "lineNotes": [
+    {
+      "line": 6,
+      "noteMd": "Tries to keep rows matching both conditions, but uses the word `and`. Each condition is a whole column of True/False, so you need `&` with parentheses: `(age > 30) & (city == \"NY\")`."
+    },
+    {
+      "line": 8,
+      "noteMd": "`len(...)` counts how many rows came through the filter."
+    }
+  ],
+  "takeaway": "Combine column conditions with & and | (each in parentheses), not Python's and/or."
 }

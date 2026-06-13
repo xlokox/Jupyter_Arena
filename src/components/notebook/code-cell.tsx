@@ -1,5 +1,9 @@
-import { Bug } from "lucide-react";
+"use client";
+
+import { useState } from "react";
+import { Bug, MessageSquareText } from "lucide-react";
 import { tokenize, type Language, type TokenKind } from "@/lib/tokenizer/tokenize";
+import { Markdown } from "@/components/markdown";
 import { en } from "@/i18n/en";
 
 const KIND_CLASS: Record<TokenKind, string> = {
@@ -20,10 +24,22 @@ interface CodeCellProps {
   title: string;
   /** True on the first render after a correct fix — flashes the patched code green. */
   justSolved?: boolean;
+  /** Learn-first: plain-language notes per code line (beginner sectors). */
+  lineNotes?: Array<{ line: number; noteMd: string }>;
 }
 
-export function CodeCell({ code, language, bugRegion, title, justSolved = false }: CodeCellProps) {
+export function CodeCell({
+  code,
+  language,
+  bugRegion,
+  title,
+  justSolved = false,
+  lineNotes,
+}: CodeCellProps) {
   const lines = tokenize(code, language);
+  const [showNotes, setShowNotes] = useState(false);
+  const hasNotes = Boolean(lineNotes && lineNotes.length > 0);
+  const sortedNotes = hasNotes ? [...lineNotes!].sort((a, b) => a.line - b.line) : [];
 
   return (
     <section aria-label={en.workspace.codeCellAria} className="flex gap-3">
@@ -31,11 +47,24 @@ export function CodeCell({ code, language, bugRegion, title, justSolved = false 
         {en.workspace.inLabel} [1]:
       </span>
       <div className="min-w-0 flex-1 overflow-hidden rounded-md border border-border bg-code-bg">
-        <div className="flex items-center justify-between border-b border-border px-3 py-1.5">
+        <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-1.5">
           <span className="truncate font-mono text-xs text-muted">{title}</span>
-          <span className="rounded bg-panel-2 px-1.5 py-0.5 font-mono text-[10px] uppercase text-muted">
-            {language}
-          </span>
+          <div className="flex shrink-0 items-center gap-2">
+            {hasNotes && (
+              <button
+                type="button"
+                aria-pressed={showNotes}
+                onClick={() => setShowNotes((v) => !v)}
+                className="flex items-center gap-1 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted transition-colors hover:border-accent-hover hover:text-text focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+              >
+                <MessageSquareText className="size-3" aria-hidden />
+                {showNotes ? en.workspace.lineNotesHide : en.workspace.lineNotesToggle}
+              </button>
+            )}
+            <span className="rounded bg-panel-2 px-1.5 py-0.5 font-mono text-[10px] uppercase text-muted">
+              {language}
+            </span>
+          </div>
         </div>
         <pre
           className={`overflow-x-auto p-0 font-mono text-[13px] leading-6 ${
@@ -79,6 +108,23 @@ export function CodeCell({ code, language, bugRegion, title, justSolved = false 
             })}
           </code>
         </pre>
+        {hasNotes && showNotes && (
+          <ul
+            aria-label={en.workspace.lineNotesToggle}
+            className="space-y-2 border-t border-border bg-panel p-3 motion-safe:animate-[output-reveal_0.35s_ease-out]"
+          >
+            {sortedNotes.map((note) => (
+              <li key={note.line} className="flex gap-2.5 text-sm">
+                <span className="mt-0.5 shrink-0 rounded bg-panel-2 px-1.5 py-0.5 font-mono text-[10px] text-accent">
+                  {en.workspace.lineLabel} {note.line}
+                </span>
+                <div className="min-w-0 text-muted">
+                  <Markdown>{note.noteMd}</Markdown>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </section>
   );

@@ -1,0 +1,85 @@
+{
+  "id": "py-035-generator-stream",
+  "sector": "py",
+  "difficulty": "hard",
+  "title": "35_stream_a_huge_log.ipynb",
+  "language": "python",
+  "icon": "infinity",
+  "conceptTags": ["generators", "yield", "memory", "iteration"],
+  "descriptionMd": "## Mission: Count Errors in a 50 GB Log\n\nYour script counts lines containing `\"ERROR\"` in a 50 GB log file. It works fine on the 100 MB sample on your laptop. Deployed against the real file, the process is killed by the OOM (Out-Of-Memory) killer within seconds — `MemoryError` or just a brutal `Killed`.\n\nThe code calls `f.readlines()`, which **loads the entire file into a Python list of strings** before you can count anything. The file object is itself an iterable — you can stream it line-by-line, holding one line in memory at a time. Or you can write a `yield`-based generator function. Both stream; both work on 50 GB on a 4 GB machine. Pick the one that respects memory.",
+  "initialCode": "def count_errors(path: str) -> int:\n    with open(path) as f:\n        lines = f.readlines()  # ← loads the entire file into memory\n    return sum(1 for line in lines if \"ERROR\" in line)\n\nprint(count_errors(\"/var/log/myapp/prod.log\"))",
+  "buggyLineStart": 3,
+  "buggyLineEnd": 3,
+  "traceback": "Killed\n# 50 GB file → Python tries to allocate ~50 GB of list+string overhead\n# On a 16 GB machine the OS OOM-killer terminates the process before MemoryError can even be raised",
+  "correctOutput": "473218\n# streamed line-by-line — peak memory ~ a few MB even on a 50 GB file",
+  "options": [
+    {
+      "key": "a",
+      "label": "Iterate the file object directly — it's already a lazy iterator",
+      "patchCode": "def count_errors(path: str) -> int:\n    with open(path) as f:\n        return sum(1 for line in f if \"ERROR\" in line)\n\nprint(count_errors(\"/var/log/myapp/prod.log\"))",
+      "isCorrect": true,
+      "resultLog": "473218\n# streamed — peak memory ~ a few MB regardless of file size",
+      "rationale": "An open file object is **already a generator** — iterating it yields one line at a time, releases that line's memory before the next one is read. The generator expression `(1 for line in f if 'ERROR' in line)` consumes it lazily; `sum` walks the generator once and the file streams through. Peak memory is one line buffer + a tiny accumulator. This is the canonical Python way to process large files; you'll write some flavour of it nearly every week for the rest of your career."
+    },
+    {
+      "key": "b",
+      "label": "Use `f.read().split('\\n')` to get a list, then count",
+      "patchCode": "def count_errors(path: str) -> int:\n    with open(path) as f:\n        lines = f.read().split(\"\\n\")\n    return sum(1 for line in lines if \"ERROR\" in line)\n\nprint(count_errors(\"/var/log/myapp/prod.log\"))",
+      "isCorrect": false,
+      "resultLog": "Killed\n# f.read() returns the entire file as one giant string — 50 GB of it.\n# .split() then allocates another 50 GB worth of substrings.",
+      "rationale": "Same shape as the original bug. `f.read()` returns the full file contents as a single string; `.split('\\n')` then makes a list of every line. Both allocations are roughly the size of the file. On 50 GB, the OS kills the process before you get a Python error. The fix isn't about *how* you load the file — it's about not loading it. Iterate the file object directly."
+    },
+    {
+      "key": "c",
+      "label": "Use `mmap` to memory-map the file",
+      "patchCode": "import mmap\n\ndef count_errors(path: str) -> int:\n    with open(path, \"rb\") as f:\n        with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:\n            count = 0\n            i = 0\n            while True:\n                j = mm.find(b\"ERROR\", i)\n                if j == -1:\n                    break\n                count += 1\n                i = j + 5\n            return count\n\nprint(count_errors(\"/var/log/myapp/prod.log\"))",
+      "isCorrect": false,
+      "resultLog": "473218\n# functionally correct; uses mmap to avoid python-side allocation but misses the iteration lesson",
+      "rationale": "Works and is fast — `mmap` lets the OS page the file in on demand without Python allocating string objects. But it counts *occurrences of the bytes* `ERROR`, not *lines containing* `ERROR`. For 'ERRORS WITHIN ERROR' the simple `mm.find` would overcount. More importantly, the lesson is that **Python file objects are already lazy iterators**; you don't need to reach for `mmap` to stream them. `mmap` is the right tool when you need random access into a giant file; for line-by-line streaming, iterate the file directly."
+    }
+  ],
+  "hints": [
+    "Look at the buggy `f.readlines()` call — it returns a list. What does iterating `f` directly return?",
+    "Iterate the file directly: `for line in f: ...`. Each iteration yields one line; the previous one is released."
+  ],
+  "explanationMd": "### Why the bug occurs\n`f.readlines()` is a convenience method that loads **the entire file into a Python list of strings**. On a 50 GB file, you allocate at least 50 GB of string data plus list-and-object overhead. Linux processes that exceed available RAM and swap are killed by the **OOM killer** before `MemoryError` can be raised inside Python.\n\nThe pattern is so common that you'll see it on Stack Overflow as the first answer to 'how do I read a file in Python.' For small files it's fine. For real production data it's a time bomb.\n\n### Why the fix is correct\nOpen file objects in Python are **already generators**: iterating one yields one line at a time, releases that line as the iterator advances. Combined with a generator expression (`sum(1 for line in f if 'ERROR' in line)`), the entire computation streams: at any moment the process holds one line in memory and an integer accumulator. Peak memory is a few KB regardless of file size.\n\nThis is the **single most important Python performance pattern**. It generalises:\n- **`for line in f:`** instead of `for line in f.readlines():`\n- **Use `csv.reader(f)`** instead of `csv.reader(f.readlines())`.\n- **Use `json.load(f)` only when the file fits in memory**; for huge JSON, use a streaming parser (`ijson`).\n- **Process pandas DataFrames in chunks**: `for chunk in pd.read_csv(path, chunksize=10000): ...`.\n\n### Writing your own generator\nThe `yield` keyword turns any function into a generator:\n```python\ndef read_chunks(path, n=1024):\n    with open(path) as f:\n        while True:\n            chunk = f.read(n)\n            if not chunk:\n                break\n            yield chunk\n```\nEach `yield` pauses the function; the next iteration resumes after the yield. State is preserved across yields. This is the pattern behind `itertools.chain`, `os.walk`, and every paginated API client you'll ever write.\n\n### `mmap` — a different tool for a different shape\n`mmap` is right when you need **random access** into a huge file — searching, indexing, parallel readers. It's wrong for sequential line-by-line work because you lose the line-buffering for free. Pick the tool for the access pattern.",
+  "recruiterReview": "Strong — you reached for the cheapest correct fix (iterate the file directly) instead of reaching for `mmap` or chunked reads. That's the right Python instinct and it scales from your laptop to a 50 TB log without code changes. Two follow-ups for production: 1) when you need to count errors per minute or per service, switch to `collections.Counter` and accumulate by `(minute, level)` — same streaming pattern, richer output. 2) For multi-day jobs, log progress with a `tqdm` wrapper or a manual `if i % 1_000_000 == 0: print(...)` so the on-call engineer can see liveness. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Generators and the Streaming Pattern\n\nThis is the single most important performance pattern in Python. Internalising it means the difference between code that scales and code that has to be rewritten when production data shows up.\n\n### What a generator is\nA generator is an iterator that produces values **one at a time, on demand**. It pauses between values and resumes when the next one is requested. Three ways to make one:\n\n#### 1) Generator expression\n```python\nsquares = (x*x for x in range(10**9))\n```\nNothing happens until you iterate. The 10⁹ values never exist all at once.\n\n#### 2) `yield` in a function\n```python\ndef read_chunks(path, n=1024):\n    with open(path) as f:\n        while chunk := f.read(n):\n            yield chunk\n```\nThe function pauses at each `yield` and resumes when the caller asks for the next value. Local state survives across yields.\n\n#### 3) Already-lazy objects\n- **File objects** (`for line in open(path):`)\n- **`csv.reader(f)`**, `dict.items()`, `enumerate(...)`, `zip(...)`, `range(...)`\n- **`itertools`** — `chain`, `islice`, `groupby`, `tee`, `accumulate`\n\n### What `readlines()` does wrong\n```python\nlines = f.readlines()                # eager — allocates the whole file\nlines = list(f)                      # eager — same thing\nlines = [line for line in f]         # eager — list comprehension\n```\nAll three materialise the full file in memory. On big files, all three OOM.\n\n```python\nfor line in f:                       # lazy — one line at a time\n    ...\ngood = (line for line in f if ok)    # lazy generator expression\n```\nBoth stream; both work on arbitrarily large files.\n\n### The streaming pattern in three shapes\n\n#### Single-pass aggregate\n```python\ncount = sum(1 for line in f if \"ERROR\" in line)\n```\n\n#### Single-pass transform-and-write\n```python\nwith open(\"in.csv\") as src, open(\"out.csv\", \"w\") as dst:\n    for line in src:\n        dst.write(transform(line))\n```\n\n#### Chunked processing for libraries that need batches\n```python\nfor chunk in pd.read_csv(path, chunksize=10_000):\n    process(chunk)\n```\n\n### Generators in pipelines\nGenerators compose cleanly — each step is lazy:\n```python\nlines  = (line for line in f)\nerrors = (line for line in lines if \"ERROR\" in line)\nrecent = (line for line in errors if line.startswith(\"2025-\"))\nfor line in recent:\n    notify(line)\n```\nNothing is computed until the `for` consumes it; data streams through the pipeline one element at a time.\n\n### `itertools` — the standard library's generator toolkit\n```python\nimport itertools\n\nitertools.islice(iter, 100)         # first 100 items\nitertools.chain(a, b, c)            # concatenate iterators\nitertools.groupby(sorted(xs), key)  # group consecutive equal keys\nitertools.tee(iter, 2)              # split one iterator into two\nitertools.accumulate(xs)            # running totals\n```\n\nUse them rather than rolling your own — they're C-coded, well-tested, and read like specifications.\n\n### The single-pass trap\nA generator is **consumed exactly once**. Read it twice and the second time it's empty:\n```python\ng = (x*x for x in range(5))\nlist(g)   # [0, 1, 4, 9, 16]\nlist(g)   # []   — generator exhausted\n```\nIf you need to iterate twice, either rebuild the generator or materialise the result (`xs = list(g)`).\n\n### When to materialise\n- You need random access (`xs[5]`).\n- You need to iterate multiple times.\n- The data is small enough that the convenience is worth the memory.\n- You need `len()`.\n\nFor everything else, **prefer lazy iteration**.\n\n### Common reasoning mistakes\n- `f.readlines()` (or `f.read().split('\\n')`) on a big file.\n- Building a list with a comprehension when a generator expression would do.\n- Trying to iterate a generator twice.\n- Reaching for `mmap` when iterating the file directly was cheaper.\n- `pd.read_csv()` without `chunksize` on a 50 GB CSV.\n\n### You just learned…\nPython file objects, `csv.reader`, `pd.read_csv(chunksize=...)`, and generators built with `yield` all share one property: they **stream**. Memory stays flat regardless of input size. This is the single most important Python performance pattern; once it's in your fingers, scale stops surprising you.",
+    "videos": [
+      { "title": "Python generators and yield", "searchQuery": "python generator yield tutorial beginner advanced" },
+      { "title": "Streaming large files in Python", "searchQuery": "python read large file memory efficient generator tutorial" }
+    ]
+  },
+  "estMinutes": 9,
+  "version": 1,
+  "conceptCard": "This mission is about **streaming iteration**.\n\n- `f.readlines()` loads the entire file into memory — OOM on big files.\n- Iterating an open file object directly is **lazy** — one line in memory at a time.\n- `yield` builds your own lazy iterators; generator expressions `(x for x in xs)` are list comprehensions' lazy cousins.\n\nThe code calls `f.readlines()` on a 50 GB log and the OS kills the process. Iterate `f` directly and peak memory stays in the MB.",
+  "lineNotes": [
+    { "line": 2, "noteMd": "Open the file in a `with` block — the right resource discipline (see py-031)." },
+    { "line": 3, "noteMd": "**The bug.** `f.readlines()` allocates a list of *every* line. Replace with `for line in f:` (lazy)." },
+    { "line": 4, "noteMd": "Generator expression `(1 for ... if ...)` is already lazy — the bug is feeding it the eager `lines` list, not the lazy `f`." }
+  ],
+  "takeaway": "Iterate file objects directly — they stream. f.readlines() loads everything; for line in f doesn't.",
+  "glossary": [
+    {
+      "term": "generator",
+      "definitionMd": "A Python iterator that produces values one at a time, on demand. Built with `yield` in a function or a generator expression `(... for ... in ...)`. Streams through data without materialising the full sequence."
+    },
+    {
+      "term": "`yield`",
+      "definitionMd": "Keyword that pauses a function and returns a value to the caller. Next call to the generator resumes after the yield, preserving local state. Turns any function into a lazy producer."
+    },
+    {
+      "term": "lazy iteration",
+      "definitionMd": "Computing values only when the next one is requested, never holding the full sequence in memory. The opposite of eager: `for line in f` is lazy; `f.readlines()` is eager."
+    },
+    {
+      "term": "OOM killer",
+      "definitionMd": "Linux kernel subsystem that picks a process to kill when the system runs out of memory. Sees `Killed` in dmesg rather than a Python `MemoryError` because the kernel acts before Python's allocator can fail gracefully."
+    },
+    {
+      "term": "`mmap`",
+      "definitionMd": "OS facility that maps a file into the process's virtual address space, letting you access it as if it were a `bytes` array. Right tool for random access into a huge file; **wrong** tool for streaming, where iterating the file directly is simpler."
+    }
+  ]
+}

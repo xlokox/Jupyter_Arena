@@ -1,0 +1,63 @@
+{
+  "id": "py-026-float-precision",
+  "sector": "py",
+  "difficulty": "medium",
+  "title": "26_invoice_totals.ipynb",
+  "language": "python",
+  "icon": "scale",
+  "conceptTags": ["floating-point", "ieee754", "equality"],
+  "descriptionMd": "## Mission: Why Doesn't the Total Equal 0.30?\n\nYou're invoicing three items at 10¢ each and checking that the total equals 30¢. You wrote `total = 0.10 + 0.10 + 0.10` and then `if total == 0.30: ... else: raise`. The program raises every single time — even though the numbers are obviously right.\n\nThis is one of the most-Googled bugs in software history. It's the same shape as **the floating-point bug that's been written about in textbooks since the 1990s** (David Goldberg, *\"What Every Computer Scientist Should Know About Floating-Point Arithmetic\"*, 1991), and the same shape that causes off-by-a-cent invoice mismatches in production systems every day. `0.1 + 0.2 != 0.3` is the canonical example. Fix the comparison.",
+  "initialCode": "# Three line items at 10 cents each — total should be 30 cents.\nline_items = [0.10, 0.10, 0.10]\ntotal = sum(line_items)\n\nprint(f\"total = {total}\")\nprint(f\"expected = 0.30\")\n\nif total == 0.30:\n    print(\"OK\")\nelse:\n    raise ValueError(f\"total mismatch: {total} != 0.30\")",
+  "buggyLineStart": 8,
+  "buggyLineEnd": 8,
+  "traceback": "total = 0.30000000000000004\nexpected = 0.30\n---------------------------------------------------------------------------\nValueError                                Traceback (most recent call last)\nCell In[1], line 10\n      8 if total == 0.30:\n      9     print(\"OK\")\n---> 10     raise ValueError(f\"total mismatch: {total} != 0.30\")\n\nValueError: total mismatch: 0.30000000000000004 != 0.30",
+  "correctOutput": "total = 0.30000000000000004\nexpected = 0.30\nOK",
+  "options": [
+    {
+      "key": "a",
+      "label": "Compare within a small tolerance: `math.isclose(total, 0.30)`",
+      "patchCode": "import math\n\n# Three line items at 10 cents each — total should be 30 cents.\nline_items = [0.10, 0.10, 0.10]\ntotal = sum(line_items)\n\nprint(f\"total = {total}\")\nprint(f\"expected = 0.30\")\n\nif math.isclose(total, 0.30):\n    print(\"OK\")\nelse:\n    raise ValueError(f\"total mismatch: {total} != 0.30\")",
+      "isCorrect": true,
+      "resultLog": "total = 0.30000000000000004\nexpected = 0.30\nOK",
+      "rationale": "`math.isclose(a, b)` checks equality **within a small tolerance** (default `rel_tol=1e-9`) — exactly what you want when comparing floats. The underlying issue is that `0.1` is not representable exactly in binary IEEE-754 floating point; it's stored as a tiny bit more than 0.1, and three of those sum to a tiny bit more than 0.3 (`0.30000000000000004`). The arithmetic is correct; the *equality* is the wrong test. For real money systems, the durable fix is `decimal.Decimal` or integer cents — but for everyday calculations, `math.isclose` is the canonical Python answer."
+    },
+    {
+      "key": "b",
+      "label": "Round the total to 2 decimals before comparing",
+      "patchCode": "# Three line items at 10 cents each — total should be 30 cents.\nline_items = [0.10, 0.10, 0.10]\ntotal = round(sum(line_items), 2)\n\nprint(f\"total = {total}\")\nprint(f\"expected = 0.30\")\n\nif total == 0.30:\n    print(\"OK\")\nelse:\n    raise ValueError(f\"total mismatch: {total} != 0.30\")",
+      "isCorrect": false,
+      "resultLog": "total = 0.3\nexpected = 0.30\nOK",
+      "rationale": "Works for this case but masks the underlying problem and breaks down as soon as the data scales. Add more line items, more decimal places, or a different operation (`round(0.575, 2)` famously returns `0.57`, not `0.58`, because of the same IEEE-754 storage) and your invoice quietly drifts. Rounding the *value* hides the inequality; using a *tolerant comparison* names it. For money systems, prefer `decimal.Decimal` with the cents fixed at the boundary."
+    },
+    {
+      "key": "c",
+      "label": "Multiply both sides by 100 and compare integer cents",
+      "patchCode": "# Three line items at 10 cents each — total should be 30 cents.\nline_items = [0.10, 0.10, 0.10]\ntotal = sum(line_items)\n\nprint(f\"total = {total}\")\nprint(f\"expected = 0.30\")\n\nif int(total * 100) == 30:\n    print(\"OK\")\nelse:\n    raise ValueError(f\"total mismatch: {total} != 0.30\")",
+      "isCorrect": false,
+      "resultLog": "total = 0.30000000000000004\nexpected = 0.30\n---------------------------------------------------------------------------\nValueError                                Traceback (most recent call last)\nCell In[1], line 10\n---> 10     raise ValueError(f\"total mismatch: {total} != 0.30\")\n\nValueError: total mismatch: 0.30000000000000004 != 0.30",
+      "rationale": "`int(0.30000000000000004 * 100)` is `int(30.000000000000004)` which is `30` — so this *should* match. But `int()` truncates rather than rounds, and on the next data set you'll meet `int(0.299999999 * 100) == 29` and the bug returns silently. The real \"work with integer cents\" pattern means storing cents as integers throughout, not converting at the comparison point. `math.isclose` is the smallest, most honest fix; integer cents (or `Decimal`) is the durable refactor."
+    }
+  ],
+  "hints": [
+    "Print `0.1 + 0.1 + 0.1` and `0.3` in a shell. They are *not* equal — `0.1` can't be stored exactly in binary floating point.",
+    "Use `math.isclose(a, b)` to compare floats within a small tolerance, or use `decimal.Decimal` for money."
+  ],
+  "explanationMd": "### Why the bug occurs\nFloats in Python (and C, Java, JavaScript, Go, …) use the **IEEE 754 double-precision** format — 64 bits of binary fractions. Numbers like `0.1`, `0.2`, `0.3` are *not exactly representable* in binary because they have infinite repeating expansions in base 2 (the same way `1/3` is `0.333...` in base 10). Python stores `0.1` as the closest representable double, which is *just slightly more* than 0.1.\n\nAdd three of those approximations together and you get `0.30000000000000004`, not `0.3`. The `==` test compares the exact binary representations and (correctly) reports they differ. No floating-point library, language, or future Python version will change this — it's baked into IEEE 754.\n\n### Why the fix is correct\n`math.isclose(a, b)` returns `True` when the two values are within a small **relative tolerance** (default `rel_tol=1e-9`) and **absolute tolerance** (default `abs_tol=0.0`). For typical scientific and engineering work that's plenty. The Python docs recommend exactly this function for float equality.\n\nFor money — where you want *exact* decimal arithmetic — use `decimal.Decimal('0.10')` or work in integer cents (`10`, `10`, `10`, total `30`). Both avoid IEEE 754 entirely. The lesson is to **never `==` two floats**; use tolerance for general work and decimals/integers for money.",
+  "recruiterReview": "Strong — you didn't \"fix\" the arithmetic, you fixed the *comparison*. That shows you understand the value didn't change; the equality test was the wrong test. `math.isclose` is the canonical Python answer for general-purpose float comparison. For production money code, follow up by moving the system to `decimal.Decimal` or integer cents at the boundary — IEEE 754 has cost real companies real money in off-by-a-cent invoice mismatches, settlement-system disputes, and audit-trail discrepancies. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Floating Point — Why `0.1 + 0.2 != 0.3`\n\nThis is the most-Googled bug in programming. Once you understand why, you'll stop being surprised by float arithmetic for life.\n\n### IEEE 754 in one paragraph\nThe IEEE 754 double-precision standard stores a float as `sign × mantissa × 2^exponent` using 64 bits. Numbers like 1.0, 2.0, 0.5, 0.25 are *exact* because they're sums of negative-power-of-two fractions. Numbers like 0.1, 0.2, 0.3 are *not exact* — their binary representation is a repeating fraction, just like `1/3 = 0.333...` in base 10. Python stores the closest possible double, which is *very slightly off*.\n\nPrint it directly:\n```python\nfrom decimal import Decimal\nprint(Decimal(0.1))\n# 0.1000000000000000055511151231257827021181583404541015625\n```\nThat's what `0.1` actually is in memory. Sum three of those and you get `0.30000000000000004`.\n\n### Why this matters in real software\nIEEE 754 mistakes have shipped real bugs:\n- **Off-by-a-cent invoice mismatches** in billing systems built on floats.\n- **Settlement-system disputes** where buyer-side and seller-side floats disagree.\n- **Loss functions in ML training** that compare floats — your training loop may decide two runs are different when they're not.\n- **Sensor reading floors / ceilings** in embedded systems.\n\nThe canonical reference is **David Goldberg, \"What Every Computer Scientist Should Know About Floating-Point Arithmetic\" (1991)** — still the best 70-page read on the topic. The Python docs section *\"Floating Point Arithmetic: Issues and Limitations\"* is the modern executive summary.\n\n### Three durable fixes (pick by use case)\n\n#### 1) `math.isclose` for general comparison\n```python\nimport math\nmath.isclose(0.1 + 0.2, 0.3)        # True — default tolerances\nmath.isclose(a, b, rel_tol=1e-6)     # tighter\nmath.isclose(a, 0, abs_tol=1e-9)     # comparing to zero — need abs_tol\n```\nThe one trap: `math.isclose(x, 0)` returns `False` for any non-zero x because `rel_tol` is multiplicative. Use `abs_tol` when comparing to zero.\n\n#### 2) `decimal.Decimal` for money\n```python\nfrom decimal import Decimal\ntotal = Decimal('0.10') + Decimal('0.10') + Decimal('0.10')\nassert total == Decimal('0.30')   # True — exact\n```\nUse string constructors (`Decimal('0.10')` not `Decimal(0.10)`) so the imprecision never enters the system.\n\n#### 3) Integer cents (or microcents, or fixed-point) for high-volume systems\n```python\ntotal_cents = 10 + 10 + 10\nassert total_cents == 30\n```\nThe fastest option and the one used by most real billing systems. Convert to/from display strings only at I/O.\n\n### `numpy` and the same trap\nNumPy floats are IEEE 754 too — `np.array([0.1, 0.1, 0.1]).sum() == 0.3` is `False`. Use `np.isclose` or `np.allclose` for arrays.\n\n### Common beginner mistakes\n- Comparing floats with `==`.\n- Using `round(x, 2)` to \"fix\" the storage instead of fixing the comparison.\n- `int(total * 100)` to get cents — truncates instead of rounding; `round(total * 100)` is closer but still float-fragile.\n- Storing money as `float` instead of `Decimal` or integer cents.\n\n### You just learned…\n`0.1 + 0.2 != 0.3` is a property of **IEEE 754**, not a Python bug. Use `math.isclose` for general comparisons and `Decimal` (or integer cents) for money. The most-Googled bug in programming has a 30-year-old, well-documented fix — and you don't have to repeat the lesson the hard way.",
+      "videos": [
+        { "title": "Floating point explained for programmers", "searchQuery": "ieee 754 floating point explained beginner tutorial" },
+        { "title": "Why 0.1 + 0.2 != 0.3", "searchQuery": "python why 0.1 + 0.2 not equal 0.3 tutorial" }
+      ]
+  },
+  "estMinutes": 7,
+  "version": 1,
+  "conceptCard": "This mission is about **floating-point equality**.\n\n- IEEE 754 stores `0.1` as a tiny bit more than 0.1 — `0.1 + 0.1 + 0.1 != 0.3` is a property of the format, not a Python bug.\n- For general comparison: `math.isclose(a, b)`. For money: `decimal.Decimal` or integer cents.\n- **Never `==` two floats** — use tolerance.\n\nThe code compares two floats with `==` and (correctly) reports them unequal. Use `math.isclose` and the test passes.",
+  "lineNotes": [
+    { "line": 2, "noteMd": "Three line items at 10¢. Each is stored as the **closest representable IEEE 754 double**, which is just over 0.1." },
+    { "line": 3, "noteMd": "Sum three of those — get `0.30000000000000004`, not exactly 0.3." },
+    { "line": 8, "noteMd": "**The bug.** `==` compares the exact binary; the three-cents-from-binary-error makes this false. Use `math.isclose`." }
+  ],
+  "takeaway": "0.1 + 0.2 != 0.3 by design; use math.isclose for floats, Decimal for money."
+}

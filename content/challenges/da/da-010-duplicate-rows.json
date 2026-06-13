@@ -58,5 +58,17 @@
     ]
   },
   "estMinutes": 6,
-  "version": 1
+  "version": 1,
+  "conceptCard": "This mission is about **duplicate rows** quietly inflating your numbers.\n\n- When data is stitched from two sources, the same row can appear twice.\n- `drop_duplicates()` removes fully-identical rows before you total.\n- For 'how many distinct customers', use `nunique()`, not `count()` (which counts rows).\n\nThe report double-counts. Dedupe before summing, and count distinct customers.",
+  "lineNotes": [
+    {
+      "line": 7,
+      "noteMd": "`.count()` counts how many rows have a value — not how many *distinct* customers. For unique customers you want `.nunique()`."
+    },
+    {
+      "line": 8,
+      "noteMd": "Sums the amount column — but duplicate rows are counted twice, inflating revenue. Remove duplicates with `drop_duplicates()` first."
+    }
+  ],
+  "takeaway": "drop_duplicates() before summing, and nunique() (not count()) for distinct values."
 }

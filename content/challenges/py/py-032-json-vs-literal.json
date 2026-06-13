@@ -1,0 +1,85 @@
+{
+  "id": "py-032-json-vs-literal",
+  "sector": "py",
+  "difficulty": "easy",
+  "title": "32_parse_partner_payload.ipynb",
+  "language": "python",
+  "icon": "braces",
+  "conceptTags": ["json", "parsing", "security"],
+  "descriptionMd": "## Mission: Parse the Partner Payload\n\nA partner sends you a `payload` string that *looks* like JSON. Your script calls `json.loads(payload)` and works for 90% of senders. One partner ships their payload with **single-quoted keys** — `\"{'user': 'ada'}\"` — and Python refuses with `json.decoder.JSONDecodeError: Expecting property name enclosed in double quotes`.\n\nThis is the **most-asked Python JSON question on Stack Overflow**, and there's a trap waiting in every popular answer. The single-quoted form *isn't JSON* (the JSON spec requires `\"`); it's a Python literal. Three options. One uses the right tool. One reaches for `eval()` (a code-execution vulnerability waiting to happen). One does a regex find-and-replace (fragile). Pick the safe one.",
+  "initialCode": "import json\n\npayload = \"{'user': 'ada', 'role': 'admin'}\"  # ← single-quoted from a partner\nparsed = json.loads(payload)\nprint(parsed)",
+  "buggyLineStart": 4,
+  "buggyLineEnd": 4,
+  "traceback": "---------------------------------------------------------------------------\nJSONDecodeError                           Traceback (most recent call last)\nCell In[1], line 4\n      3 payload = \"{'user': 'ada', 'role': 'admin'}\"\n----> 4 parsed = json.loads(payload)\n      5 print(parsed)\n\nJSONDecodeError: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)",
+  "correctOutput": "{'user': 'ada', 'role': 'admin'}\n# parsed as a dict via ast.literal_eval — safe; never executes arbitrary code",
+  "options": [
+    {
+      "key": "a",
+      "label": "Use `ast.literal_eval` — parses Python literals safely, no code execution",
+      "patchCode": "import ast\n\npayload = \"{'user': 'ada', 'role': 'admin'}\"\nparsed = ast.literal_eval(payload)\nprint(parsed)",
+      "isCorrect": true,
+      "resultLog": "{'user': 'ada', 'role': 'admin'}",
+      "rationale": "`ast.literal_eval` parses a string containing a **Python literal** (dict, list, tuple, set, int, float, str, bool, None) and raises `ValueError` on anything else. It's the right tool when your input is Python-shaped (single quotes, `True`/`False`/`None` instead of `true`/`false`/`null`). Crucially, it does *not* execute arbitrary code — `ast.literal_eval(\"__import__('os').system('rm -rf /')\")` raises ValueError, not destroys your machine. For real JSON, `json.loads` is still the right answer; the partner who's shipping Python-literal-shaped data needs an upstream fix too. But while you wait for that, `ast.literal_eval` is the safe parse."
+    },
+    {
+      "key": "b",
+      "label": "Use `eval(payload)` to evaluate the Python literal directly",
+      "patchCode": "payload = \"{'user': 'ada', 'role': 'admin'}\"\nparsed = eval(payload)\nprint(parsed)",
+      "isCorrect": false,
+      "resultLog": "{'user': 'ada', 'role': 'admin'}",
+      "rationale": "**Catastrophic security mistake.** `eval()` runs *any* Python expression. If a partner ever sends `__import__('os').system('rm -rf /')` or `open('/etc/passwd').read()`, your server runs it. This is the canonical 'remote code execution via eval' anti-pattern; it has shipped real CVEs (search 'python eval RCE'). `eval` looks like a one-line fix; it's a permanent backdoor. Never `eval()` on input you didn't write — use `ast.literal_eval` for literals, `json.loads` for JSON."
+    },
+    {
+      "key": "c",
+      "label": "Replace single quotes with double quotes, then `json.loads`",
+      "patchCode": "import json\n\npayload = \"{'user': 'ada', 'role': 'admin'}\"\nrepaired = payload.replace(\"'\", '\"')\nparsed = json.loads(repaired)\nprint(parsed)",
+      "isCorrect": false,
+      "resultLog": "{'user': 'ada', 'role': 'admin'}",
+      "rationale": "Works for *this* example. Breaks the moment any string *value* contains a single quote: `\"{'name': \"Ada O'Brien\"}\"` (already invalid input, but illustrative) — your replace mangles the apostrophe and `json.loads` fails again. More subtly, it loses Python literals JSON can't represent: `True` → JSON's `true`, `None` → `null`. Regex-as-parser is the slow road to a hundred edge cases. `ast.literal_eval` parses the shape you actually have."
+    }
+  ],
+  "hints": [
+    "What language is `\"{'user': 'ada'}\"` in? It's a **Python literal**, not JSON. JSON requires double quotes; Python accepts both.",
+    "Use `ast.literal_eval` — it's the safe parser for Python literals. Never use `eval()` on input you don't control."
+  ],
+  "explanationMd": "### Why the bug occurs\nThe JSON specification (ECMA-404, RFC 8259) requires that all string literals — keys and values — use **double quotes**. Single quotes are not legal JSON. `json.loads` is a strict JSON parser and refuses anything non-conforming, with the precise error: `Expecting property name enclosed in double quotes`.\n\nMany hand-rolled producers (Python apps using `str(some_dict)`, JavaScript apps using `.toString()` on an object) emit the **single-quoted Python-literal form** instead. It looks like JSON because dicts look like JSON objects, but it isn't.\n\n### Why the fix is correct\n`ast.literal_eval` parses any string that contains a **Python literal expression** — `dict`, `list`, `tuple`, `set`, `int`, `float`, `complex`, `str`, `bool`, `None`. It's implemented as a constrained walk of Python's abstract syntax tree — it will *only* construct those literal types, and it raises `ValueError` on anything else (function calls, attribute access, imports, side effects).\n\nCrucially, this means it can't be used as a code-execution vector. `ast.literal_eval('__import__(\"os\").system(\"rm -rf /\")')` raises `ValueError: malformed node or string` instead of destroying anything.\n\n### What about `eval`?\n`eval()` runs any Python expression. On untrusted input it's a remote-code-execution vulnerability. CVEs going back two decades trace to `eval` on parsed data — config files, JSON-shaped payloads, query strings. **Treat `eval` as off-limits for any input you didn't write yourself.**\n\n### The general principle\nMatch the parser to the language of the input:\n- **JSON** → `json.loads`\n- **Python literals** → `ast.literal_eval`\n- **YAML** → `yaml.safe_load` (never `yaml.load`, same RCE risk as eval)\n- **Pickle from untrusted source** → don't (RCE)\n- **TOML** → `tomllib` (Python 3.11+)\n\nAll of these are designed to refuse what they can't safely parse; the unsafe forms (`eval`, `yaml.load`, `pickle.loads`) all exist for legacy reasons and should be quarantined to trusted inputs.",
+  "recruiterReview": "Strong — you didn't reach for `eval`. That's the kind of instinct a senior reviewer watches for, because the `eval` shortcut has shipped CVEs in nearly every language that has it. `ast.literal_eval` is the right tool when the input is genuinely Python-literal-shaped; `json.loads` is right when it's JSON. The follow-up to negotiate upstream: ask the partner to ship real JSON (double quotes, `true`/`false`/`null`) so your code path stays on `json.loads` with strict validation. If they can't, document the deviation explicitly so the next engineer knows the parser choice is intentional. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## JSON, Python Literals, and the `eval` Trap\n\nThis is one of the most-Googled Python questions and one of the most-bug-prone areas of any service that takes input from elsewhere. A few principles save a lot of pain.\n\n### JSON vs Python literals — the visible differences\n| Form | JSON | Python literal |\n|---|---|---|\n| String quote | `\"...\"` only | `\"...\"` or `'...'` |\n| Boolean | `true`, `false` | `True`, `False` |\n| Null | `null` | `None` |\n| Trailing comma | Forbidden | Allowed since 3.0 |\n| Comments | Forbidden (the spec) | `#` |\n| `inf`/`nan` | Forbidden | Allowed |\n\nSome things look the same and *are* the same (numbers, list shape, dict shape). The rest will trip a parser that doesn't expect them.\n\n### The four parsers worth knowing\n#### `json.loads` — JSON only\n```python\nimport json\njson.loads('{\"user\": \"ada\"}')      # OK\njson.loads(\"{'user': 'ada'}\")      # JSONDecodeError\n```\nUse for any data declared as JSON. Strict by design.\n\n#### `ast.literal_eval` — Python literals only, safe\n```python\nimport ast\nast.literal_eval(\"{'user': 'ada'}\")         # OK\nast.literal_eval(\"[1, 2, 3, (4, 5)]\")        # OK\nast.literal_eval(\"True\")                     # True\nast.literal_eval(\"__import__('os')\")         # ValueError — safe\n```\nUse when the input is Python-literal-shaped. Cannot execute code.\n\n#### `eval` — runs anything\n```python\neval(\"1 + 2\")                          # 3\neval(\"__import__('os').system('id')\")  # RCE — runs the shell\n```\n**Never `eval` on untrusted input.** Treat it as off-limits for any string you didn't write.\n\n#### `yaml.safe_load` — YAML, safe\n```python\nimport yaml\nyaml.safe_load(\"user: ada\")            # {'user': 'ada'}\nyaml.load(\"user: !!python/object/apply:os.system [id]\")  # RCE\n```\nYAML has its own `eval`-like trap: `yaml.load` will instantiate arbitrary Python objects from special tags. **Always use `yaml.safe_load`.**\n\n### Choosing the right parser\nMatch the parser to the source's declared format:\n- The partner says \"I send JSON\" → `json.loads`. Reject single-quoted payloads at the boundary; fix upstream.\n- An internal tool stores Python literals (config file with `True`/`False`) → `ast.literal_eval`.\n- Config file is YAML → `yaml.safe_load`.\n- Untrusted pickle → don't deserialize at all.\n\nWhen the input format is unclear, **decide and document it before writing the parser** — the schema is the contract.\n\n### The `eval` trap, with three real-world flavours\n1. **Web app stores user-provided expressions** and `eval`s them later for \"calculation features.\" CVE: visit /api/calc?expr=__import__('os').system('id').\n2. **Config loader uses `eval` on .py-like config** for \"flexibility.\" CVE: anyone who can write a config can run code.\n3. **Tooling that 'JSON-parses' Python-literal-shaped data via `eval`** \"because `json.loads` doesn't accept it.\" CVE: any caller that controls the source can substitute code.\n\nEach has shipped, with CVEs and incident reports. The fix in all three cases: choose a parser that matches the declared format and refuses everything else.\n\n### Boundary discipline\nWhen taking input from outside your process, **validate at the boundary**:\n```python\nimport ast\n\ndef parse_user_filter(raw: str) -> dict:\n    obj = ast.literal_eval(raw)\n    if not isinstance(obj, dict):\n        raise ValueError(\"filter must be an object\")\n    for k in obj.keys():\n        if not isinstance(k, str):\n            raise ValueError(\"filter keys must be strings\")\n    return obj\n```\nParse, then type-check. Refuse anything that doesn't match the contract. This pattern is also why **`pydantic`** is so popular for FastAPI/Flask services — it's `json.loads` + type-check in one declaration.\n\n### Common reasoning mistakes\n- Reaching for `eval` because `json.loads` doesn't accept the data.\n- Forgetting that `yaml.load` can run code; always `yaml.safe_load`.\n- Treating regex repair as parsing.\n- Not deciding what the input format actually IS — parsing is downstream of contract.\n\n### You just learned…\nJSON and Python literals look similar but aren't the same language. Match the parser to the source: `json.loads` for JSON, `ast.literal_eval` for Python literals (safely), `yaml.safe_load` for YAML. **Never `eval` on input you don't control** — it's the most common Python RCE vector and the one most often regretted.",
+    "videos": [
+      { "title": "ast.literal_eval vs eval and json.loads", "searchQuery": "python ast literal_eval vs eval safe parsing tutorial" },
+      { "title": "Why eval is dangerous", "searchQuery": "python eval security risk arbitrary code execution explained" }
+    ]
+  },
+  "estMinutes": 6,
+  "version": 1,
+  "conceptCard": "This mission is about **parsing payloads safely**.\n\n- `json.loads` is strict — JSON requires double quotes; single-quoted payloads fail.\n- A Python-literal-shaped string parses safely with **`ast.literal_eval`**.\n- **Never `eval()`** on untrusted input — it's the canonical Python RCE vector.\n\nThe code calls `json.loads` on a Python-literal-shaped string and fails. `ast.literal_eval` parses it safely.",
+  "lineNotes": [
+    { "line": 3, "noteMd": "**Python-literal-shaped**, not JSON — note the single quotes." },
+    { "line": 4, "noteMd": "**The bug.** `json.loads` is strict; single quotes raise `JSONDecodeError`. Use `ast.literal_eval` for Python literals." },
+    { "line": 5, "noteMd": "Prints the parsed dict on the fix; never reaches it on the bug." }
+  ],
+  "takeaway": "Match the parser to the format: json.loads for JSON, ast.literal_eval for Python literals; never eval untrusted input.",
+  "glossary": [
+    {
+      "term": "JSON",
+      "definitionMd": "A text format for structured data, specified in **ECMA-404** and **RFC 8259**. Strings always use double quotes; booleans are `true`/`false`; null is `null`. JSON does not allow trailing commas, comments, or `inf`/`nan`."
+    },
+    {
+      "term": "Python literal",
+      "definitionMd": "A string that contains a Python literal expression — `dict`, `list`, `tuple`, `set`, `int`, `float`, `complex`, `str`, `bool`, `None`. Looks like JSON for dicts and lists but allows single quotes, `True`/`False`/`None`, and trailing commas."
+    },
+    {
+      "term": "`ast.literal_eval`",
+      "definitionMd": "Safe parser for Python literals. Walks the AST and constructs literal types only; raises `ValueError` on anything else (function calls, imports, attribute access). Cannot execute code."
+    },
+    {
+      "term": "`eval` (unsafe)",
+      "definitionMd": "Built-in that runs any Python expression. On untrusted input it's a **remote-code-execution** vulnerability. Never use on data you didn't write yourself."
+    },
+    {
+      "term": "RCE (Remote Code Execution)",
+      "definitionMd": "A vulnerability class where an attacker can run arbitrary code on the server by crafting input the server parses unsafely. `eval`, `pickle.loads`, and `yaml.load` are common Python RCE vectors."
+    }
+  ]
+}

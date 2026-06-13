@@ -58,5 +58,17 @@
     ]
   },
   "estMinutes": 6,
-  "version": 1
+  "version": 1,
+  "conceptCard": "This mission is about **WHERE vs HAVING** in SQL.\n\n- `WHERE` filters individual rows **before** they're grouped — so it can't see group totals.\n- `HAVING` filters **after** grouping, so it can compare aggregates like `SUM(amount)`.\n- Rule of thumb: filter rows with `WHERE`, filter groups with `HAVING`.\n\nThe query puts a `SUM()` condition in `WHERE` and fails. Move it to where group totals live.",
+  "lineNotes": [
+    {
+      "line": 4,
+      "noteMd": "`WHERE SUM(amount) > 5000` is the bug: `WHERE` runs *before* grouping, so the group total doesn't exist yet. Filtering on an aggregate belongs in `HAVING`, after `GROUP BY`."
+    },
+    {
+      "line": 5,
+      "noteMd": "`GROUP BY category` builds the per-category totals — the `HAVING` filter goes right after this line."
+    }
+  ],
+  "takeaway": "Filter rows with WHERE, group totals with HAVING — aggregates aren't allowed in WHERE."
 }

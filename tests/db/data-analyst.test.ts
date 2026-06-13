@@ -3,6 +3,7 @@ import {
   admin,
   createTestUser,
   DA_001,
+  dailyChallengeIdServer,
   lockedChallengeOfDifficulty,
   submit,
 } from "./helpers";
@@ -42,7 +43,11 @@ describe("ungated Data Analyst sector", () => {
       .eq("id", DA_001);
     if (lockError) throw new Error(lockError.message);
 
-    const gatedLocked = await lockedChallengeOfDifficulty("hard"); // gated sector, unlock 6
+    // Exclude today's daily pick — it's exempt from gating, so if it happens
+    // to be the alphabetically-first hard gated challenge the test would fail
+    // by date-collision rather than by a real gating bug.
+    const daily = await dailyChallengeIdServer();
+    const gatedLocked = await lockedChallengeOfDifficulty("hard", daily); // gated sector, unlock 6
 
     const user = await createTestUser(); // fresh => level 1
 

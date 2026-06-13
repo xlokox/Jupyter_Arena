@@ -1,0 +1,74 @@
+{
+  "id": "py-010-range-off-by-one",
+  "sector": "py",
+  "difficulty": "easy",
+  "title": "10_count_to_five.ipynb",
+  "language": "python",
+  "icon": "repeat",
+  "conceptTags": ["loops", "range", "off-by-one"],
+  "descriptionMd": "## Mission: Count 1 Through 5\n\nYou want a loop that prints the numbers 1, 2, 3, 4, 5. You wrote `range(1, 5)` — but the output stops at 4. The 5 never appears.\n\nPython's `range(start, stop)` goes *up to but not including* the stop value. So `range(1, 5)` gives 1, 2, 3, 4. To include 5, the stop has to be one higher. Fix the range so all five numbers print.",
+  "initialCode": "# Print the numbers 1 through 5\nfor n in range(1, 5):\n    print(\"Number:\", n)",
+  "buggyLineStart": 2,
+  "buggyLineEnd": 2,
+  "traceback": "Number: 1\nNumber: 2\nNumber: 3\nNumber: 4\n\n# Expected 1 through 5, but 5 is missing — range(1, 5) stops before 5.",
+  "correctOutput": "Number: 1\nNumber: 2\nNumber: 3\nNumber: 4\nNumber: 5",
+  "options": [
+    {
+      "key": "a",
+      "label": "Make the stop value 6",
+      "patchCode": "# Print the numbers 1 through 5\nfor n in range(1, 6):\n    print(\"Number:\", n)",
+      "isCorrect": true,
+      "resultLog": "Number: 1\nNumber: 2\nNumber: 3\nNumber: 4\nNumber: 5",
+      "rationale": "`range(start, stop)` produces numbers from `start` up to **but not including** `stop`. So to reach 5 you set the stop to 6: `range(1, 6)` yields 1, 2, 3, 4, 5. The exclusive stop is deliberate (it pairs nicely with zero-based indexing) but it's the most common off-by-one in Python."
+    },
+    {
+      "key": "b",
+      "label": "Start from 0 instead",
+      "patchCode": "# Print the numbers 1 through 5\nfor n in range(0, 5):\n    print(\"Number:\", n)",
+      "isCorrect": false,
+      "resultLog": "Number: 0\nNumber: 1\nNumber: 2\nNumber: 3\nNumber: 4",
+      "rationale": "Lowering the start to 0 adds a `0` at the front and *still* stops before 5 — now you print 0 through 4. The problem isn't the start; it's the stop. Leave the start at 1 and raise the stop to 6."
+    },
+    {
+      "key": "c",
+      "label": "Add a step of 1",
+      "patchCode": "# Print the numbers 1 through 5\nfor n in range(1, 5, 1):\n    print(\"Number:\", n)",
+      "isCorrect": false,
+      "resultLog": "Number: 1\nNumber: 2\nNumber: 3\nNumber: 4\n\n# Still missing 5 — the third number is the step size, not the stop.",
+      "rationale": "The third argument to `range` is the *step* (how much to count by), not the stop. A step of 1 is already the default, so this changes nothing — the stop is still 5 (exclusive) and you still miss it. Raise the stop to 6."
+    }
+  ],
+  "hints": [
+    "Count what `range(1, 5)` actually produces: it starts at 1 and stops *before* 5. So which numbers do you get, and which one is left out?",
+    "The stop value is not included. To reach 5, the loop has to run up to 6: `range(1, 6)`."
+  ],
+  "explanationMd": "### Why the bug occurs\n`range(start, stop)` generates numbers beginning at `start` and ending **one before** `stop` — the stop value itself is *excluded*. So `range(1, 5)` is 1, 2, 3, 4, and 5 is never produced. This exclusive-end design is intentional (it makes `range(len(list))` line up perfectly with valid indexes 0…len-1), but it's the single most common off-by-one mistake beginners hit.\n\n### Why the fix is correct\nTo include 5, the stop must be one higher: `range(1, 6)` produces 1, 2, 3, 4, 5. The start isn't the issue (it *is* included), and the optional third argument is the step size, not the end. Remember the rule: `range(a, b)` covers `a` up to `b − 1`.",
+  "recruiterReview": "Good — you traced the missing value to the exclusive stop rather than fiddling with the start or step. The 'stop is not included' rule is worth memorizing because it shows up constantly: `range`, slicing (`list[1:3]`), and many other places all use half-open ranges. Once it clicks, off-by-one loops mostly disappear. Clean reasoning. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Loops and range()\n\nLoops repeat work, and `range()` is the usual way to count in Python. Its one quirk — the exclusive end — trips up nearly every beginner.\n\n### A for loop\nA `for` loop runs its body once for each value it's given:\n```python\nfor n in [10, 20, 30]:\n    print(n)\n# 10, 20, 30\n```\n\n### range() makes a sequence of numbers\nInstead of typing numbers out, `range` generates them:\n- `range(stop)` → 0 up to stop − 1. `range(3)` is 0, 1, 2.\n- `range(start, stop)` → start up to stop − 1. `range(1, 5)` is 1, 2, 3, 4.\n- `range(start, stop, step)` → counting by `step`. `range(0, 10, 2)` is 0, 2, 4, 6, 8.\n\n### The key rule: stop is NOT included\nThis is the whole lesson. `range(1, 5)` stops **before** 5, giving 1, 2, 3, 4. To include 5, go one past it:\n```python\nfor n in range(1, 6):\n    print(n)\n# 1, 2, 3, 4, 5\n```\n\n### Why exclusive?\nIt pairs perfectly with zero-based indexing: `range(len(items))` gives exactly the valid indexes `0 … len-1`, so you can loop over a list by position with no off-by-one.\n\n### A tiny worked example\n```python\nfor i in range(3):\n    print(\"Step\", i)\n```\nprints:\n```\nStep 0\nStep 1\nStep 2\n```\nThree steps, numbered 0, 1, 2.\n\n### How to spot it\nIf a counting loop is missing its last number (or runs one time too few), the exclusive stop is almost always why — raise the stop by 1.\n\n### Common beginner mistakes\n- Expecting `range(1, 5)` to include 5.\n- Changing the start when the stop is the problem.\n- Thinking the third argument is the end (it's the step).\n\n### You just learned…\n`range(start, stop)` counts from `start` up to **but not including** `stop`, and the optional third value is the step. To count *through* a number, set the stop one higher. This half-open rule appears all over Python.",
+    "videos": [
+      {
+        "title": "Python for loops and range() for beginners",
+        "searchQuery": "python for loop range function beginner tutorial"
+      },
+      {
+        "title": "Why range stops one early (exclusive end)",
+        "searchQuery": "python range exclusive stop off by one explained beginner"
+      }
+    ]
+  },
+  "estMinutes": 4,
+  "version": 1,
+  "conceptCard": "This mission is about **loops** and `range()`.\n\n- A `for` loop repeats its body for each value it's given.\n- `range(start, stop)` makes numbers from `start` up to **but not including** `stop`.\n- So `range(1, 5)` is 1, 2, 3, 4 — the stop value is left out.\n\nThe code is meant to count 1 through 5 but stops early. Adjust the range to include 5.",
+  "lineNotes": [
+    {
+      "line": 2,
+      "noteMd": "`range(1, 5)` produces 1, 2, 3, 4 — it stops **before** 5. To reach 5, the stop value needs to be one higher."
+    },
+    {
+      "line": 3,
+      "noteMd": "Indented under the `for`, so it runs once for each number the loop produces."
+    }
+  ],
+  "takeaway": "range(a, b) stops just before b — to count through b, set the stop to b + 1."
+}

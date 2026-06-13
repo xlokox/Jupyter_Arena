@@ -1,0 +1,64 @@
+{
+  "id": "py-029-recursion-fibonacci",
+  "sector": "py",
+  "difficulty": "hard",
+  "title": "29_compute_fibonacci.ipynb",
+  "language": "python",
+  "icon": "infinity",
+  "conceptTags": ["recursion", "memoization", "stack"],
+  "descriptionMd": "## Mission: Compute the 100th Fibonacci Number\n\nYou wrote the textbook recursive definition: `fib(n) = fib(n-1) + fib(n-2)`. It works perfectly for `fib(10) = 55`. For `fib(40)` your machine starts heating up. For `fib(100)` your kernel quietly hangs forever — or crashes with `RecursionError: maximum recursion depth exceeded`.\n\nThis is the most famous example of **why naive recursion is dangerous**. The recursive Fibonacci has `O(2^n)` time complexity — `fib(100)` makes more recursive calls than there are atoms in the observable universe (~`2^100 ≈ 10^30`). It also blows past Python's default recursion limit (1000 frames). Both problems vanish with **memoization** — store each result the first time you compute it.",
+  "initialCode": "def fib(n: int) -> int:\n    if n < 2:\n        return n\n    return fib(n - 1) + fib(n - 2)\n\n# fib(10) returns instantly (~55 calls); fib(100) does ~10^30 calls.\nprint(f\"fib(10)  = {fib(10)}\")\nprint(f\"fib(100) = {fib(100)}  # will hang / RecursionError\")",
+  "buggyLineStart": 4,
+  "buggyLineEnd": 4,
+  "traceback": "fib(10)  = 55\n---------------------------------------------------------------------------\nRecursionError                            Traceback (most recent call last)\nCell In[1], line 8\n      6 # fib(10) returns instantly (~55 calls); fib(100) does ~10^30 calls.\n      7 print(f\"fib(10)  = {fib(10)}\")\n----> 8 print(f\"fib(100) = {fib(100)}  # will hang / RecursionError\")\n\nCell In[1], line 4, in fib(n)\n      2 if n < 2:\n      3     return n\n----> 4 return fib(n - 1) + fib(n - 2)\n\n[Previous line repeated 996 more times]\n\nRecursionError: maximum recursion depth exceeded",
+  "correctOutput": "fib(10)  = 55\nfib(100) = 354224848179261915075",
+  "options": [
+    {
+      "key": "a",
+      "label": "Add `@functools.lru_cache(None)` for memoization",
+      "patchCode": "from functools import lru_cache\n\n@lru_cache(maxsize=None)\ndef fib(n: int) -> int:\n    if n < 2:\n        return n\n    return fib(n - 1) + fib(n - 2)\n\nprint(f\"fib(10)  = {fib(10)}\")\nprint(f\"fib(100) = {fib(100)}\")",
+      "isCorrect": true,
+      "resultLog": "fib(10)  = 55\nfib(100) = 354224848179261915075",
+      "rationale": "`@lru_cache(maxsize=None)` (or `@cache` in Python 3.9+) **memoizes** the function — the first call with each argument runs the body, every subsequent call returns the cached result. Time complexity drops from `O(2^n)` to `O(n)`; recursion depth drops from `O(n)` worst-case in the call stack to `O(n)` linear (one frame per unique argument). `fib(100)` now runs in microseconds and returns the 21-digit `354224848179261915075` — the correct 100th Fibonacci number."
+    },
+    {
+      "key": "b",
+      "label": "Raise Python's recursion limit: `sys.setrecursionlimit(10**6)`",
+      "patchCode": "import sys\nsys.setrecursionlimit(10**6)\n\ndef fib(n: int) -> int:\n    if n < 2:\n        return n\n    return fib(n - 1) + fib(n - 2)\n\nprint(f\"fib(10)  = {fib(10)}\")\nprint(f\"fib(100) = {fib(100)}\")",
+      "isCorrect": false,
+      "resultLog": "fib(10)  = 55\n# (still hangs — recursion limit isn't the real problem; the 2^100 redundant calls are)",
+      "rationale": "Raising the recursion limit lets the call stack grow deeper, but the **real** problem is exponential redundant work. `fib(100)` makes ~`2^100` recursive calls — more than `10^30`. Even at a billion calls per second that's `10^21` seconds (~100 quadrillion years). The recursion limit was never the bottleneck. Worse: this 'fix' also risks a **segfault** if the C stack overflows the raised Python limit."
+    },
+    {
+      "key": "c",
+      "label": "Replace recursion with a `while` loop",
+      "patchCode": "def fib(n: int) -> int:\n    a, b = 0, 1\n    for _ in range(n):\n        a, b = b, a + b\n    return a\n\nprint(f\"fib(10)  = {fib(10)}\")\nprint(f\"fib(100) = {fib(100)}\")",
+      "isCorrect": false,
+      "resultLog": "fib(10)  = 55\nfib(100) = 354224848179261915075",
+      "rationale": "This **does** produce the correct answer and runs in `O(n)` — but it changes the algorithm rather than fixing the recursion class. The mission's point is that recursion is fine *if you memoize*; iteration is a sometimes-better alternative, not the cure. If your codebase has a tree of recursive functions, replacing every one with a loop is a major rewrite; adding `@lru_cache` is one line each and preserves the recursive shape. Use both tools in their places."
+    }
+  ],
+  "hints": [
+    "Add `count = [0]` in the enclosing scope and `count[0] += 1` at the top of `fib`. For `fib(35)` you'll see ~14 million calls. For `fib(100)` you'd see ~10^30.",
+    "Cache the results: `@functools.lru_cache(maxsize=None)` above the function. Identical-argument calls return instantly."
+  ],
+  "explanationMd": "### Why the bug occurs\nThe naive recursive Fibonacci has **exponential time complexity** because `fib(n-1)` and `fib(n-2)` recompute the same subproblems independently. `fib(40)` calls `fib(38)` once but `fib(2)` is recomputed about a billion times. The call tree is the textbook example of overlapping subproblems and is used in every algorithms course to motivate **dynamic programming**.\n\nFor `fib(100)`, the call count is on the order of `2^100 ≈ 1.27 × 10^30` — more than the number of atoms in the observable universe (~`10^80` of those, but only ~`10^30` would fit in any practical computer's lifetime of operation). The script hangs forever long before Python's recursion limit (default 1000) is even tested.\n\n### Why the fix is correct\nMemoization (caching) turns `O(2^n)` into `O(n)`. The first call to `fib(50)` computes and stores; every subsequent call returns the cached value. `@functools.lru_cache(maxsize=None)` is Python's built-in decorator for this — one line, zero edits to the recursive body. The cache also bounds recursion depth: `fib(100)` recursively calls `fib(99)..fib(0)` linearly (the second branch hits cache immediately on the way up), so depth is `O(n)`, well under the default 1000-frame limit.\n\nThis pattern — *naive recursion → exponential blow-up → cache or DP* — is the foundation of dynamic programming and appears in every algorithms textbook from Cormen to Knuth. Internalising it as 'check whether subproblems overlap before reaching for recursion' will save you from countless real-world performance bugs.",
+  "recruiterReview": "Strong — you recognised the issue was algorithmic (exponential redundant work), not configuration (the recursion limit). `lru_cache` is the smallest, most idiomatic Python fix and preserves the readable recursive form. Two refinements: 1) for very deep recursion (`fib(10_000)`), the cache helps but the linear recursion still hits Python's stack — at that scale, iterate. 2) For arbitrary-precision Fibonacci (`fib(10_000_000)`), there's a matrix-exponentiation trick that runs in `O(log n)` — same principle as fast exponentiation. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Naive Recursion vs Memoization\n\nNaive recursive Fibonacci is the textbook example of an algorithm that *looks* clean but performs catastrophically. Understanding why teaches the foundation of dynamic programming.\n\n### The call tree\n```\nfib(5)\n├ fib(4)\n│ ├ fib(3)\n│ │ ├ fib(2)\n│ │ │ ├ fib(1) = 1\n│ │ │ └ fib(0) = 0\n│ │ └ fib(1) = 1\n│ └ fib(2)\n│   ├ fib(1) = 1\n│   └ fib(0) = 0\n└ fib(3)\n  ├ fib(2)\n  │ ├ fib(1) = 1\n  │ └ fib(0) = 0\n  └ fib(1) = 1\n```\n\n`fib(5)` calls `fib(2)` **three times** independently. `fib(40)` calls `fib(2)` about a billion times. `fib(100)` calls `fib(2)` more times than there are useful CPU cycles available in a human lifetime.\n\n### The big-O math\nThe number of calls is approximately `Fibonacci(n+1)` (yes, recursively), which grows like the golden ratio `φ^n ≈ 1.618^n`. So:\n- `fib(20)`: ~`10^4` calls — fast.\n- `fib(40)`: ~`10^8` calls — seconds.\n- `fib(50)`: ~`10^10` calls — minutes.\n- `fib(100)`: ~`10^21` calls — geologic time.\n\nThis is `O(2^n)` time, the worst common complexity class for any non-toy algorithm. Recognising it on sight saves real engineering time.\n\n### The fix: memoization\nMemoization stores the result of each unique input the first time it's computed:\n```python\nfrom functools import lru_cache\n\n@lru_cache(maxsize=None)   # or @cache in Python 3.9+\ndef fib(n: int) -> int:\n    if n < 2:\n        return n\n    return fib(n - 1) + fib(n - 2)\n```\nNow `fib(50)` runs once and is reused everywhere it appears in the call tree. Time complexity drops to `O(n)`; the call tree collapses to a linear chain.\n\nThis is the simplest **dynamic programming** technique. Real DP usually adds:\n- **Bottom-up tabulation** instead of top-down recursion (avoids stack use entirely).\n- **Space optimisation** when you only need the last few values (constant space instead of O(n)).\n\nFor `fib`, the bottom-up version:\n```python\ndef fib(n):\n    a, b = 0, 1\n    for _ in range(n):\n        a, b = b, a + b\n    return a\n```\nis `O(n)` time and `O(1)` space — the production-grade implementation.\n\n### Python's recursion limit — separate concern\nPython sets `sys.getrecursionlimit()` to 1000 by default. This is a guard against runaway recursion that would otherwise crash the interpreter via C-stack overflow. Raising it (`sys.setrecursionlimit(10**6)`) lets you go deeper, but:\n- Each Python frame is ~1 KB, so 10^6 frames = ~1 GB of stack.\n- The OS-imposed C stack limit (typically 8 MB) may segfault before your Python limit is reached.\n\nFor truly deep recursion (parse trees, graph traversal of 100k nodes), **convert to iteration** with an explicit stack: `stack = []; stack.append(...)`. You control memory and can pick LIFO/FIFO order explicitly.\n\n### Where this pattern shows up\nNaive recursion blows up wherever subproblems overlap:\n- **Edit distance** (Levenshtein): `O(2^min(m,n))` naive → `O(mn)` with DP.\n- **Longest common subsequence**: same shape.\n- **Coin-change problem**: same shape.\n- **Grid path counting**: same shape.\n\nEvery algorithms course teaches these. The trick is recognising the overlap at design time, not after profiling.\n\n### Common reasoning mistakes\n- 'It's recursive so it's elegant' — the code is elegant; the performance is catastrophic.\n- 'Just raise the recursion limit' — addresses depth, not redundant work.\n- 'Iteration is always faster than recursion' — only for cases where naive recursion is exponential; memoised recursion is just as fast.\n- 'Python's `lru_cache` is a workaround' — it's the production-recommended pattern.\n\n### You just learned…\nNaive recursive Fibonacci is **exponential** because subproblems overlap. Memoization (`@lru_cache`) makes it linear. This pattern — recognise overlap, cache or tabulate — is the foundation of dynamic programming and applies to dozens of real algorithms. Iteration is a different tool for a different concern (stack depth, not redundant work).",
+      "videos": [
+        { "title": "Memoization and recursion explained", "searchQuery": "python memoization recursion lru_cache tutorial beginner" },
+        { "title": "Fibonacci complexity from O(2^n) to O(n)", "searchQuery": "fibonacci recursion exponential complexity memoization tutorial" }
+      ]
+  },
+  "estMinutes": 9,
+  "version": 1,
+  "conceptCard": "This mission is about **why naive recursion explodes**.\n\n- Recursive `fib(n) = fib(n-1) + fib(n-2)` recomputes the same subproblems — `O(2^n)`.\n- `@functools.lru_cache(None)` (or `@cache`) memoises — drops complexity to `O(n)`.\n- Python's recursion limit (default 1000) is a separate guard; raising it doesn't fix the redundant work.\n\nThe code hangs on `fib(100)` because the call tree has `~10^30` overlapping calls. Add `@lru_cache` and it returns in microseconds.",
+  "lineNotes": [
+    { "line": 1, "noteMd": "Classic recursive Fibonacci definition — mathematically correct, computationally catastrophic." },
+    { "line": 4, "noteMd": "**The bug.** Two recursive calls per level → `O(2^n)` redundant work. Memoise with `@lru_cache(None)`." },
+    { "line": 7, "noteMd": "`fib(10)` ≈ 55 calls — fine." },
+    { "line": 8, "noteMd": "`fib(100)` ≈ `10^30` calls — would take longer than the heat death of the universe." }
+  ],
+  "takeaway": "Naive recursion with overlapping subproblems is O(2^n) — memoise with @lru_cache to drop to O(n)."
+}

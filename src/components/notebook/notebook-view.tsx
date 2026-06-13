@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Lock, RefreshCw } from "lucide-react";
+import { Brain, GraduationCap, Loader2, Lock, RefreshCw } from "lucide-react";
 import type { Challenge, ChallengeMeta } from "@/lib/content/schema";
 import { useChallenge } from "@/lib/content/use-challenge";
 import { Markdown } from "@/components/markdown";
@@ -11,6 +11,8 @@ import { CodeCell } from "./code-cell";
 import { OutputCell } from "./output-cell";
 import { ControlCell } from "./control-cell";
 import { SolvePanel } from "./solve-panel";
+import { FigurePanel } from "./figure-panel";
+import { GlossaryDisclosure } from "./glossary-disclosure";
 import { useWorkspaceStore, getAttempt, type OptionKey } from "@/store/workspace";
 import { useAuthStore } from "@/store/auth";
 import { submitAttemptServer } from "@/lib/game/server-progress";
@@ -144,9 +146,19 @@ function LoadedNotebook({
   const abortRun = useWorkspaceStore((s) => s.abortRun);
   const applyServerOutcome = useWorkspaceStore((s) => s.applyServerOutcome);
   const revealHint = useWorkspaceStore((s) => s.revealHint);
+  const openTutorial = useWorkspaceStore((s) => s.openTutorial);
   const isAuthed = useAuthStore((s) => s.status === "signedIn");
   const [runError, setRunError] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Learn-first: beginner sectors show a concept card before the notebook.
+  const hasConceptCard =
+    (challenge.sector === "py" || challenge.sector === "da") && Boolean(challenge.conceptCard);
+  const [conceptDismissed, setConceptDismissed] = useState(false);
+  useEffect(() => {
+    setConceptDismissed(false); // a fresh mission shows its card again
+  }, [challenge.id]);
+  const showConceptGate = hasConceptCard && !conceptDismissed && !attempt.solved;
 
   useEffect(() => {
     return () => {
@@ -199,16 +211,65 @@ function LoadedNotebook({
     ? null
     : { start: challenge.buggyLineStart, end: challenge.buggyLineEnd };
 
+  const headerBlock = (
+    <header className="flex flex-wrap items-center gap-3">
+      <ChallengeIcon name={challenge.icon} className="size-5 text-accent" />
+      <h1 className="font-mono text-base font-semibold text-text md:text-lg">{challenge.title}</h1>
+      <DifficultyBadge difficulty={challenge.difficulty} />
+      {challenge.track === "reasoning" && (
+        <span
+          data-reasoning-badge
+          title={en.workspace.reasoningBadge}
+          className="inline-flex items-center gap-1 rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-accent"
+        >
+          <Brain className="size-3" aria-hidden />
+          {en.workspace.reasoningBadge}
+        </span>
+      )}
+      <span className="text-xs text-muted">{en.sectors[challenge.sector]}</span>
+    </header>
+  );
+
+  // Learn-first gate: in beginner sectors, the concept card comes first.
+  if (showConceptGate && challenge.conceptCard) {
+    return (
+      <div className="mx-auto max-w-4xl space-y-5 p-4 md:p-6">
+        {headerBlock}
+        <section
+          aria-label={en.workspace.conceptCardHeading}
+          className="rounded-md border border-accent/40 bg-panel p-5 motion-safe:animate-[toast-in_0.3s_ease-out_both]"
+        >
+          <h2 className="mb-3 flex items-center gap-2 font-mono text-sm font-semibold text-accent">
+            <GraduationCap className="size-4" aria-hidden />
+            {en.workspace.conceptCardHeading}
+          </h2>
+          <div className="text-sm">
+            <Markdown>{challenge.conceptCard}</Markdown>
+          </div>
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={() => setConceptDismissed(true)}
+              className="flex min-h-[44px] items-center justify-center gap-2 rounded-md bg-accent px-5 font-semibold text-bg transition-colors hover:bg-accent-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              {en.workspace.conceptCardProceed}
+            </button>
+            <button
+              type="button"
+              onClick={() => openTutorial(challenge.id)}
+              className="flex min-h-[44px] items-center justify-center gap-2 rounded-md border border-border bg-panel-2 px-5 text-sm text-muted transition-colors hover:border-accent-hover hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              {en.workspace.conceptCardViewLesson}
+            </button>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-4xl space-y-5 p-4 md:p-6">
-      <header className="flex flex-wrap items-center gap-3">
-        <ChallengeIcon name={challenge.icon} className="size-5 text-accent" />
-        <h1 className="font-mono text-base font-semibold text-text md:text-lg">
-          {challenge.title}
-        </h1>
-        <DifficultyBadge difficulty={challenge.difficulty} />
-        <span className="text-xs text-muted">{en.sectors[challenge.sector]}</span>
-      </header>
+      {headerBlock}
 
       <section
         aria-label={en.workspace.briefingAria}
@@ -217,12 +278,25 @@ function LoadedNotebook({
         <Markdown>{challenge.descriptionMd}</Markdown>
       </section>
 
+      {challenge.glossary && challenge.glossary.length > 0 && (
+        <GlossaryDisclosure entries={challenge.glossary} />
+      )}
+
+      {challenge.figureSvg && challenge.figureCaption && (
+        <FigurePanel
+          svg={challenge.figureSvg}
+          caption={challenge.figureCaption}
+          variant="before"
+        />
+      )}
+
       <CodeCell
         code={displayedCode}
         language={challenge.language}
         bugRegion={bugRegion}
         title={challenge.title}
         justSolved={attempt.runState === "solved"}
+        lineNotes={ranOption ? undefined : challenge.lineNotes}
       />
 
       <OutputCell challenge={challenge} attempt={attempt} />

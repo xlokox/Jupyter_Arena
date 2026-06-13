@@ -1,0 +1,89 @@
+{
+  "id": "da-016-missing-plt-show",
+  "sector": "da",
+  "difficulty": "easy",
+  "title": "16_monthly_revenue.ipynb",
+  "language": "python",
+  "icon": "bar-chart-3",
+  "conceptTags": [
+    "matplotlib",
+    "plt-show",
+    "plotting"
+  ],
+  "descriptionMd": "## Mission: Where Did the Chart Go?\n\nYou wrote six lines of matplotlib to plot monthly revenue and your boss asked for the chart. You ran the cell — and nothing. No figure window, no embedded image, just text output saying `<Figure size 700x400 with 1 Axes>`.\n\nThat repr is your hint. matplotlib **built** the figure but never **rendered** it. In a notebook with `%matplotlib inline` the figure usually shows on its own at the end of the cell, but as soon as you assign or print the figure handle the auto-display is suppressed. Add the one missing call.",
+  "initialCode": "import matplotlib.pyplot as plt\n\nmonths = [\"Jan\", \"Feb\", \"Mar\", \"Apr\", \"May\", \"Jun\"]\nrevenue = [4200, 4500, 4900, 5100, 5400, 5800]\n\nfig, ax = plt.subplots(figsize=(7, 4))\nax.bar(months, revenue, color=\"#7CD992\")\nax.set_title(\"monthly_revenue_2025.png\")\nax.set_xlabel(\"month\")\nax.set_ylabel(\"revenue (USD)\")\nprint(fig)",
+  "buggyLineStart": 11,
+  "buggyLineEnd": 11,
+  "traceback": "<Figure size 700x400 with 1 Axes>\n# the figure built but never rendered — printing the handle suppressed the auto-display",
+  "correctOutput": "<Figure size 700x400 with 1 Axes>\n# figure rendered below — bars climbing Jan → Jun, ~4200 → 5800",
+  "options": [
+    {
+      "key": "a",
+      "label": "Call `plt.show()` at the end",
+      "patchCode": "import matplotlib.pyplot as plt\n\nmonths = [\"Jan\", \"Feb\", \"Mar\", \"Apr\", \"May\", \"Jun\"]\nrevenue = [4200, 4500, 4900, 5100, 5400, 5800]\n\nfig, ax = plt.subplots(figsize=(7, 4))\nax.bar(months, revenue, color=\"#7CD992\")\nax.set_title(\"monthly_revenue_2025.png\")\nax.set_xlabel(\"month\")\nax.set_ylabel(\"revenue (USD)\")\nplt.show()",
+      "isCorrect": true,
+      "resultLog": "<Figure size 700x400 with 1 Axes>\n# figure rendered below — bars climbing Jan → Jun, ~4200 → 5800",
+      "rationale": "`plt.show()` flushes the active figure to the renderer (inline image in Jupyter, GUI window in a script). It's the explicit \"draw what I built\" call. The notebook's normal auto-display happens when the last expression of a cell *is* a figure; once you printed `fig`, the last expression was `None` (the return of `print`), and the auto-display didn't fire. `plt.show()` makes the rendering unconditional and is the safer habit.",
+      "resultFigureSvg": "<svg viewBox=\"0 0 700 400\" xmlns=\"http://www.w3.org/2000/svg\" preserveAspectRatio=\"xMidYMid meet\" width=\"100%\" height=\"auto\"><rect x=\"0\" y=\"0\" width=\"700\" height=\"400\" fill=\"var(--code-bg, #11161D)\" rx=\"6\"/><text x=\"64\" y=\"22\" fill=\"var(--text, #E6E8EC)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"13\" font-weight=\"600\">monthly_revenue_2025.png</text><line x1=\"64\" y1=\"36\" x2=\"64\" y2=\"344\" stroke=\"var(--muted, #8B9099)\" stroke-width=\"1\"/><line x1=\"64\" y1=\"344\" x2=\"676\" y2=\"344\" stroke=\"var(--muted, #8B9099)\" stroke-width=\"1\"/><rect x=\"71.7\" y=\"141.2\" width=\"71.4\" height=\"202.8\" fill=\"#7CD992\" opacity=\"0.85\"/><text x=\"107.3\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">Jan</text><rect x=\"173.7\" y=\"126.8\" width=\"71.4\" height=\"217.2\" fill=\"#7CD992\" opacity=\"0.85\"/><text x=\"209.3\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">Feb</text><rect x=\"275.6\" y=\"107.4\" width=\"71.4\" height=\"236.6\" fill=\"#7CD992\" opacity=\"0.85\"/><text x=\"311.3\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">Mar</text><rect x=\"377.6\" y=\"97.8\" width=\"71.4\" height=\"246.2\" fill=\"#7CD992\" opacity=\"0.85\"/><text x=\"413.3\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">Apr</text><rect x=\"479.6\" y=\"83.3\" width=\"71.4\" height=\"260.7\" fill=\"#7CD992\" opacity=\"0.85\"/><text x=\"515.4\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">May</text><rect x=\"581.6\" y=\"64.0\" width=\"71.4\" height=\"280.0\" fill=\"#7CD992\" opacity=\"0.85\"/><text x=\"617.4\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">Jun</text><text x=\"56\" y=\"347\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">0</text><text x=\"56\" y=\"285.4\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">1.3k</text><text x=\"56\" y=\"223.8\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">2.6k</text><text x=\"56\" y=\"162.19999999999996\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">3.8k</text><text x=\"56\" y=\"100.6\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">5.1k</text><text x=\"56\" y=\"39\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">6.4k</text><text x=\"370\" y=\"386\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"11\" text-anchor=\"middle\">month</text><text transform=\"translate(20, 190) rotate(-90)\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"11\" text-anchor=\"middle\">revenue (USD)</text></svg>"
+    },
+    {
+      "key": "b",
+      "label": "Save the figure to disk so you can open it manually",
+      "patchCode": "import matplotlib.pyplot as plt\n\nmonths = [\"Jan\", \"Feb\", \"Mar\", \"Apr\", \"May\", \"Jun\"]\nrevenue = [4200, 4500, 4900, 5100, 5400, 5800]\n\nfig, ax = plt.subplots(figsize=(7, 4))\nax.bar(months, revenue, color=\"#7CD992\")\nax.set_title(\"monthly_revenue_2025.png\")\nax.set_xlabel(\"month\")\nax.set_ylabel(\"revenue (USD)\")\nprint(fig)\nfig.savefig(\"/tmp/monthly_revenue_2025.png\")",
+      "isCorrect": false,
+      "resultLog": "<Figure size 700x400 with 1 Axes>\n# figure saved to /tmp/monthly_revenue_2025.png — but still no inline render",
+      "rationale": "Writes the figure to disk, but the notebook still shows nothing inline — your boss is asking \"where's the chart?\" again. Saving is for shipping a final image; for showing it in the notebook, call `plt.show()` (and remove the `print(fig)` that suppresses auto-display)."
+    },
+    {
+      "key": "c",
+      "label": "Remove the `print(fig)` and trust the notebook auto-display",
+      "patchCode": "import matplotlib.pyplot as plt\n\nmonths = [\"Jan\", \"Feb\", \"Mar\", \"Apr\", \"May\", \"Jun\"]\nrevenue = [4200, 4500, 4900, 5100, 5400, 5800]\n\nfig, ax = plt.subplots(figsize=(7, 4))\nax.bar(months, revenue, color=\"#7CD992\")\nax.set_title(\"monthly_revenue_2025.png\")\nax.set_xlabel(\"month\")\nax.set_ylabel(\"revenue (USD)\")",
+      "isCorrect": false,
+      "resultLog": "# (no output — relying on notebook auto-display, which doesn't trigger in scripts)",
+      "rationale": "Often works in a Jupyter cell — the last expression `ax.set_ylabel(...)` evaluates to the Text object, not the figure, so auto-display is hit or miss. And in a plain `.py` script it does nothing. `plt.show()` is the rendering call that works in every context; reach for it."
+    }
+  ],
+  "hints": [
+    "Read what the cell printed: `<Figure size 700x400 with 1 Axes>`. matplotlib built a figure but never *rendered* it.",
+    "Add `plt.show()` as the last line. That's the call that flushes the active figure to the inline display (or GUI window)."
+  ],
+  "explanationMd": "### Why the bug occurs\nmatplotlib separates **building** a figure (`subplots`, `bar`, `set_title`) from **rendering** it. In a Jupyter notebook the last expression of a cell is auto-displayed — *if* it happens to be a figure. Print the figure (or assign it, or call something that returns `None` last) and the auto-display step doesn't fire. The figure object exists in memory; you just never told matplotlib to show it.\n\n### Why the fix is correct\n`plt.show()` renders the active figure to whatever backend matplotlib is using — inline image in Jupyter, GUI window in a script, PNG bytes in a headless server. It's unconditional and explicit, so the chart appears regardless of what the rest of the cell does. The general habit: **build with `ax.*`, render with `plt.show()`**. It's also the call that flushes pending state so the next cell starts clean.",
+  "recruiterReview": "Good — you recognised that matplotlib's figure-object repr is a smell, not a successful render, and reached for `plt.show()`. Two follow-ups: 1) in a notebook you can also write `display(fig)` or just leave `fig` as the last expression — but in scripts `plt.show()` is the portable answer. 2) When you have multiple figures in one cell, each needs its own `plt.show()` or you'll see them stacked oddly. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## How matplotlib Figures Get to the Screen\n\nmatplotlib has a build/render split that trips up almost every new analyst. Once you see it once, it never confuses you again.\n\n### The two phases\n```python\nfig, ax = plt.subplots()    # build — creates the Figure and Axes objects\nax.bar(x, y)                # build — adds bars to the axes\nax.set_xlabel(\"x\")          # build — sets a label\nplt.show()                  # render — draws the figure where it can be seen\n```\nThe first three lines don't show anything — they only configure objects in memory. `plt.show()` is the call that flushes them to the renderer.\n\n### Why a Jupyter cell *sometimes* shows the chart anyway\nJupyter auto-displays the **last expression** of a cell. If that expression evaluates to a Figure (or anything with a `_repr_html_` / `_repr_png_`), Jupyter renders it. So\n```python\nfig, ax = plt.subplots()\nax.bar(x, y)\nfig                           # last expression — Figure object — auto-displays\n```\nworks. But the moment you add a final line that returns something else (`print(fig)`, `ax.set_title(...)`, an assignment, an `import`), the auto-display chain breaks and you see nothing.\n\nThe fix is to be explicit:\n```python\nplt.show()\n```\nNow it doesn't matter what the last expression is — matplotlib renders whatever's pending.\n\n### `plt.show()` vs `fig.show()` vs `display(fig)`\n- `plt.show()` — renders the **currently active** figure(s) using the configured backend. In Jupyter that's inline; in a script, a GUI window.\n- `fig.show()` — renders just `fig`. Useful when you have multiple figures.\n- `display(fig)` — works in Jupyter (it's from IPython). Bypasses the auto-display chain.\n\nIn a notebook with `%matplotlib inline`, `plt.show()` is the most-portable choice.\n\n### Saving vs showing\n```python\nfig.savefig(\"chart.png\", dpi=150)\n```\nWrites the figure to disk — useful for reports — but **doesn't** show it inline. If you want both, do both.\n\n### A small worked example\n```python\nimport matplotlib.pyplot as plt\n\nmonths = [\"Jan\", \"Feb\", \"Mar\"]\nrevenue = [42, 47, 51]\n\nfig, ax = plt.subplots(figsize=(6, 4))\nax.bar(months, revenue, color=\"#7CD992\")\nax.set_title(\"Q1 revenue\")\nax.set_xlabel(\"month\")\nax.set_ylabel(\"revenue (k)\")\nplt.show()\n```\nThe `plt.show()` is the line that makes the chart appear. Drop it and you have a beautifully configured invisible figure.\n\n### The `%matplotlib inline` magic\nA notebook line `%matplotlib inline` (often in the first cell) tells matplotlib to render inline images instead of opening GUI windows. It's the standard for Jupyter and is what makes `plt.show()` produce an embedded PNG.\n\n### Common beginner mistakes\n- Building a figure and forgetting `plt.show()` (the bug).\n- Printing the figure and being surprised by `<Figure size ...>`.\n- Calling `plt.show()` inside a `for` loop without `plt.close(fig)` afterwards — memory leak in long-running scripts.\n- Mixing `plt.bar(...)` (state-machine API) with `ax.bar(...)` (object-oriented API). Pick one; OO is clearer in longer scripts.\n\n### You just learned…\nmatplotlib **builds** then **renders**. `plt.show()` is the render call. In Jupyter, the auto-display chain rescues you when your last cell expression *is* the figure, but the moment something else takes that slot, the chart vanishes. Make `plt.show()` a habit and you'll never debug a missing figure again.",
+    "videos": [
+      {
+        "title": "matplotlib plt.show() and the build/render split",
+        "searchQuery": "matplotlib plt show beginner tutorial figure render"
+      },
+      {
+        "title": "Why my matplotlib chart doesn't appear",
+        "searchQuery": "matplotlib figure not showing notebook fix beginner"
+      }
+    ]
+  },
+  "estMinutes": 5,
+  "version": 1,
+  "conceptCard": "This mission is about **how matplotlib gets a figure on screen**.\n\n- `subplots()` / `ax.bar(...)` only **build** the figure in memory.\n- `plt.show()` is the call that **renders** it to the notebook (or GUI).\n- The Jupyter auto-display only fires when the last expression *is* the figure; `print(fig)` suppresses it.\n\nThe code prints the figure handle (`<Figure …>`) instead of rendering. Add `plt.show()` as the last line.",
+  "lineNotes": [
+    {
+      "line": 1,
+      "noteMd": "Standard import — `plt` is the figure builder & renderer entry point."
+    },
+    {
+      "line": 6,
+      "noteMd": "Creates a Figure and an Axes — in memory only, nothing on screen yet."
+    },
+    {
+      "line": 7,
+      "noteMd": "Adds bars. Still in memory; the renderer hasn't been asked to draw."
+    },
+    {
+      "line": 11,
+      "noteMd": "**The bug.** `print(fig)` shows the repr string and breaks Jupyter's auto-display chain. Replace with `plt.show()`."
+    }
+  ],
+  "takeaway": "Building a figure is not rendering it — end the cell with plt.show() to show the chart.",
+  "figureSvg": "<svg viewBox=\"0 0 700 400\" xmlns=\"http://www.w3.org/2000/svg\" preserveAspectRatio=\"xMidYMid meet\" width=\"100%\" height=\"auto\"><rect x=\"0\" y=\"0\" width=\"700\" height=\"400\" fill=\"var(--code-bg, #11161D)\" rx=\"6\"/><text x=\"64\" y=\"22\" fill=\"var(--text, #E6E8EC)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"13\" font-weight=\"600\">(no figure was shown)</text><line x1=\"64\" y1=\"36\" x2=\"64\" y2=\"344\" stroke=\"var(--muted, #8B9099)\" stroke-width=\"1\"/><line x1=\"64\" y1=\"344\" x2=\"676\" y2=\"344\" stroke=\"var(--muted, #8B9099)\" stroke-width=\"1\"/><rect x=\"71.7\" y=\"344.0\" width=\"71.4\" height=\"0.0\" fill=\"#8B9099\" opacity=\"0.85\"/><text x=\"107.3\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">0</text><rect x=\"173.7\" y=\"344.0\" width=\"71.4\" height=\"0.0\" fill=\"#8B9099\" opacity=\"0.85\"/><text x=\"209.3\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">1</text><rect x=\"275.6\" y=\"344.0\" width=\"71.4\" height=\"0.0\" fill=\"#8B9099\" opacity=\"0.85\"/><text x=\"311.3\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">2</text><rect x=\"377.6\" y=\"344.0\" width=\"71.4\" height=\"0.0\" fill=\"#8B9099\" opacity=\"0.85\"/><text x=\"413.3\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">3</text><rect x=\"479.6\" y=\"344.0\" width=\"71.4\" height=\"0.0\" fill=\"#8B9099\" opacity=\"0.85\"/><text x=\"515.4\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">4</text><rect x=\"581.6\" y=\"344.0\" width=\"71.4\" height=\"0.0\" fill=\"#8B9099\" opacity=\"0.85\"/><text x=\"617.4\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">5</text><text x=\"56\" y=\"347\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">0</text><text x=\"56\" y=\"285.4\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">1.2k</text><text x=\"56\" y=\"223.8\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">2.4k</text><text x=\"56\" y=\"162.20000000000002\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">3.6k</text><text x=\"56\" y=\"100.6\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">4.8k</text><text x=\"56\" y=\"39\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">6k</text><text x=\"370\" y=\"386\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"11\" text-anchor=\"middle\">month</text><text transform=\"translate(20, 190) rotate(-90)\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"11\" text-anchor=\"middle\">revenue (USD)</text></svg>",
+  "figureCaption": "Before — the cell prints '<Figure size 700x400 with 1 Axes>' and nothing renders."
+}

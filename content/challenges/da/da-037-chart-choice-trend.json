@@ -1,0 +1,85 @@
+{
+  "id": "da-037-chart-choice-trend",
+  "sector": "da",
+  "difficulty": "easy",
+  "title": "37_did_dau_grow.ipynb",
+  "language": "python",
+  "icon": "activity",
+  "conceptTags": [
+    "chart-choice",
+    "trend",
+    "reasoning"
+  ],
+  "descriptionMd": "## Mission: 'Did DAU Grow This Week?'\n\nA PM Slacks: *\"Did DAU grow this week? Send me whatever chart shows it best.\"* You've got 7 days of daily active users — Monday through Sunday — and the numbers slope steadily up. Three chart types are on the table. Which one answers *\"did it grow?\"* fastest, and what makes the other two worse?\n\nThe question is about a **trend over an ordered axis (time)**. A line lets the eye read slope as rate of change. A bar chart reads as seven separate categories. A pie chart can't represent change at all. Pick the right shape — and name the failure mode of the other two.",
+  "initialCode": "# Scenario: PM asks 'did DAU grow this week?'\n# Data: 7 days of daily active users (illustrative numbers).\ndays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']\ndau  = [1200, 1240, 1280, 1330, 1380, 1420, 1460]",
+  "buggyLineStart": 4,
+  "buggyLineEnd": 4,
+  "traceback": "Junior analyst's draft: 'A bar chart — one bar per day. Stakeholders can read each value precisely.'",
+  "correctOutput": "Senior analyst's verdict: 'Line chart with markers, y-axis anchored at zero. Slope = the answer.'",
+  "options": [
+    {
+      "key": "a",
+      "label": "Line chart, markers on each day, y-axis from 0",
+      "patchCode": "# Scenario: PM asks 'did DAU grow this week?'\n# Data: 7 days of daily active users (illustrative numbers).\ndays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']\ndau  = [1200, 1240, 1280, 1330, 1380, 1420, 1460]",
+      "isCorrect": true,
+      "resultLog": "Acting on this reading: the PM glances at the chart and reads the slope as 'yes, growing'. Done.",
+      "rationale": "The question is about **change over time** — the eye reads slope as the rate of change. Markers on each day keep specific values identifiable. Anchoring the y-axis at zero (same rule as da-018) keeps the slope honest: visible length equals magnitude. A line over the seven days is the most direct visual answer to 'did it grow?'"
+    },
+    {
+      "key": "b",
+      "label": "Bar chart, one bar per day, sorted by value",
+      "patchCode": "# Scenario: PM asks 'did DAU grow this week?'\n# Data: 7 days of daily active users (illustrative numbers).\ndays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']\ndau  = [1200, 1240, 1280, 1330, 1380, 1420, 1460]",
+      "isCorrect": false,
+      "resultLog": "Acting on this reading: the PM stares at seven bars trying to mentally connect the tops to see the trend. Worse: sorting by value destroys the time order.",
+      "rationale": "Bars read as **discrete category comparisons** — the eye doesn't naturally connect bar tops into a slope. Sorting by value (rather than by day) actively destroys the time axis, which is the whole point. This is the same da-020 anti-pattern: bar where line was right."
+    },
+    {
+      "key": "c",
+      "label": "Pie chart with one slice per day",
+      "patchCode": "# Scenario: PM asks 'did DAU grow this week?'\n# Data: 7 days of daily active users (illustrative numbers).\ndays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']\ndau  = [1200, 1240, 1280, 1330, 1380, 1420, 1460]",
+      "isCorrect": false,
+      "resultLog": "Acting on this reading: the PM can't tell whether DAU grew or shrank — pie shows parts of a whole, not change over time.",
+      "rationale": "A pie chart represents **parts of a whole at one moment** — it has no time axis at all. Whether the chart was made for a growing or shrinking week, the seven slices look about the same. Pie *cannot* answer 'did it grow?' regardless of how skilfully drawn."
+    }
+  ],
+  "hints": [
+    "Read the verb: *grew*. That's a question about change over time. Which encoding makes change easiest to see?",
+    "Line slope reads as rate of change. Bars don't connect, pies don't have a time axis."
+  ],
+  "explanationMd": "### Why this is the right reading\nThe question is *trend over an ordered axis* — \"did it grow?\" is asking the eye to read a slope. The encoding that maps directly to slope is a line. Markers preserve per-day exact values; the zero-anchored y-axis keeps the slope honest.\n\n### What makes the other two reasonings weak\n- **Bar chart**: the eye reads bars as discrete category heights, not as a connected sequence. Sorting by value (as the wrong option says) destroys the time axis entirely. The chart that *could* show the trend ends up answering a different question.\n- **Pie chart**: has no time axis. It represents parts of a whole at a single moment. There's no honest way to read \"did it grow?\" from a pie at all.\n\n### The general principle\nThe **shape of the question** (\"did it grow?\") must match the **shape of the chart** (line — slope = rate of change). Bars are for categorical comparison. Pies are for clear-dominator parts-of-whole. Use the chart whose visual encoding directly answers the verb in the question.",
+  "recruiterReview": "Solid — you read the verb in the question ('grow' = change over time) and matched it to slope. You also named the failure mode of the bar chart (sorting by value destroys the time axis) and the categorical failure of the pie. Two refinements: 1) pair the line chart with `set_ylim(0, max*1.15)` so the slope reads honestly (combining the lesson with da-018); 2) if the trend is very small relative to the absolute level, add a small annotation 'DAU grew 22% W/W' so the chart and the headline number agree.",
+  "tutorial": {
+    "bodyMd": "## Reading the Verb in the Question\n\nThe most reliable trick for picking a chart type: **read the verb in the stakeholder's question**, and ask what visual encoding maps to that verb.\n\n### The verb → encoding cheat sheet\n| Verb in the ask | Visual encoding | Chart type |\n|---|---|---|\n| 'grew', 'changed', 'trended' | slope | **line** |\n| 'biggest', 'most', 'highest' | length | **bar** (sorted) |\n| 'distributed', 'typical', 'spread' | shape of a histogram or box | **histogram / box** |\n| 'related to', 'correlates with' | cloud shape, slope | **scatter** |\n| 'broken down into parts', 'composition' | area or stack | **stacked bar / area** |\n| 'compared across two dimensions' | colour cell | **heatmap** |\n\n### Why line wins this question\nThe slope of a line says rate of change. Going up means growing. Flat means flat. Down means shrinking. Each marker preserves the exact value, so the reader can still get \"DAU on Sunday was 1460.\"\n\n### Why bar loses for trends\nBars are read as separate categories. The eye doesn't connect bar tops into a slope; it compares bar heights pairwise. For seven days the comparison is *seven choose two = 21 pairwise reads* the audience has to mentally aggregate into 'is this growing?' A line does the aggregation visually for them.\n\nThe most insidious form of the bar-vs-line bug is when the wrong-answer impulse is *sorting by value* — that destroys the time axis entirely.\n\n### Why pie can't represent change\nA pie shows parts of a whole at one moment in time. There's no axis for change. If you handed someone a pie of \"DAU each day this week,\" they couldn't tell whether the week grew, shrank, or held flat — only the slice sizes (which are usually similar enough to look identical).\n\n### Practical authoring checklist for trend charts\n1. Use `ax.plot(x, y, marker=\"o\")` — markers keep individual values identifiable.\n2. **Anchor the y-axis at zero** for absolute counts (the da-018 rule) so the slope reads honestly.\n3. Sort the x-axis in **time order**, not by value (the da-019 rule).\n4. If the change is small relative to the absolute level, annotate the headline (\"+22% W/W\").\n5. For multi-line charts, add a legend or label the lines directly.\n\n### Common reasoning mistakes\n- Sorting the x-axis by value when the question is about a trend.\n- Hiding the trend with autoscaled y (da-018).\n- Using a pie because 'percentage went up' — pie doesn't show change.\n- Smoothing too aggressively — the line should answer the question, not pretend the noise isn't there.\n\n### You just learned…\nThe verb in the ask tells you the chart type. \"Grew / changed / trended\" → **line**. \"Biggest / most\" → **bar**. \"Typical\" → **histogram**. Pies don't show change. Match the chart's visual encoding to the question's verb and the reader's eye does the work.",
+    "videos": [
+      {
+        "title": "Bar vs line vs pie",
+        "searchQuery": "bar vs line vs pie chart when to use each tutorial"
+      },
+      {
+        "title": "Reading the question to pick a chart",
+        "searchQuery": "data visualization match chart type to question"
+      }
+    ]
+  },
+  "estMinutes": 5,
+  "version": 1,
+  "conceptCard": "This mission is about **matching chart shape to the question's verb**.\n\n- 'Grew' / 'changed' = trend = **line** (slope reads as rate of change).\n- Bars read as discrete category comparisons — wrong for trends.\n- Pies have no time axis — they can't answer 'did it grow?' at all.\n\nThe PM asked 'did DAU grow this week?' — that's a trend question. A line chart with a zero-anchored y-axis answers it in one glance.",
+  "lineNotes": [
+    {
+      "line": 1,
+      "noteMd": "The stakeholder ask — the verb 'grow' tells you the chart shape."
+    },
+    {
+      "line": 3,
+      "noteMd": "Seven days — a continuous time-ordered sequence."
+    },
+    {
+      "line": 4,
+      "noteMd": "Smoothly increasing values — perfect for a line."
+    }
+  ],
+  "takeaway": "The verb in the question picks the chart: 'grew' → line, 'biggest' → bar.",
+  "track": "reasoning",
+  "figureSvg": "<svg viewBox=\"0 0 700 400\" xmlns=\"http://www.w3.org/2000/svg\" preserveAspectRatio=\"xMidYMid meet\" width=\"100%\" height=\"auto\"><rect x=\"0\" y=\"0\" width=\"700\" height=\"400\" fill=\"var(--code-bg, #11161D)\" rx=\"6\"/><text x=\"64\" y=\"22\" fill=\"var(--text, #E6E8EC)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"13\" font-weight=\"600\">dau_last_7_days.png</text><line x1=\"64\" y1=\"36\" x2=\"64\" y2=\"344\" stroke=\"var(--muted, #8B9099)\" stroke-width=\"1\"/><line x1=\"64\" y1=\"344\" x2=\"676\" y2=\"344\" stroke=\"var(--muted, #8B9099)\" stroke-width=\"1\"/><polyline points=\"114.3,113.0 201.7,105.3 289.1,97.6 376.6,88.0 464.0,78.3 551.4,70.7 638.8,62.9\" fill=\"none\" stroke=\"#7CD992\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"114.3\" cy=\"113.0\" r=\"2.5\" fill=\"#7CD992\"/><circle cx=\"201.7\" cy=\"105.3\" r=\"2.5\" fill=\"#7CD992\"/><circle cx=\"289.1\" cy=\"97.6\" r=\"2.5\" fill=\"#7CD992\"/><circle cx=\"376.6\" cy=\"88.0\" r=\"2.5\" fill=\"#7CD992\"/><circle cx=\"464.0\" cy=\"78.3\" r=\"2.5\" fill=\"#7CD992\"/><circle cx=\"551.4\" cy=\"70.7\" r=\"2.5\" fill=\"#7CD992\"/><circle cx=\"638.8\" cy=\"62.9\" r=\"2.5\" fill=\"#7CD992\"/><text x=\"114.3\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">Mon</text><text x=\"201.7\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">Tue</text><text x=\"289.1\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">Wed</text><text x=\"376.6\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">Thu</text><text x=\"464.0\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">Fri</text><text x=\"551.4\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">Sat</text><text x=\"638.8\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">Sun</text><text x=\"56\" y=\"347\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">0</text><text x=\"56\" y=\"285.4\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">320</text><text x=\"56\" y=\"223.8\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">640</text><text x=\"56\" y=\"162.20000000000002\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">960</text><text x=\"56\" y=\"100.6\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">1.3k</text><text x=\"56\" y=\"39\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">1.6k</text><text x=\"370\" y=\"386\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"11\" text-anchor=\"middle\">day</text><text transform=\"translate(20, 190) rotate(-90)\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"11\" text-anchor=\"middle\">DAU</text></svg>",
+  "figureCaption": "DAU last week — 7 days of values the PM is asking about (illustrative)."
+}

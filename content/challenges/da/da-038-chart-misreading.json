@@ -1,0 +1,85 @@
+{
+  "id": "da-038-chart-misreading",
+  "sector": "da",
+  "difficulty": "easy",
+  "title": "38_what_does_the_chart_say.ipynb",
+  "language": "python",
+  "icon": "scale",
+  "conceptTags": [
+    "chart-reading",
+    "interpretation",
+    "reasoning"
+  ],
+  "descriptionMd": "## Mission: What Does the Chart Actually Say?\n\nA colleague drops the chart below into a deck for tomorrow's exec meeting. The chart is *honest* — y-axis anchored at zero, real values, no funky scales, clear labels. Three exec-deck headlines are on the table. **Two of them over-claim** — they assert things the chart doesn't actually support. One is exactly what the chart says.\n\nPick the headline that's supported by what the chart shows — not by what the audience hopes it shows.",
+  "initialCode": "# Scenario: an exec-deck headline candidate.\n# Chart shown below: monthly signups Jan–Jun 2025 (illustrative).\n# Values: 820, 870, 905, 950, 985, 1020.\n# What does it actually support?",
+  "buggyLineStart": 1,
+  "buggyLineEnd": 1,
+  "traceback": "Junior analyst's draft: 'Signups exploded in 2025 — we're on track to hit 5,000 by year end. Recommend doubling acquisition spend.'",
+  "correctOutput": "Senior analyst's verdict: 'Signups grew ~24% Jan→Jun, ~4–5% per month. Trend looks steady; extrapolation is *speculation*, not what the chart shows.'",
+  "options": [
+    {
+      "key": "a",
+      "label": "'Signups grew ~24% from Jan to Jun — about 4–5% per month, steady.'",
+      "patchCode": "# Scenario: an exec-deck headline candidate.\n# Chart shown below: monthly signups Jan–Jun 2025 (illustrative).\n# Values: 820, 870, 905, 950, 985, 1020.\n# What does it actually support?",
+      "isCorrect": true,
+      "resultLog": "Acting on this reading: the deck headline matches what the chart shows; downstream decisions reference accurate numbers.",
+      "rationale": "This headline restates the chart literally. 820 → 1020 is ~24% growth over 6 months, ~4–5% per month — both numbers are arithmetic from the bars. No extrapolation, no causal claim, no comparison to a target the chart doesn't show. This is the *only* thing the audience can claim from this chart alone."
+    },
+    {
+      "key": "b",
+      "label": "'Signups exploded — we'll hit 5,000 by year end. Double acquisition spend.'",
+      "patchCode": "# Scenario: an exec-deck headline candidate.\n# Chart shown below: monthly signups Jan–Jun 2025 (illustrative).\n# Values: 820, 870, 905, 950, 985, 1020.\n# What does it actually support?",
+      "isCorrect": false,
+      "resultLog": "Acting on this reading: the team spends 2× on acquisition, hits ~1,300 in July, exec asks why we missed the forecast.",
+      "rationale": "Two over-claims: (1) **'Exploded' is a 24% half-year rise** — call it what it is. (2) **Extrapolating** 6 months of linear-ish growth to a year-end target ignores seasonality, saturation, and basic forecasting humility (da-054). The chart shows 6 months; it can't tell you about month 12. Worse: it bundles in a *recommendation* the chart doesn't support at all."
+    },
+    {
+      "key": "c",
+      "label": "'Our new homepage redesign in February drove a 24% lift.'",
+      "patchCode": "# Scenario: an exec-deck headline candidate.\n# Chart shown below: monthly signups Jan–Jun 2025 (illustrative).\n# Values: 820, 870, 905, 950, 985, 1020.\n# What does it actually support?",
+      "isCorrect": false,
+      "resultLog": "Acting on this reading: marketing claims credit publicly; product disagrees; trust in the analyst's reads erodes.",
+      "rationale": "**Correlation, not causation.** The chart shows growth across months. It does *not* show what caused that growth. Maybe the redesign helped; maybe seasonal demand was the real driver; maybe a campaign in a different month was. Attributing 'X% lift' to a specific change requires a controlled comparison — at minimum a before/after with a counterfactual, ideally a holdout test. This is the **`da-040` correlation-vs-causation** trap one card early."
+    }
+  ],
+  "hints": [
+    "What does the chart literally show? Six numbers in time order. What does it *not* show? Causes, futures, alternatives.",
+    "Reject anything that adds a cause, a future, or a comparison the bars don't depict."
+  ],
+  "explanationMd": "### Why this is the right reading\nA chart is a **statement about the values it depicts** — nothing more. This bar chart says: in months Jan through Jun 2025, signups were `[820, 870, 905, 950, 985, 1020]`. Any honest exec-deck headline restates that and stops there. Growth rate (24% over 6 months, ~4–5% per month) is arithmetic from the bars — fine. Anything else is **adding a claim**.\n\n### What makes the over-claims weak\n- **'Exploded ... 5,000 by year end'** is two errors stacked. \"Exploded\" is editorializing a 24% rise. \"5,000 by year end\" extrapolates from 6 months to 12, assuming a constant growth rate the chart cannot promise. (Forecasting humility — see da-054.)\n- **'Homepage redesign drove the lift'** is a causal claim. The chart shows the *what*, not the *why*. Attribution requires a controlled comparison: a holdout, an A/B test, or at minimum a counterfactual the chart doesn't show. (Correlation vs causation — see da-040.)\n\n### The general principle\nA chart is *evidence*, not *argument*. When you write the headline, ask: would I be able to defend this from the chart alone? If you'd need extra evidence (causal attribution, future-trend assumption, comparison to a target), you're **adding to the chart**, not reading it. State only what the chart shows — and label the rest as *opinion* or *requires further analysis*.",
+  "recruiterReview": "Strong — you didn't let the deck-headline pressure pull you into over-claiming. You rejected both the extrapolation (claims about month 12 the 6-month chart can't support) and the causal attribution (the chart shows what, not why). That's the senior-analyst instinct: state what the chart shows, label everything else as opinion. One refinement: when stakeholders want a forward-looking headline, pair the chart with an explicit *forecast* (with uncertainty bands) and label it as such — don't let the readers turn 'recent slope' into 'commitment.'",
+  "tutorial": {
+    "bodyMd": "## Reading a Chart Without Over-Claiming\n\nThe most-corrupting habit in business analytics is letting the deck headline *add to* what the chart shows. The chart is evidence; the headline should restate that evidence and stop.\n\n### Three traps the eye walks into\n#### 1) Adverbs that aren't in the data\n'Exploded.' 'Stalled.' 'Surged.' These describe the *reader's reaction*, not the data. A 24% half-year rise isn't an explosion in absolute terms — it's a healthy ~4–5% per month. Write the number, not the adverb.\n\n#### 2) Extrapolation from a short window\nIf the chart shows 6 months, the headline can't honestly claim things about month 12. Seasonality, saturation, and competitive response all bend the curve. **Forecasting humility**: short windows can't tell you about long ones. If a forward claim is needed, do a *forecast* (with uncertainty bands) and label it as such, separate from the historical chart.\n\n#### 3) Causal attribution\n'The redesign caused the lift.' The chart shows growth happening in the months *after* the redesign. It does **not** show:\n- What signups would have been *without* the redesign (the counterfactual).\n- Whether other things changed in the same window (campaigns, partnerships, seasonality).\n- Whether the redesign affected signups specifically vs other downstream metrics.\nAttribution requires a controlled comparison: an A/B test, a difference-in-differences against a baseline, or at minimum an honest counterfactual narrative. A bar chart of one metric over time **cannot** prove cause.\n\n### A two-question litmus test for any chart headline\nBefore you write the headline, ask:\n1. **Can I draw a finger from the chart's data to every word in this headline?** If part of the headline requires *additional* data (a target, a comparison group, a future projection), the chart alone doesn't support it.\n2. **Would I bet my paycheck on this headline if challenged?** Adverbs and extrapolations rarely survive that test. Numbers and direction do.\n\n### Good headline patterns\n- 'Signups grew 24% Jan→Jun, ~4–5% per month.' — restates the values.\n- 'June was the largest month so far in 2025.' — true, from the chart.\n- 'Trend looks steady; July's value will tell us whether to update the forecast.' — names a next step without claiming the future.\n\n### Bad headline patterns (and why)\n- 'On track for 5,000.' → extrapolation.\n- 'X caused Y.' → causal attribution from observational data.\n- 'Exploded.' → adverb without an anchor.\n- 'Best year ever.' → comparison the chart doesn't show.\n\n### Common reasoning mistakes\n- Letting the audience's *expected* story shape the headline rather than the data.\n- Conflating 'after' with 'because of' (post hoc ergo propter hoc).\n- Smoothing or selectively framing the data to fit a narrative.\n- Promising future numbers from past slopes.\n\n### You just learned…\nA chart is **evidence**, not **argument**. The honest headline restates what the chart shows and labels anything else as opinion. Reject adverbs, extrapolations, and causal claims the chart can't carry alone.",
+    "videos": [
+      {
+        "title": "Reading charts critically",
+        "searchQuery": "how to read a chart without misinterpreting data viz"
+      },
+      {
+        "title": "Correlation vs causation explained",
+        "searchQuery": "correlation does not imply causation tutorial beginner"
+      }
+    ]
+  },
+  "estMinutes": 6,
+  "version": 1,
+  "conceptCard": "This mission is about **reading a chart without adding claims it doesn't carry**.\n\n- A chart is **evidence**, not **argument**. Restate what's there; label everything else as opinion.\n- Watch for: adverbs ('exploded'), extrapolations ('by year end'), causal claims ('X caused Y').\n- Litmus test: can you draw a finger from the chart's data to every word in your headline?\n\nThe chart shows 6 months of steady growth. The right headline restates that and stops.",
+  "lineNotes": [
+    {
+      "line": 1,
+      "noteMd": "The scenario — a deck-headline candidate is what we're judging."
+    },
+    {
+      "line": 3,
+      "noteMd": "The data the chart depicts — these six numbers are everything the chart 'says.'"
+    },
+    {
+      "line": 4,
+      "noteMd": "The question to ask of every headline: what does the chart *actually* support?"
+    }
+  ],
+  "takeaway": "A chart is evidence, not argument — restate what it shows, don't add claims it can't carry.",
+  "track": "reasoning",
+  "figureSvg": "<svg viewBox=\"0 0 700 400\" xmlns=\"http://www.w3.org/2000/svg\" preserveAspectRatio=\"xMidYMid meet\" width=\"100%\" height=\"auto\"><rect x=\"0\" y=\"0\" width=\"700\" height=\"400\" fill=\"var(--code-bg, #11161D)\" rx=\"6\"/><text x=\"64\" y=\"22\" fill=\"var(--text, #E6E8EC)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"13\" font-weight=\"600\">monthly_signups_2025.png</text><line x1=\"64\" y1=\"36\" x2=\"64\" y2=\"344\" stroke=\"var(--muted, #8B9099)\" stroke-width=\"1\"/><line x1=\"64\" y1=\"344\" x2=\"676\" y2=\"344\" stroke=\"var(--muted, #8B9099)\" stroke-width=\"1\"/><rect x=\"71.7\" y=\"133.5\" width=\"71.4\" height=\"210.5\" fill=\"#7CD992\" opacity=\"0.85\"/><text x=\"107.3\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">Jan</text><rect x=\"173.7\" y=\"120.7\" width=\"71.4\" height=\"223.3\" fill=\"#7CD992\" opacity=\"0.85\"/><text x=\"209.3\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">Feb</text><rect x=\"275.6\" y=\"111.7\" width=\"71.4\" height=\"232.3\" fill=\"#7CD992\" opacity=\"0.85\"/><text x=\"311.3\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">Mar</text><rect x=\"377.6\" y=\"100.2\" width=\"71.4\" height=\"243.8\" fill=\"#7CD992\" opacity=\"0.85\"/><text x=\"413.3\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">Apr</text><rect x=\"479.6\" y=\"91.2\" width=\"71.4\" height=\"252.8\" fill=\"#7CD992\" opacity=\"0.85\"/><text x=\"515.4\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">May</text><rect x=\"581.6\" y=\"82.2\" width=\"71.4\" height=\"261.8\" fill=\"#7CD992\" opacity=\"0.85\"/><text x=\"617.4\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">Jun</text><text x=\"56\" y=\"347\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">0</text><text x=\"56\" y=\"285.4\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">240</text><text x=\"56\" y=\"223.8\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">480</text><text x=\"56\" y=\"162.20000000000002\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">720</text><text x=\"56\" y=\"100.6\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">960</text><text x=\"56\" y=\"39\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">1.2k</text><text x=\"370\" y=\"386\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"11\" text-anchor=\"middle\">month</text><text transform=\"translate(20, 190) rotate(-90)\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"11\" text-anchor=\"middle\">signups</text></svg>",
+  "figureCaption": "Monthly signups Jan–Jun 2025 — the chart the headline is supposed to summarise."
+}

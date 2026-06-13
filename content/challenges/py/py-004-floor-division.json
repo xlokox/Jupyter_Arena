@@ -1,0 +1,74 @@
+{
+  "id": "py-004-floor-division",
+  "sector": "py",
+  "difficulty": "easy",
+  "title": "04_split_the_bill.ipynb",
+  "language": "python",
+  "icon": "scale",
+  "conceptTags": ["division", "operators", "numbers"],
+  "descriptionMd": "## Mission: Split the Bill\n\nTwo friends split a $7 bill evenly, so each should pay `3.5`. Your program prints `Each person pays: 3` — the half-dollar vanished.\n\nPython has two kinds of division. One keeps the fraction; the other throws the remainder away and gives you a whole number. You used the wrong one. Switch to the division that keeps the decimal so the split is exact.",
+  "initialCode": "# Split a $7 bill evenly between 2 people\nbill = 7\npeople = 2\neach_pays = bill // people\nprint(\"Each person pays:\", each_pays)",
+  "buggyLineStart": 4,
+  "buggyLineEnd": 4,
+  "traceback": "Each person pays: 3\n\n# Expected 3.5. The // operator does whole-number division and drops the 0.5 remainder.",
+  "correctOutput": "Each person pays: 3.5",
+  "options": [
+    {
+      "key": "a",
+      "label": "Use single-slash / for true division",
+      "patchCode": "# Split a $7 bill evenly between 2 people\nbill = 7\npeople = 2\neach_pays = bill / people\nprint(\"Each person pays:\", each_pays)",
+      "isCorrect": true,
+      "resultLog": "Each person pays: 3.5",
+      "rationale": "Python has two division operators: `/` gives the exact answer including the decimal (`7 / 2` = 3.5), while `//` does *floor division* — it divides and then throws away anything after the decimal point (`7 // 2` = 3). You wanted the real split, so `/` is correct."
+    },
+    {
+      "key": "b",
+      "label": "Use % to get the share",
+      "patchCode": "# Split a $7 bill evenly between 2 people\nbill = 7\npeople = 2\neach_pays = bill % people\nprint(\"Each person pays:\", each_pays)",
+      "isCorrect": false,
+      "resultLog": "Each person pays: 1\n\n# 1 is the leftover dollar, not each person's share.",
+      "rationale": "`%` is the *remainder* operator, not division — `7 % 2` is 1, the amount left over after taking out whole 2s. That's not each person's share. For the actual split you need `/`."
+    },
+    {
+      "key": "c",
+      "label": "Keep // but turn the result into a decimal",
+      "patchCode": "# Split a $7 bill evenly between 2 people\nbill = 7\npeople = 2\neach_pays = bill // people * 1.0\nprint(\"Each person pays:\", each_pays)",
+      "isCorrect": false,
+      "resultLog": "Each person pays: 3.0",
+      "rationale": "Multiplying by 1.0 turns 3 into 3.0, but the 0.5 was already gone — `//` discarded it *before* you converted. You can't recover a remainder that was thrown away. Use `/`, which never drops it in the first place."
+    }
+  ],
+  "hints": [
+    "You got a whole number when you expected a decimal. Look at the division symbol on line 4 — Python has two, and one of them deliberately removes the fractional part.",
+    "`/` keeps the decimal (`7 / 2` = 3.5); `//` rounds down to a whole number (`7 // 2` = 3). Pick the one that keeps the half."
+  ],
+  "explanationMd": "### Why the bug occurs\nPython has two division operators and they do different jobs. `//` is **floor division**: it divides and then drops everything after the decimal point, always giving a whole number. `7 // 2` is 3, not 3.5 — the 0.5 is discarded. So the bill split lost its half-dollar.\n\n### Why the fix is correct\n`/` is **true division** and keeps the full result, decimals included: `7 / 2` = 3.5. Each friend's exact share now prints. Floor division (`//`) is genuinely useful — for example, \"how many whole boxes of 12 fit in 100 items\" is `100 // 12` = 8 — but whenever you need the precise answer with its fraction, reach for `/`. (The remainder operator `%` answers a third question: what's left over.)",
+  "recruiterReview": "Good instinct — you recognized that the *whole number* output pointed at the operator, not the numbers. The `/` vs `//` distinction is small but causes real money and metric bugs, so internalizing it now pays off. Worth filing away: `//` (floor) and `%` (remainder) are a pair — together they tell you \"how many whole groups, and how much is left over,\" which comes up constantly in real data work. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Two Kinds of Division\n\nDivision in Python has a twist that surprises almost every beginner: there are two division operators, and they give different answers.\n\n### True division: `/`\nThe single slash gives the exact result, decimals and all:\n```python\n7 / 2     # 3.5\n10 / 4    # 2.5\n6 / 3     # 2.0   (still a decimal type)\n```\nThis is the one you want for an average, a price split, a percentage — anything where the fraction matters.\n\n### Floor division: `//`\nThe double slash divides and then **rounds down** to a whole number, throwing away the remainder:\n```python\n7 // 2    # 3   (the .5 is dropped)\n10 // 4   # 2\n```\nUse it when you genuinely want whole units — \"how many full boxes of 12?\" is `items // 12`.\n\n### The remainder: `%`\nA close cousin, the percent sign gives what's *left over*:\n```python\n7 % 2     # 1   (after two 2s, 1 remains)\n```\n`//` and `%` are a team: `7 // 2` whole groups (3) with `7 % 2` left over (1).\n\n### A tiny worked example\n```python\ntotal = 7\npeople = 2\nprint(total / people)    # 3.5  ← exact split\nprint(total // people)   # 3    ← whole dollars each\nprint(total % people)    # 1    ← one dollar left over\n```\n\n### How to spot it\nIf a calculation that should have a decimal comes out as a whole number, check whether you used `//` where you meant `/`.\n\n### Common beginner mistakes\n- Using `//` for an average or split and losing the fraction.\n- Confusing `%` (remainder) with division.\n- Expecting `/` to give a whole number when the division is exact — it still returns a decimal type (`6 / 3` is `2.0`).\n\n### You just learned…\n`/` keeps the decimal, `//` rounds down to a whole number, and `%` gives the remainder. Knowing which question each one answers is a small thing that prevents a lot of quietly wrong numbers.",
+    "videos": [
+      {
+        "title": "Python division: / vs // vs % for beginners",
+        "searchQuery": "python division floor division modulo slash beginner tutorial"
+      },
+      {
+        "title": "Integer vs float division in Python",
+        "searchQuery": "python integer float division remainder explained beginner"
+      }
+    ]
+  },
+  "estMinutes": 4,
+  "version": 1,
+  "conceptCard": "This mission is about **division** — and Python has two kinds.\n\n- `/` is true division and keeps the decimal: `7 / 2` is `3.5`.\n- `//` is floor division and drops the remainder: `7 // 2` is `3`.\n\nThe code splits a $7 bill between 2 people and should give `3.5`, but it uses the wrong slash. Pick the division that keeps the half.",
+  "lineNotes": [
+    {
+      "line": 4,
+      "noteMd": "Divides the bill by the number of people. It uses `//`, which is *floor* division — it rounds down and throws away the `.5`. That's the bug."
+    },
+    {
+      "line": 5,
+      "noteMd": "Prints each person's share — whatever line 4 worked out."
+    }
+  ],
+  "takeaway": "Use / for an exact answer; // rounds down and discards the remainder."
+}

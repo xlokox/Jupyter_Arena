@@ -30,6 +30,7 @@ export function AppShell({ challenges, initialChallengeId, initialChallenge }: A
   const view = useWorkspaceStore((s) => s.view);
   const sectorFilter = useWorkspaceStore((s) => s.sectorFilter);
   const difficultyFilter = useWorkspaceStore((s) => s.difficultyFilter);
+  const trackFilter = useWorkspaceStore((s) => s.trackFilter);
   const searchQuery = useWorkspaceStore((s) => s.searchQuery);
   const sidebarOpen = useWorkspaceStore((s) => s.sidebarOpen);
   const setSidebarOpen = useWorkspaceStore((s) => s.setSidebarOpen);
@@ -43,15 +44,22 @@ export function AppShell({ challenges, initialChallengeId, initialChallenge }: A
   const isAuthed = useAuthStore((s) => s.status === "signedIn");
 
   const active = challenges.find((c) => c.id === activeChallengeId) ?? null;
-  // First Data Analyst mission — the ungated on-ramp the empty state nudges toward.
-  const firstBeginnerId = challenges.find((c) => c.sector === "da")?.id ?? null;
+  // First ungated beginner mission the empty state nudges toward — Python
+  // Fundamentals (the true first step) if present, else Data Analyst.
+  const firstBeginnerId =
+    challenges.find((c) => c.sector === "py")?.id ??
+    challenges.find((c) => c.sector === "da")?.id ??
+    null;
 
   // Anonymous badge evaluation lives here (not the content-agnostic store):
   // AppShell holds the metadata badges need (sector/language/difficulty). For
   // authed users the server returns awards via submit_attempt, so we skip.
   useEffect(() => {
     if (isAuthed) return;
-    const sectorTotals = { da: 0, ml: 0, dl: 0, fullstack: 0, db: 0 } as Record<SectorId, number>;
+    const sectorTotals = { py: 0, da: 0, ml: 0, dl: 0, fullstack: 0, db: 0 } as Record<
+      SectorId,
+      number
+    >;
     const solved: SolvedFact[] = [];
     for (const c of challenges) {
       sectorTotals[c.sector] += 1;
@@ -92,13 +100,14 @@ export function AppShell({ challenges, initialChallengeId, initialChallenge }: A
     const visible = filterChallenges(challenges, {
       sector: sectorFilter,
       difficulty: difficultyFilter,
+      track: trackFilter,
       query: searchQuery,
     });
     if (visible.length === 0) return;
     const currentIndex = visible.findIndex((c) => c.id === activeChallengeId);
     const next = visible[(currentIndex + 1) % visible.length];
     if (next) openMission(next.id);
-  }, [challenges, sectorFilter, difficultyFilter, searchQuery, activeChallengeId, openMission]);
+  }, [challenges, sectorFilter, difficultyFilter, trackFilter, searchQuery, activeChallengeId, openMission]);
 
   // Keyboard support: 1/2/3 select an option, Enter runs, N advances,
   // Escape closes the mobile drawer. Inputs are never hijacked.

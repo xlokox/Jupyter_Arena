@@ -35,6 +35,11 @@ export function AuthProvider() {
       let account = await fetchAccountState();
 
       if (!account.merged) {
+        // On the standalone /login and /signup pages the workspace store was
+        // never rehydrated (no AppShell mounts there), so the anonymous attempts
+        // still sit only in localStorage. Rehydrate before collecting them, or
+        // the merge sees an empty store and the progress is lost on hydration.
+        await useWorkspaceStore.persist.rehydrate();
         const items = collectMergeItems(useWorkspaceStore.getState().attempts);
         if (items.length > 0) {
           try {

@@ -58,5 +58,17 @@
     ]
   },
   "estMinutes": 4,
-  "version": 1
+  "version": 1,
+  "conceptCard": "This mission is about **ordering and limiting** SQL results.\n\n- A `SELECT` returns rows in **no guaranteed order** unless you ask with `ORDER BY`.\n- `ORDER BY col DESC` sorts largest-first; `LIMIT n` keeps the first n rows.\n- 'Top 5' always needs both: sort, then cap.\n\nThe query returns every customer in no useful order. Add the ordering and the limit.",
+  "lineNotes": [
+    {
+      "line": 2,
+      "noteMd": "Selects the columns to show. On its own this returns *all* rows in whatever order the database finds convenient."
+    },
+    {
+      "line": 3,
+      "noteMd": "`FROM customers` is the table. There's no `ORDER BY` or `LIMIT`, so you get everyone, unsorted — no 'top 5'."
+    }
+  ],
+  "takeaway": "'Top N' needs ORDER BY col DESC then LIMIT N — a SELECT has no inherent row order."
 }

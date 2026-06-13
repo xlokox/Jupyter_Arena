@@ -1,0 +1,82 @@
+{
+  "id": "py-025-late-binding-closure",
+  "sector": "py",
+  "difficulty": "hard",
+  "title": "25_button_handlers.ipynb",
+  "language": "python",
+  "icon": "git-branch",
+  "conceptTags": ["closures", "lambdas", "late-binding"],
+  "descriptionMd": "## Mission: Wire Three Buttons\n\nYou're building three button handlers. Each one should announce which button it is — `\"Button 0\"`, `\"Button 1\"`, `\"Button 2\"`. You wrote a one-line comprehension to build them all, then called each in turn. They all announce **`Button 2`**.\n\nThis is one of Python's loudest gotchas: lambdas in a loop **close over the variable**, not its current value. By the time you call them, the loop is done and `i` is `2` — so every lambda reads `2`. Fix it by binding `i` at the moment the lambda is created.",
+  "initialCode": "handlers = [lambda: f\"Button {i}\" for i in range(3)]\nprint(f\"built {len(handlers)} handlers — calling each:\")\n\nfor h in handlers:\n    print(h())",
+  "buggyLineStart": 1,
+  "buggyLineEnd": 1,
+  "traceback": "built 3 handlers — calling each:\nButton 2\nButton 2\nButton 2",
+  "correctOutput": "built 3 handlers — calling each:\nButton 0\nButton 1\nButton 2",
+  "options": [
+    {
+      "key": "a",
+      "label": "Bind `i` as a default argument: `lambda i=i: f\"Button {i}\"`",
+      "patchCode": "handlers = [lambda i=i: f\"Button {i}\" for i in range(3)]\nprint(f\"built {len(handlers)} handlers — calling each:\")\n\nfor h in handlers:\n    print(h())",
+      "isCorrect": true,
+      "resultLog": "built 3 handlers — calling each:\nButton 0\nButton 1\nButton 2",
+      "rationale": "Default-argument values are evaluated at **definition time** — exactly the moment we want to snapshot. `lambda i=i: ...` makes each lambda's parameter `i` default to whatever `i` was when that particular lambda was created. Now the value is frozen into the function itself; the outer `i` can go anywhere it likes afterwards. This is the idiomatic Python fix and one of the few times mutable-default discipline is *exactly* what you want."
+    },
+    {
+      "key": "b",
+      "label": "Use a list comprehension that pre-evaluates the string",
+      "patchCode": "handlers = [f\"Button {i}\" for i in range(3)]\nprint(f\"built {len(handlers)} handlers — calling each:\")\n\nfor h in handlers:\n    print(h)",
+      "isCorrect": false,
+      "resultLog": "built 3 handlers — calling each:\nButton 0\nButton 1\nButton 2",
+      "rationale": "This builds **three strings**, not three callables. The exercise is about how closures capture — the API the caller expects (`h()`) no longer exists. In real code (Tkinter callbacks, request routes, deferred work) the buttons need to be functions; turning them into plain strings papers over the lesson and breaks the contract."
+    },
+    {
+      "key": "c",
+      "label": "Wrap in a helper function but still close over `i`",
+      "patchCode": "def make_handler():\n    return lambda: f\"Button {i}\"\n\nhandlers = [make_handler() for i in range(3)]\nprint(f\"built {len(handlers)} handlers — calling each:\")\n\nfor h in handlers:\n    print(h())",
+      "isCorrect": false,
+      "resultLog": "built 3 handlers — calling each:\nButton 2\nButton 2\nButton 2",
+      "rationale": "Same bug, one level deeper. The lambda still closes over the same outer `i` (the comprehension's loop variable), so by the time you call any of them `i` is `2`. The fix is to **capture the current value** — either via a default argument or by passing it as an argument to the wrapper: `def make_handler(i): return lambda: f\"Button {i}\"` and then `make_handler(i)`."
+    }
+  ],
+  "hints": [
+    "Add `print(h.__closure__[0].cell_contents)` inside the loop. All three print `2` — they share one cell.",
+    "Snapshot the value by giving the lambda a default argument: `lambda i=i: f\"Button {i}\"`. The default is captured when the lambda is created."
+  ],
+  "explanationMd": "### Why the bug occurs\nA lambda (or any nested function) doesn't snapshot the variables it uses. It keeps a **reference** to the enclosing scope. When you write\n```python\n[lambda: i for i in range(3)]\n```\nthe three lambdas all close over the *same* `i` — the loop variable in the comprehension's scope. By the time you call any of them, the comprehension has finished and `i` is sitting at its final value (`2`). All three lambdas look at that same `i` and return the same thing. This behaviour is called **late binding** — the value is resolved when the lambda runs, not when it was written.\n\n### Why the fix is correct\n`lambda i=i: f\"Button {i}\"` adds a **default argument** also called `i`. Default arguments are evaluated and stored at the time the `def` (or `lambda`) is created — exactly the snapshot we want. The lambda's `i` (its parameter) shadows the outer `i` (the loop variable), so when the lambda runs it reads its own frozen value, not the long-since-changed enclosing one.\n\nThis is one of the rare cases where the mutable-default-argument trap from `py-019` *helps* — the same evaluate-once semantics that ruined `def f(items=[])` is exactly the snapshotting behaviour we want for `lambda i=i: ...`.\n\nThe other clean way to fix this is to pass the value through a function call (the lesson from option C done right):\n```python\ndef make_handler(value):\n    return lambda: f\"Button {value}\"\n\nhandlers = [make_handler(i) for i in range(3)]\n```\nBecause `value` is a parameter of `make_handler`, each call gets its own `value` binding, and the lambda closes over *that* — three different cells, three different captures.",
+  "recruiterReview": "Strong — you identified late binding correctly and reached for the canonical fix. This bug is one of the most-Googled Python questions because it appears in every framework that uses callbacks: Tkinter button handlers, Flask route decorators applied in a loop, deferred work in a thread pool. Two things to file: the `i=i` default-argument fix has the smell of being clever; in a real codebase, a small `make_handler(i)` factory often reads better and survives later refactors. And: this is one of the gotchas that pushed JavaScript to add `let` and Python's grammar to introduce expression-scoped iteration variables in comprehensions — both languages spent years cleaning this up. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Closures and Late Binding\n\nThis is the bug that taught a generation of Python and JavaScript developers what \"closure\" actually means. Working through it once builds correct intuition for life.\n\n### What is a closure?\nA function that uses a name from an enclosing scope keeps that scope alive. The function and the captured variables together are called a **closure**.\n```python\ndef make_counter():\n    count = 0\n    def inc():\n        nonlocal count\n        count += 1\n        return count\n    return inc\n\nc = make_counter()\nc(); c(); c()  # 1, 2, 3\n```\nEach call to `make_counter` builds a fresh `count`, and the returned `inc` closes over it. Different calls → different closures → different state.\n\n### What is **late** binding?\nA closure refers to the enclosing **variable**, not its current **value**. Python resolves the name only when the inner function actually runs.\n```python\nx = 1\ndef f():\n    return x\nx = 99\nprint(f())  # 99 — f looked up x when called, not when defined\n```\n\n### The loop trap\n```python\nfuncs = [lambda: i for i in range(3)]\n[f() for f in funcs]   # [2, 2, 2]\n```\nAll three lambdas close over the *same* loop variable. By the time you call them, the loop is done and `i` holds its final value.\n\n### Two correct fixes\n#### 1) Default-argument snapshot\n```python\nfuncs = [lambda i=i: i for i in range(3)]\n[f() for f in funcs]   # [0, 1, 2]\n```\nThe default is evaluated **at definition** — exactly when we want to snapshot.\n\n#### 2) Capture via a function call\n```python\ndef make(i):\n    return lambda: i\n\nfuncs = [make(i) for i in range(3)]\n[f() for f in funcs]   # [0, 1, 2]\n```\n`make` has its own `i` (a parameter), so each call gets its own binding, and the lambda closes over that. Often the cleanest in production code because the intent is named.\n\n### Where this bug actually shows up\n- **Tkinter / wxPython buttons in a loop:** `Button(root, command=lambda: on_click(i))`. Without the `i=i` snapshot or the factory, every button thinks it's the last one.\n- **Flask routes registered programmatically:** every route ends up serving the last entry.\n- **`asyncio` tasks scheduled in a loop:** all share the loop variable; common cause of \"only the last task ran with the right data.\"\n\n### What about regular `for` loops?\nSame trap, same fixes:\n```python\nfuncs = []\nfor i in range(3):\n    funcs.append(lambda: i)\nprint([f() for f in funcs])  # [2, 2, 2]\n```\nThe `for` loop variable lives in the enclosing scope, and the lambda closes over it. Apply `i=i` or a factory.\n\n### Comprehensions have their own scope (since Python 3) — but not for *closures*\nThe loop variable in a list/dict/set comprehension is scoped to the comprehension, but the lambdas you build inside still keep a reference to that same loop variable. The scope rule helps with leaking the name into the surrounding code; it does not save you from the closure trap.\n\n### Common beginner mistakes\n- `lambda: i` inside any loop with no snapshot.\n- Reaching for `functools.partial(lambda i: ..., i)` — works, but the closer-to-home `i=i` is shorter.\n- Believing `nonlocal i` will help — it won't; it makes the binding *more* shared, not less.\n\n### You just learned…\nClosures hold **references**, not values. The fix is to bind a fresh copy at definition time — `lambda i=i: ...` or a `def make(i): return lambda: ...` factory. This pattern shows up everywhere callbacks are built in a loop.",
+    "videos": [
+      {
+        "title": "Python closures and late binding explained",
+        "searchQuery": "python closure late binding loop lambda tutorial"
+      },
+      {
+        "title": "The lambda-in-a-for-loop trap",
+        "searchQuery": "python lambda for loop closure trap fix beginner"
+      }
+    ]
+  },
+  "estMinutes": 9,
+  "version": 1,
+  "conceptCard": "This mission is about **late-binding closures**.\n\n- A lambda inside a loop closes over the **variable**, not its current value.\n- By the time you call the lambdas, the loop is done — they all read the final value.\n- Snapshot with a default argument: `lambda i=i: ...`, or build via a factory function.\n\nThe code builds three lambdas in a comprehension; all three read the final `i = 2`. Add `i=i` to the lambda.",
+  "lineNotes": [
+    {
+      "line": 1,
+      "noteMd": "**The bug.** `lambda: f\"Button {i}\"` closes over the loop variable `i`, not its current value. After the comprehension, all three lambdas read `i = 2`. Use `lambda i=i: f\"Button {i}\"` to snapshot."
+    },
+    {
+      "line": 2,
+      "noteMd": "Quick sanity print so the loop's output has context."
+    },
+    {
+      "line": 4,
+      "noteMd": "Walks the three lambdas..."
+    },
+    {
+      "line": 5,
+      "noteMd": "...and calls each. Buggy version: prints `Button 2` three times. Fixed: prints `Button 0`, `Button 1`, `Button 2`."
+    }
+  ],
+  "takeaway": "Lambdas in a loop close over the variable — snapshot the value with lambda x=x: ..."
+}

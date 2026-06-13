@@ -58,5 +58,17 @@
     ]
   },
   "estMinutes": 4,
-  "version": 1
+  "version": 1,
+  "conceptCard": "This mission is about **grouping and summarizing** with `groupby`.\n\n- `groupby` works in two steps: **split** the rows into groups, then **apply** a summary.\n- `df.groupby(\"region\")[\"sales\"]` only does the split — it returns a grouping handle, not numbers.\n- Add an aggregation like `.mean()` or `.sum()` to collapse each group to one value.\n\nThe code groups but never summarizes. Add the missing step.",
+  "lineNotes": [
+    {
+      "line": 6,
+      "noteMd": "Splits the sales into one group per region — but stops there, returning a *GroupBy handle*, not numbers. You still have to say how to combine each group (e.g. `.mean()`)."
+    },
+    {
+      "line": 7,
+      "noteMd": "Prints the grouping. Because no aggregation was applied, this shows a `GroupBy object`, not per-region averages."
+    }
+  ],
+  "takeaway": "groupby splits the data; chain an aggregation like .mean() to get one number per group."
 }

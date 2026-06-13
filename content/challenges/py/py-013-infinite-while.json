@@ -1,0 +1,74 @@
+{
+  "id": "py-013-infinite-while",
+  "sector": "py",
+  "difficulty": "medium",
+  "title": "13_countdown.ipynb",
+  "language": "python",
+  "icon": "infinity",
+  "conceptTags": ["while-loops", "infinite-loop", "counters"],
+  "descriptionMd": "## Mission: Count Down From 3\n\nYou wrote a `while` loop to count down 3, 2, 1. Instead it prints `Count: 3` over and over and never stops — an infinite loop.\n\nA `while` loop keeps running as long as its condition stays true. Yours checks `count > 0`, but nothing inside the loop ever changes `count`, so the condition is true forever. Make `count` move toward 0 each pass so the loop can end.",
+  "initialCode": "# Count down from 3 to 1\ncount = 3\nwhile count > 0:\n    print(\"Count:\", count)",
+  "buggyLineStart": 3,
+  "buggyLineEnd": 4,
+  "traceback": "Count: 3\nCount: 3\nCount: 3\nCount: 3\n... (repeats forever — count never decreases, so count > 0 is always true)",
+  "correctOutput": "Count: 3\nCount: 2\nCount: 1",
+  "options": [
+    {
+      "key": "a",
+      "label": "Decrease count by 1 each pass, inside the loop",
+      "patchCode": "# Count down from 3 to 1\ncount = 3\nwhile count > 0:\n    print(\"Count:\", count)\n    count = count - 1",
+      "isCorrect": true,
+      "resultLog": "Count: 3\nCount: 2\nCount: 1",
+      "rationale": "A `while` loop repeats as long as its condition is true. Nothing was changing `count`, so `count > 0` stayed true forever. Adding `count = count - 1` inside the loop moves `count` toward 0 each pass — 3, 2, 1, then 0 makes the condition false and the loop ends. (`count -= 1` is the shorthand.)"
+    },
+    {
+      "key": "b",
+      "label": "Compute count minus 1 without storing it",
+      "patchCode": "# Count down from 3 to 1\ncount = 3\nwhile count > 0:\n    print(\"Count:\", count)\n    count - 1",
+      "isCorrect": false,
+      "resultLog": "Count: 3\nCount: 3\nCount: 3\n... (still repeats forever — the new value is never saved)",
+      "rationale": "`count - 1` calculates 2 but throws the result away — it never updates `count`, which is still 3. You have to store the new value back: `count = count - 1` (or `count -= 1`). Computing without assigning is a no-op."
+    },
+    {
+      "key": "c",
+      "label": "Decrease count after the loop",
+      "patchCode": "# Count down from 3 to 1\ncount = 3\nwhile count > 0:\n    print(\"Count:\", count)\ncount = count - 1",
+      "isCorrect": false,
+      "resultLog": "Count: 3\nCount: 3\nCount: 3\n... (still repeats forever — the update is outside the loop and never runs)",
+      "rationale": "The decrement is flush-left, so it's *after* the loop, not inside it. But the loop never ends, so that line never runs. The update has to be **indented into the loop body** so it executes on every pass."
+    }
+  ],
+  "hints": [
+    "The same line prints forever, which means the `while` condition `count > 0` never becomes false. What would have to change for it to eventually be false?",
+    "Inside the loop, reduce `count` each pass and store it back: `count = count - 1` (or `count -= 1`). Make sure it's indented to run every time."
+  ],
+  "explanationMd": "### Why the bug occurs\nA `while` loop runs its body repeatedly **as long as its condition is true**, re-checking the condition before each pass. The condition here is `count > 0`, but nothing in the loop ever changes `count`, so it stays 3 and the condition is true forever — an infinite loop that prints the same line endlessly.\n\n### Why the fix is correct\nAdding `count = count - 1` inside the loop makes `count` shrink each pass: 3 → 2 → 1 → 0. Once it reaches 0, `count > 0` is false and the loop stops, leaving the output 3, 2, 1. Two things were essential: you must **store** the new value back (`count = count - 1`, not just `count - 1`), and the update must be **inside** the loop body (indented) so it runs every pass. Every `while` loop needs something in its body that eventually makes the condition false.",
+  "recruiterReview": "Good — you identified the missing 'progress toward the exit' that every `while` loop needs, and you put the update in the right place with the assignment back. Infinite loops are a rite of passage; the mental checklist 'does something in the body move the condition toward false?' will save you from most of them. You also avoided the two classic traps (no assignment, and update outside the loop). Solid. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## while Loops and Avoiding Infinite Loops\n\nA `while` loop repeats *until a condition becomes false*. Its great power — and its classic danger — is that **you** are responsible for making the condition eventually fail.\n\n### How a while loop works\n```python\nwhile condition:\n    # body runs as long as condition is true\n```\nPython checks the condition; if true, it runs the body, then checks again — over and over. The loop ends the first time the condition is false.\n\n### The infinite-loop trap\nIf nothing in the body changes the condition, it stays true forever:\n```python\ncount = 3\nwhile count > 0:\n    print(count)        # prints 3 endlessly — count never changes\n```\nThe loop has no way to exit.\n\n### The fix: make progress toward the exit\nChange the value the condition depends on, each pass, *inside* the loop:\n```python\ncount = 3\nwhile count > 0:\n    print(count)\n    count = count - 1   # 3 → 2 → 1 → 0, then the loop stops\n```\nTwo musts:\n1. **Store** the new value: `count = count - 1` (the shorthand is `count -= 1`). Just writing `count - 1` computes and discards it.\n2. Keep the update **inside** the loop (indented), so it runs every pass.\n\n### A tiny worked example\n```python\nn = 1\nwhile n <= 3:\n    print(\"n is\", n)\n    n += 1\n```\nprints:\n```\nn is 1\nn is 2\nn is 3\n```\n\n### for vs while\nUse a `for` loop when you know how many times to repeat (counting, going through a list). Use a `while` loop when you repeat *until something changes* (until input is valid, until a value crosses a threshold).\n\n### How to spot it\nIf your program hangs and repeats the same output, you have an infinite loop — check that the body actually changes whatever the condition tests.\n\n### Common beginner mistakes\n- Forgetting to update the loop variable (infinite loop).\n- Writing `count - 1` without `count =` so nothing is stored.\n- Putting the update outside the loop body.\n\n### You just learned…\nA `while` loop repeats while its condition is true, so the body must **make progress toward making it false** — usually by updating and storing a counter each pass. Miss that and you get an infinite loop.",
+    "videos": [
+      {
+        "title": "Python while loops for beginners",
+        "searchQuery": "python while loop beginner tutorial counter"
+      },
+      {
+        "title": "How to avoid infinite loops in Python",
+        "searchQuery": "python infinite loop while fix counter increment beginner"
+      }
+    ]
+  },
+  "estMinutes": 5,
+  "version": 1,
+  "conceptCard": "This mission is about **while loops**.\n\n- A `while` loop repeats its body **as long as a condition is true**.\n- *You* are responsible for eventually making the condition false — usually by changing a counter inside the loop.\n- If nothing changes, it runs forever (an infinite loop).\n\nThe code counts down but never changes the counter. Make it move toward the exit.",
+  "lineNotes": [
+    {
+      "line": 3,
+      "noteMd": "The loop keeps running while `count > 0` is true. Something inside must eventually make this false, or it never stops."
+    },
+    {
+      "line": 4,
+      "noteMd": "Prints `count` every pass — but nothing here changes `count`, so it stays 3 forever. You need to decrease it each time and store the new value."
+    }
+  ],
+  "takeaway": "A while loop's body must make progress toward its condition becoming false, or it never ends."
+}

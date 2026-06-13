@@ -41,7 +41,9 @@ export function HowItWorks() {
               <div className="flex size-10 items-center justify-center rounded-md bg-accent/10 text-accent">
                 <step.icon className="size-5" aria-hidden />
               </div>
-              <span className="font-mono text-3xl font-bold text-border">{step.number}</span>
+              <span aria-hidden className="font-mono text-3xl font-bold text-muted">
+                {step.number}
+              </span>
             </div>
             <h3 className="font-semibold text-text">{step.title}</h3>
             <p className="text-sm leading-relaxed text-muted">{step.body}</p>
