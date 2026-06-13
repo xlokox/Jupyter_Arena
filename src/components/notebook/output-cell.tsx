@@ -64,11 +64,14 @@ export function OutputCell({ challenge, attempt }: OutputCellProps) {
           </pre>
         </div>
       </div>
-      {postFigureSvg && challenge.figureCaption && (
+      {postFigureSvg && (
         <div className="sm:ms-[76px]">
+          {/* The post-fix figure gets the generic "your fix renders the corrected
+              chart" caption — the challenge's `figureCaption` describes the
+              broken pre-solve plot, which would read wrong here. */}
           <FigurePanel
             svg={postFigureSvg}
-            caption={challenge.figureCaption}
+            caption={en.workspace.figureAfterFix}
             variant="after"
           />
         </div>

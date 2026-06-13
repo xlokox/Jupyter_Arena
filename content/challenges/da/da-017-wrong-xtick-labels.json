@@ -1,0 +1,89 @@
+{
+  "id": "da-017-wrong-xtick-labels",
+  "sector": "da",
+  "difficulty": "easy",
+  "title": "17_top_products.ipynb",
+  "language": "python",
+  "icon": "bar-chart-3",
+  "conceptTags": [
+    "matplotlib",
+    "xticks",
+    "labels"
+  ],
+  "descriptionMd": "## Mission: Label the Bars\n\nYour chart of `top 5 products by units sold` came out with the right *shape* — five bars, descending heights — but the x-axis labels are `0, 1, 2, 3, 4`. The values are right; the labels are wrong. Your boss can't tell which bar is `mug` and which is `bag`.\n\nThe trap: `ax.bar(products, sales)` would label automatically, but you wrote `ax.bar(range(len(sales)), sales)` and forgot to tell the axis what to call those numeric positions. Use the right `bar()` arguments — or set the ticks afterwards.",
+  "initialCode": "import matplotlib.pyplot as plt\n\nproducts = [\"mug\", \"tee\", \"pen\", \"cap\", \"bag\"]\nsales    = [320, 280, 240, 200, 160]\n\nfig, ax = plt.subplots(figsize=(7, 4))\nax.bar(range(len(sales)), sales, color=\"#E8B65A\")\nax.set_title(\"top_products_q2.png\")\nax.set_xlabel(\"product\")\nax.set_ylabel(\"units sold\")\nplt.show()",
+  "buggyLineStart": 7,
+  "buggyLineEnd": 7,
+  "traceback": "<Figure size 700x400 with 1 Axes>\n# x-axis labels are 0, 1, 2, 3, 4 — should be mug, tee, pen, cap, bag",
+  "correctOutput": "<Figure size 700x400 with 1 Axes>\n# bars labelled mug, tee, pen, cap, bag below the right heights",
+  "options": [
+    {
+      "key": "a",
+      "label": "Pass the names to `bar()` directly: `ax.bar(products, sales, …)`",
+      "patchCode": "import matplotlib.pyplot as plt\n\nproducts = [\"mug\", \"tee\", \"pen\", \"cap\", \"bag\"]\nsales    = [320, 280, 240, 200, 160]\n\nfig, ax = plt.subplots(figsize=(7, 4))\nax.bar(products, sales, color=\"#7CD992\")\nax.set_title(\"top_products_q2.png\")\nax.set_xlabel(\"product\")\nax.set_ylabel(\"units sold\")\nplt.show()",
+      "isCorrect": true,
+      "resultLog": "<Figure size 700x400 with 1 Axes>\n# bars labelled mug, tee, pen, cap, bag — heights unchanged",
+      "rationale": "When `bar()`'s first argument is a list of strings, matplotlib uses them as **categorical** x-positions: one bar per name, name printed below. No manual tick-setting needed. This is the cleanest fix and reads exactly like the code's intent.",
+      "resultFigureSvg": "<svg viewBox=\"0 0 700 400\" xmlns=\"http://www.w3.org/2000/svg\" preserveAspectRatio=\"xMidYMid meet\" width=\"100%\" height=\"auto\"><rect x=\"0\" y=\"0\" width=\"700\" height=\"400\" fill=\"var(--code-bg, #11161D)\" rx=\"6\"/><text x=\"64\" y=\"22\" fill=\"var(--text, #E6E8EC)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"13\" font-weight=\"600\">top_products_q2.png</text><line x1=\"64\" y1=\"36\" x2=\"64\" y2=\"344\" stroke=\"var(--muted, #8B9099)\" stroke-width=\"1\"/><line x1=\"64\" y1=\"344\" x2=\"676\" y2=\"344\" stroke=\"var(--muted, #8B9099)\" stroke-width=\"1\"/><rect x=\"73.2\" y=\"64.0\" width=\"85.7\" height=\"280.0\" fill=\"#7CD992\" opacity=\"0.85\"/><text x=\"116.0\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">mug</text><rect x=\"195.6\" y=\"99.0\" width=\"85.7\" height=\"245.0\" fill=\"#7CD992\" opacity=\"0.85\"/><text x=\"238.4\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">tee</text><rect x=\"318.0\" y=\"134.0\" width=\"85.7\" height=\"210.0\" fill=\"#7CD992\" opacity=\"0.85\"/><text x=\"360.8\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">pen</text><rect x=\"440.4\" y=\"169.0\" width=\"85.7\" height=\"175.0\" fill=\"#7CD992\" opacity=\"0.85\"/><text x=\"483.2\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">cap</text><rect x=\"562.8\" y=\"204.0\" width=\"85.7\" height=\"140.0\" fill=\"#7CD992\" opacity=\"0.85\"/><text x=\"605.6\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">bag</text><text x=\"56\" y=\"347\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">0</text><text x=\"56\" y=\"285.4\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">70</text><text x=\"56\" y=\"223.8\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">141</text><text x=\"56\" y=\"162.19999999999996\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">211</text><text x=\"56\" y=\"100.6\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">282</text><text x=\"56\" y=\"39\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">352</text><text x=\"370\" y=\"386\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"11\" text-anchor=\"middle\">product</text><text transform=\"translate(20, 190) rotate(-90)\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"11\" text-anchor=\"middle\">units sold</text></svg>"
+    },
+    {
+      "key": "b",
+      "label": "Set the labels manually with `ax.set_xticklabels(products)`",
+      "patchCode": "import matplotlib.pyplot as plt\n\nproducts = [\"mug\", \"tee\", \"pen\", \"cap\", \"bag\"]\nsales    = [320, 280, 240, 200, 160]\n\nfig, ax = plt.subplots(figsize=(7, 4))\nax.bar(range(len(sales)), sales, color=\"#E8B65A\")\nax.set_xticklabels(products)\nax.set_title(\"top_products_q2.png\")\nax.set_xlabel(\"product\")\nax.set_ylabel(\"units sold\")\nplt.show()",
+      "isCorrect": false,
+      "resultLog": "UserWarning: FixedFormatter should only be used together with FixedLocator\n<Figure size 700x400 with 1 Axes>\n# labels render but matplotlib warns the ticks weren't fixed first",
+      "rationale": "Works visually but raises the noisy `FixedFormatter should only be used together with FixedLocator` warning, because you set labels without setting the underlying tick positions. The correct two-line form is `ax.set_xticks(range(len(products))); ax.set_xticklabels(products)`. Letting `bar()` handle both is shorter and warning-free."
+    },
+    {
+      "key": "c",
+      "label": "Rotate the existing numeric labels so they're easier to read",
+      "patchCode": "import matplotlib.pyplot as plt\n\nproducts = [\"mug\", \"tee\", \"pen\", \"cap\", \"bag\"]\nsales    = [320, 280, 240, 200, 160]\n\nfig, ax = plt.subplots(figsize=(7, 4))\nax.bar(range(len(sales)), sales, color=\"#E8B65A\")\nax.set_title(\"top_products_q2.png\")\nax.set_xlabel(\"product\")\nax.set_ylabel(\"units sold\")\nax.tick_params(axis=\"x\", rotation=45)\nplt.show()",
+      "isCorrect": false,
+      "resultLog": "<Figure size 700x400 with 1 Axes>\n# numbers 0..4 tilted 45° — still numbers, still useless",
+      "rationale": "Rotates `0..4` to be more readable — but they're still `0..4`. The audience needs **what each bar is**, not a prettier presentation of placeholder numbers. The fix is to label them at all; pass the names to `bar()`."
+    }
+  ],
+  "hints": [
+    "Look at `bar()`'s first argument. You wrote `range(len(sales))` — numeric positions. matplotlib will label whatever you hand it.",
+    "Pass `products` as the first argument: `ax.bar(products, sales, ...)`. matplotlib uses strings as categorical tick labels automatically."
+  ],
+  "explanationMd": "### Why the bug occurs\n`ax.bar(x, heights)` lays out one bar per `x` value. If `x` is numeric, the x-axis shows numbers; if `x` is a list of strings, matplotlib treats them as **categorical** and uses each string as the bar's tick label. The code passed `range(len(sales))`, which is `[0, 1, 2, 3, 4]` — so the axis honestly shows `0, 1, 2, 3, 4`. Nothing wrong with the heights; the labels just describe the positions you actually used.\n\n### Why the fix is correct\nPassing `products` as the first argument tells matplotlib \"there are five categories named `mug`, `tee`, `pen`, `cap`, `bag`,\" and it draws one bar per category with the name underneath. No manual tick-setting, no warning, one line shorter. The general rule: **let `bar()` see the names you want to show.** Reach for manual `set_xticks` / `set_xticklabels` only when the positions and labels truly differ (e.g. logarithmic ticks with custom labels).",
+  "recruiterReview": "Good — you saw that the bars were right and only the labels were wrong, then reached for the simplest correct fix (pass categories to `bar()`). The warning-emitting `set_xticklabels`-without-`set_xticks` mistake is one of matplotlib's most-Googled errors — knowing why it complains will save you when you do need manual tick control. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Labelling Bars\n\nGetting the x-axis labels right is one of the smallest matplotlib skills that separates a notebook draft from something a stakeholder can read.\n\n### The categorical shortcut\nIf the first argument to `bar()` is a list of strings, matplotlib treats them as categories and labels each bar with the corresponding string:\n```python\nax.bar([\"mug\", \"tee\", \"pen\"], [320, 280, 240])\n```\nThree bars, labelled `mug`, `tee`, `pen`. No further work needed.\n\n### The manual route — and why it's longer than it looks\nIf you pass numeric positions, the axis labels them with those numbers:\n```python\nax.bar([0, 1, 2], [320, 280, 240])  # x-axis: 0, 1, 2\n```\nTo override, you need to set **both** the tick positions and the labels:\n```python\npositions = [0, 1, 2]\nlabels    = [\"mug\", \"tee\", \"pen\"]\nax.bar(positions, [320, 280, 240])\nax.set_xticks(positions)        # fix the tick positions\nax.set_xticklabels(labels)      # then attach labels\n```\nDoing only `set_xticklabels` triggers matplotlib's `FixedFormatter should only be used together with FixedLocator` warning — it's reminding you that you set labels without committing to where the ticks live.\n\n### When to use manual ticks\nThe categorical shortcut is right 95% of the time. Manual ticks are for:\n- **Custom positions** — e.g. log-scale ticks at `[1, 10, 100]`.\n- **Different label set than data** — e.g. plotting numeric `month_index` (`0..11`) and labelling with month abbreviations.\n- **Long labels** that need rotation:\n  ```python\n  ax.tick_params(axis=\"x\", rotation=45)\n  ```\n\n### Rotation, alignment, and overlap\nWhen labels are long and overlap, three knobs help:\n```python\nax.tick_params(axis=\"x\", rotation=45)\nplt.setp(ax.get_xticklabels(), ha=\"right\")  # right-align after rotation\nfig.tight_layout()                          # let matplotlib expand for the labels\n```\nWithout `tight_layout` rotated labels can be clipped at the bottom.\n\n### Multiple bars per category (grouped bars)\nWhen you have two series per category, you draw two `bar` calls with shifted x-positions:\n```python\nimport numpy as np\nproducts = [\"mug\", \"tee\", \"pen\"]\nx = np.arange(len(products))\nax.bar(x - 0.2, q1, width=0.4, label=\"Q1\")\nax.bar(x + 0.2, q2, width=0.4, label=\"Q2\")\nax.set_xticks(x)\nax.set_xticklabels(products)\nax.legend()\n```\nNumeric `x` is unavoidable here — but you set both ticks and labels.\n\n### Common beginner mistakes\n- `ax.bar(range(len(items)), values)` and being surprised by `0..N` labels.\n- `set_xticklabels(...)` without `set_xticks(...)` and getting the formatter warning.\n- Rotated labels falling off the figure — forgot `tight_layout`.\n\n### You just learned…\nLet `bar()` see the categories you want to display — pass them as the first argument. Manual tick control is for cases where positions and labels truly differ. When you do go manual, set both `set_xticks` and `set_xticklabels` together.",
+    "videos": [
+      {
+        "title": "Bar chart labels in matplotlib for beginners",
+        "searchQuery": "matplotlib bar chart x axis labels categorical tutorial"
+      },
+      {
+        "title": "set_xticks vs set_xticklabels explained",
+        "searchQuery": "matplotlib xticks xticklabels FixedFormatter warning"
+      }
+    ]
+  },
+  "estMinutes": 5,
+  "version": 1,
+  "conceptCard": "This mission is about **how matplotlib decides x-axis labels**.\n\n- Pass strings as the first arg to `bar()` → matplotlib labels each bar with the string.\n- Pass numbers → matplotlib labels with those numbers.\n- `set_xticklabels` alone warns; you need `set_xticks` too.\n\nThe code passes `range(len(sales))` so the bars are at `0..4` and the labels show `0..4`. Pass `products` instead.",
+  "lineNotes": [
+    {
+      "line": 3,
+      "noteMd": "The category names — these are the labels we want on the x-axis."
+    },
+    {
+      "line": 4,
+      "noteMd": "The bar heights — these line up with `products` by position."
+    },
+    {
+      "line": 7,
+      "noteMd": "**The bug.** `range(len(sales))` is `[0, 1, 2, 3, 4]` — numeric positions. Replace with `products` so matplotlib uses the names."
+    },
+    {
+      "line": 9,
+      "noteMd": "`set_xlabel` is the **axis title** below the ticks — not the per-bar labels. Different thing."
+    }
+  ],
+  "takeaway": "Pass categories (strings) to bar() — matplotlib labels each bar with the string for free.",
+  "figureSvg": "<svg viewBox=\"0 0 700 400\" xmlns=\"http://www.w3.org/2000/svg\" preserveAspectRatio=\"xMidYMid meet\" width=\"100%\" height=\"auto\"><rect x=\"0\" y=\"0\" width=\"700\" height=\"400\" fill=\"var(--code-bg, #11161D)\" rx=\"6\"/><text x=\"64\" y=\"22\" fill=\"var(--text, #E6E8EC)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"13\" font-weight=\"600\">top_products_q2.png</text><line x1=\"64\" y1=\"36\" x2=\"64\" y2=\"344\" stroke=\"var(--muted, #8B9099)\" stroke-width=\"1\"/><line x1=\"64\" y1=\"344\" x2=\"676\" y2=\"344\" stroke=\"var(--muted, #8B9099)\" stroke-width=\"1\"/><rect x=\"73.2\" y=\"64.0\" width=\"85.7\" height=\"280.0\" fill=\"#E8B65A\" opacity=\"0.85\"/><text x=\"116.0\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">0</text><rect x=\"195.6\" y=\"99.0\" width=\"85.7\" height=\"245.0\" fill=\"#E8B65A\" opacity=\"0.85\"/><text x=\"238.4\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">1</text><rect x=\"318.0\" y=\"134.0\" width=\"85.7\" height=\"210.0\" fill=\"#E8B65A\" opacity=\"0.85\"/><text x=\"360.8\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">2</text><rect x=\"440.4\" y=\"169.0\" width=\"85.7\" height=\"175.0\" fill=\"#E8B65A\" opacity=\"0.85\"/><text x=\"483.2\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">3</text><rect x=\"562.8\" y=\"204.0\" width=\"85.7\" height=\"140.0\" fill=\"#E8B65A\" opacity=\"0.85\"/><text x=\"605.6\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">4</text><text x=\"56\" y=\"347\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">0</text><text x=\"56\" y=\"285.4\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">70</text><text x=\"56\" y=\"223.8\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">141</text><text x=\"56\" y=\"162.19999999999996\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">211</text><text x=\"56\" y=\"100.6\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">282</text><text x=\"56\" y=\"39\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">352</text><text x=\"370\" y=\"386\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"11\" text-anchor=\"middle\">(x-axis labels missing — got 0..N)</text><text transform=\"translate(20, 190) rotate(-90)\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"11\" text-anchor=\"middle\">units sold</text></svg>",
+  "figureCaption": "Before — the bars are right but x-ticks say 0..4 instead of the category names."
+}
