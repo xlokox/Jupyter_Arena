@@ -1,0 +1,84 @@
+{
+  "id": "da-040-correlation-causation",
+  "sector": "da",
+  "difficulty": "easy",
+  "title": "40_users_who_save_more.ipynb",
+  "language": "python",
+  "icon": "scale",
+  "conceptTags": [
+    "correlation",
+    "causation",
+    "selection-bias",
+    "reasoning"
+  ],
+  "descriptionMd": "## Mission: 'Users Who Use the Feature Retain Better'\n\nA growth PM shares a finding: *'Users who use the save-to-cart button retain at 2.4× the rate of users who don't. We should make it the homepage hero — get everyone to use it.'*\n\nThe number is real. The correlation is real. The recommendation is **not what the data shows**. There are at least two alternative explanations that would produce exactly the same observed pattern with the feature having zero causal effect on retention. Pick the response that names the gap honestly — and the experiment that would close it.",
+  "initialCode": "# Scenario: a finding from product analytics.\n# > Users who use the save-to-cart button retain at 2.4× the rate of\n# > users who don't.\n# > Recommendation: 'make the button the homepage hero, force adoption.'\n#\n# What's the most defensible response?",
+  "buggyLineStart": 1,
+  "buggyLineEnd": 1,
+  "traceback": "Junior analyst's draft: '2.4× retention — huge lift. We should ship the hero treatment to drive adoption.'",
+  "correctOutput": "Senior analyst's verdict: 'The 2.4× is correlation between two outcomes (engagement + retention) — could be selection bias (engaged users were going to retain anyway) or confounding (both are caused by something upstream). Need an A/B test on *exposure*, not usage.'",
+  "options": [
+    {
+      "key": "a",
+      "label": "Push back: the comparison is observational. Recommend an A/B test on exposure to the feature.",
+      "patchCode": "# Scenario: a finding from product analytics.\n# > Users who use the save-to-cart button retain at 2.4× the rate of\n# > users who don't.\n# > Recommendation: 'make the button the homepage hero, force adoption.'\n#\n# What's the most defensible response?",
+      "isCorrect": true,
+      "resultLog": "Acting on this reading: the team runs a randomized test (half see the prominent button, half don't), measures retention lift on the *exposed* group — not the users who self-selected to engage.",
+      "rationale": "This is **selection bias dressed as a feature win**. Users who *choose* to use any engagement feature were probably going to be more retentive *anyway* — the kind of user who clicks save-to-cart is also the kind of user who comes back. The 2.4× compares two groups that differ in many ways besides feature use, so the gap conflates the feature's effect with the type of user. An A/B test on *exposure* (does showing the button cause retention lift?) is the only way to isolate the feature's contribution from the user's pre-existing propensity to retain."
+    },
+    {
+      "key": "b",
+      "label": "Ship the hero treatment — 2.4× retention is huge.",
+      "patchCode": "# Scenario: a finding from product analytics.\n# > Users who use the save-to-cart button retain at 2.4× the rate of\n# > users who don't.\n# > Recommendation: 'make the button the homepage hero, force adoption.'\n#\n# What's the most defensible response?",
+      "isCorrect": false,
+      "resultLog": "Acting on this reading: the team makes the button prominent for everyone, retention is flat the next month, the team can't explain why.",
+      "rationale": "**Acting on correlation as if it were causation.** The 2.4× is the gap between *self-selected engagers* and *self-selected non-engagers*. Making the button prominent doesn't turn non-engagers into engagers — it just shows the button to people who weren't going to use it. The 'lift' was never causally tied to the feature; it was a property of the kind of user who already used it. This is one of the most common, most expensive product mistakes."
+    },
+    {
+      "key": "c",
+      "label": "Build a propensity-score model to control for user-type and re-estimate.",
+      "patchCode": "# Scenario: a finding from product analytics.\n# > Users who use the save-to-cart button retain at 2.4× the rate of\n# > users who don't.\n# > Recommendation: 'make the button the homepage hero, force adoption.'\n#\n# What's the most defensible response?",
+      "isCorrect": false,
+      "resultLog": "Acting on this reading: 3 weeks of modeling work that *still* can't rule out unobserved confounders — the team has a fancier point estimate and no real answer.",
+      "rationale": "Better than naïvely shipping, but propensity scoring controls only for **observed** covariates. Unobserved differences between engagers and non-engagers (intent to purchase, account age, motivation level) still confound the estimate. It's a useful tool when randomization is genuinely impossible, but here a real randomized test is available — and a test gives you causal evidence directly without trying to model your way around the bias."
+    }
+  ],
+  "hints": [
+    "Who chose to use the feature? Were they random? If not, what kind of user were they before they ever saw the button?",
+    "Push for an experiment on *exposure*, not on *usage*. The treatment is showing the button, not clicking it."
+  ],
+  "explanationMd": "### Why this is the right reading\nThe 2.4× number isn't false — it's just answering a *different* question than the recommendation assumes. The number compares:\n- **Group A**: users who *chose* to use the save-to-cart button.\n- **Group B**: users who *chose* not to.\n\nThese groups differ in *many* ways besides feature use: engagement level, intent to purchase, account age, motivation. So the gap between them mixes (a) the feature's actual effect, (b) the user type difference, and (c) any unmeasured confounders. The recommendation acts as if the feature *caused* the gap; the data can't say that.\n\n### Why the other readings fail\n- **'Ship the hero treatment'** — making the button prominent shows it to users who *weren't* going to use it. Those users have the lower-retention type. Forcing them to see the button doesn't make them into the higher-retention type. The 2.4× evaporates because it was never about the button.\n- **'Build a propensity-score model'** is a real technique, but it controls only for **observed** covariates. The user attributes that predict 'will I use this feature?' are largely the ones that predict 'will I retain?' — and the most important ones are unobserved (intent, motivation). The model gives you a more confident-looking number, not a more honest one.\n\n### The general principle\n**Correlation ≠ causation, especially with self-selected groups.** If group membership is a *choice*, the choice itself is correlated with the outcome — and you can't disentangle one from the other observationally. The fix is randomization: assign exposure (not usage), measure outcomes, compare. When randomization is impossible, name the limit explicitly in the writeup — don't pretend a model fixes it.",
+  "recruiterReview": "Strong — you didn't get pulled in by the 2.4× headline. You recognised the comparison was observational, named the specific bias (selection / self-selection), and proposed the right fix (A/B on exposure). That's how senior analysts kill expensive product mistakes before they ship. One refinement: when proposing the experiment, also pre-register the metric and decision threshold (the lesson from da-039) so the post-test debate isn't 'did it work?' rephrased ten ways.",
+  "tutorial": {
+    "bodyMd": "## Correlation vs Causation — The Cheap Trap\n\nThis is the single most expensive reasoning failure in product analytics. It costs companies real money every quarter and undergirds a remarkable fraction of confidently-wrong launch decisions.\n\n### The shape of the trap\nYou observe two things move together:\n- Users who use feature X have higher retention.\n- Customers who answer the survey are more loyal.\n- Companies that adopt practice Y are more profitable.\n\nThe instinct is: *X causes the better outcome*. So push more X and you'll get more of the outcome.\n\nThe trap is that X and the outcome are *both* often caused by an upstream factor — engagement, motivation, capability, organizational health — and the correlation you see is a downstream symptom of *that*, not a causal effect of X.\n\n### Two specific failure modes\n#### 1) Selection bias\nThe group that chose to use the feature is **not random**. Engagers, by definition, are the type who engages. Their retention is high *because they're engagers*, not because the feature taught them to be. Showing the button to a non-engager doesn't make them into an engager.\n\nExamples:\n- 'Customers who call support have higher LTV.' → calling support is a sign of investment; investors stay.\n- 'Patients who adhere to medication recover better.' → people who can stick to a regimen are different from people who can't, in many ways besides the pills.\n- 'Employees who use the wellness app are happier.' → opting in is selection.\n\n#### 2) Confounding\nA third variable causes *both* the feature use and the outcome. Without controlling for it, the feature gets credit for the third variable's effect.\n\nExamples:\n- 'Cities with more ice cream sales have more drownings.' → both caused by summer.\n- 'Countries with more chocolate consumption have more Nobel laureates.' → both correlated with national wealth and education.\n\n### How to tell the difference\n#### Run a real experiment\nRandomly assign exposure (or treatment, or whatever the intervention is). Measure outcome. Compare. If the groups were truly random pre-assignment, the difference in outcome **is** the causal effect.\n- **A/B test**: the gold standard for product. Assign users to see-feature vs not-see-feature; measure retention.\n- **Stepped-wedge / staggered rollout**: when full simultaneous A/B isn't possible, roll out in waves and compare across waves.\n\n#### When you can't experiment\nWhen randomization is genuinely impossible (regulatory, ethical, infeasible), there are quasi-experimental designs:\n- **Difference-in-differences**: compare the *change* in treated vs untreated over a discontinuity.\n- **Regression discontinuity**: compare units just above vs just below a sharp cutoff.\n- **Instrumental variables**: find a 'natural lottery' that predicts treatment but not outcome directly.\n\nEach has its limits. **Be explicit about the limits** in the writeup. Don't pretend you've measured the causal effect when you haven't.\n\n### What *doesn't* fix it\n- **More data**: a million-row observational dataset is still observational. The bias doesn't average out.\n- **Statistical controls**: regression with covariates controls only for the covariates you observed. Unobserved confounders still bias the estimate.\n- **Propensity scoring**: better than naïve adjustment, but only addresses observed confounders — same limitation.\n- **Fancy models**: a deep network doesn't help. The bias is in the data, not the model.\n\n### A two-question litmus test\n1. **Did the groups choose their group?** If yes, you have selection bias. (Self-reported features, opt-in surveys, free trials.)\n2. **Is there a third variable that could plausibly cause both X and the outcome?** If yes, confounding is at play.\n\nIf either answer is yes, **state the limit and call for an experiment**, or label the analysis as 'descriptive, not causal.'\n\n### Common reasoning mistakes\n- 'They went together, so X caused Y.'\n- 'I controlled for everything I could think of, so it's causal.'\n- 'The effect is so big it must be real.' (Big effects are often big *biases*.)\n- 'A model would fix this.' (No.)\n\n### You just learned…\nObserved correlations between feature use and outcomes almost always **mix** the feature's effect with the user's pre-existing type. The only way to isolate the feature's *causal* contribution is randomization. When you can't randomize, name the limit; never let an observational correlation drive a confident causal recommendation.",
+    "videos": [
+      {
+        "title": "Correlation vs causation explained for analysts",
+        "searchQuery": "correlation does not imply causation analyst examples tutorial"
+      },
+      {
+        "title": "Why A/B tests matter for product decisions",
+        "searchQuery": "ab test causal product decisions selection bias tutorial"
+      }
+    ]
+  },
+  "estMinutes": 8,
+  "version": 1,
+  "conceptCard": "This mission is about **why observed correlations don't justify causal recommendations**.\n\n- Users who *chose* to use a feature differ from users who didn't in many ways — selection bias.\n- A third variable can cause both feature use *and* the outcome — confounding.\n- The fix is **randomization** (A/B on exposure), not a fancier model.\n\nThe 2.4× retention gap between users who use the feature and users who don't is correlation. Acting on it as causation costs real money.",
+  "lineNotes": [
+    {
+      "line": 2,
+      "noteMd": "The observed correlation — real but ambiguous."
+    },
+    {
+      "line": 4,
+      "noteMd": "The recommendation — assumes the correlation is causal. It might not be."
+    },
+    {
+      "line": 6,
+      "noteMd": "The reframe question: what does the data actually support?"
+    }
+  ],
+  "takeaway": "Correlation ≠ causation, especially when group membership was a choice — randomize to know.",
+  "track": "reasoning"
+}
