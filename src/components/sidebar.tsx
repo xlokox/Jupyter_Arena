@@ -124,8 +124,11 @@ function SidebarContent({ challenges }: { challenges: ChallengeMeta[] }) {
     sectorFilter !== "all"
       ? activeSectorSubSectors.filter((s) => subSectorsInScope.includes(s))
       : [];
+  // Show chip row whenever the active sector has any tagged content in scope.
+  // Even one tagged sub-sector is useful: [All, data-flow] lets the user opt in
+  // to the tagged subset and ignore the untagged remainder.
   const showSubSectorFilter =
-    sectorFilter !== "all" && activeSectorSubSectors.length >= 2 && subSectorChips.length >= 2;
+    sectorFilter !== "all" && activeSectorSubSectors.length >= 2 && subSectorChips.length >= 1;
 
   // Show the track chip row only when the *currently selected scope* contains
   // both tracks. If the user filters to a sector with only debugging missions,
