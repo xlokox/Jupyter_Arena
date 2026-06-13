@@ -11,6 +11,7 @@ import { CodeCell } from "./code-cell";
 import { OutputCell } from "./output-cell";
 import { ControlCell } from "./control-cell";
 import { SolvePanel } from "./solve-panel";
+import { FigurePanel } from "./figure-panel";
 import { useWorkspaceStore, getAttempt, type OptionKey } from "@/store/workspace";
 import { useAuthStore } from "@/store/auth";
 import { submitAttemptServer } from "@/lib/game/server-progress";
@@ -265,6 +266,14 @@ function LoadedNotebook({
       >
         <Markdown>{challenge.descriptionMd}</Markdown>
       </section>
+
+      {challenge.figureSvg && challenge.figureCaption && (
+        <FigurePanel
+          svg={challenge.figureSvg}
+          caption={challenge.figureCaption}
+          variant="before"
+        />
+      )}
 
       <CodeCell
         code={displayedCode}

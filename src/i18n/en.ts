@@ -184,6 +184,9 @@ export const en = {
     lineNotesHide: "Hide line notes",
     lineLabel: "Line",
     takeawayHeading: "Key takeaway",
+    figurePanelAria: "Figure shown for this mission",
+    figureBeforeFix: "Before — this is the broken chart your code produces",
+    figureAfterFix: "After — your fix renders the corrected chart",
   },
   landing: {
     navAria: "Main navigation",

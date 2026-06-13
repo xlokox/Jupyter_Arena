@@ -22,6 +22,23 @@ export const SectorSchema = z.object({
 
 export const SectorsFileSchema = z.array(SectorSchema).min(1);
 
+/**
+ * Inline SVG must start with `<svg`, end with `</svg>`, and carry none of the
+ * tokens a renderer-injected payload could weaponise. The renderer also gates
+ * on this (defense in depth) but the schema rejects bad content at the seed
+ * boundary so a broken figure can never round-trip into the DB.
+ */
+const SVG_DANGER_RE = /<script\b|javascript:|\son[a-z]+\s*=/i;
+const figureSvgField = z
+  .string()
+  .min(40)
+  .refine((s) => /^\s*<svg[\s>]/i.test(s) && /<\/svg>\s*$/i.test(s), {
+    message: "figureSvg must start with <svg and end with </svg>",
+  })
+  .refine((s) => !SVG_DANGER_RE.test(s), {
+    message: "figureSvg contains a banned token (<script, javascript:, or on*= handler)",
+  });
+
 export const ChallengeOptionSchema = z.object({
   key: z.enum(OPTION_KEYS),
   label: z.string(),
@@ -29,6 +46,8 @@ export const ChallengeOptionSchema = z.object({
   isCorrect: z.boolean(),
   resultLog: z.string().min(20),
   rationale: z.string().min(60),
+  /** Optional post-fix figure rendered in the output cell after a successful run. */
+  resultFigureSvg: figureSvgField.optional(),
 });
 
 export const ChallengeSchema = z.object({
@@ -63,6 +82,12 @@ export const ChallengeSchema = z.object({
     .array(z.object({ line: z.number().int().positive(), noteMd: z.string().min(1) }))
     .optional(),
   takeaway: z.string().optional(),
+  // Figure pipeline (the da graph challenges). Optional in the schema; the
+  // validator requires figureSvg + figureCaption + correct-option resultFigureSvg
+  // for GRAPH_CHALLENGE_IDS (da-016..025) only. Stored as inline SVG so the
+  // runtime executes nothing — "content is data, not code."
+  figureSvg: figureSvgField.optional(),
+  figureCaption: z.string().min(8).max(160).optional(),
 });
 
 export type Sector = z.infer<typeof SectorSchema>;

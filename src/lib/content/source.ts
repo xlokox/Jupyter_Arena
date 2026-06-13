@@ -39,6 +39,8 @@ interface ChallengeRow {
   concept_card?: string | null;
   line_notes?: Array<{ line: number; noteMd: string }> | null;
   takeaway?: string | null;
+  figure_svg?: string | null;
+  figure_caption?: string | null;
   challenge_options: Array<{
     option_key: string;
     label: string;
@@ -46,6 +48,7 @@ interface ChallengeRow {
     is_correct: boolean;
     result_log: string;
     rationale: string;
+    result_figure_svg?: string | null;
   }>;
   challenge_hints: Array<{ hint_order: number; hint_md: string }>;
   tutorials: {
@@ -94,6 +97,7 @@ export function mapChallengeRow(row: ChallengeRow): Challenge {
         isCorrect: option.is_correct,
         resultLog: option.result_log,
         rationale: option.rationale,
+        resultFigureSvg: option.result_figure_svg ?? undefined,
       })),
     hints: [hints[0]?.hint_md ?? "", hints[1]?.hint_md ?? ""],
     explanationMd: row.explanation_md,
@@ -110,6 +114,8 @@ export function mapChallengeRow(row: ChallengeRow): Challenge {
     conceptCard: row.concept_card ?? undefined,
     lineNotes: row.line_notes ?? undefined,
     takeaway: row.takeaway ?? undefined,
+    figureSvg: row.figure_svg ?? undefined,
+    figureCaption: row.figure_caption ?? undefined,
   });
 }
 

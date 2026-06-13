@@ -248,3 +248,54 @@ describe("validateSectorsFile", () => {
     expect(validateSectorsFile(raw).length).toBeGreaterThan(0);
   });
 });
+
+describe("figure pipeline (slice 1)", () => {
+  const safeSvg =
+    '<svg viewBox="0 0 700 400" xmlns="http://www.w3.org/2000/svg"><rect width="700" height="400" fill="#11161D"/></svg>';
+
+  it("accepts a challenge with figureSvg + figureCaption + option resultFigureSvg", () => {
+    const c = makeValidChallenge();
+    const withFigure: Challenge = {
+      ...c,
+      figureSvg: safeSvg,
+      figureCaption: "Monthly revenue — broken axis hides the trend",
+      options: c.options.map((o, i) =>
+        i === 0 ? { ...o, resultFigureSvg: safeSvg } : o,
+      ) as Challenge["options"],
+    };
+    expect(validateObject(withFigure).errors).toEqual([]);
+  });
+
+  it("rejects figureSvg that does not start with <svg", () => {
+    const c = makeValidChallenge();
+    const withFigure: Challenge = {
+      ...c,
+      figureSvg: '<div>not actually svg, just padding to exceed the min length</div>',
+      figureCaption: "Caption that is long enough to satisfy the min",
+    };
+    const result = validateObject(withFigure);
+    expect(result.errors.some((e) => e.includes("figureSvg"))).toBe(true);
+  });
+
+  it("rejects figureSvg containing <script>", () => {
+    const c = makeValidChallenge();
+    const withFigure: Challenge = {
+      ...c,
+      figureSvg:
+        '<svg viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>',
+      figureCaption: "Caption that is long enough to satisfy the min",
+    };
+    expect(validateObject(withFigure).errors.some((e) => e.includes("banned token"))).toBe(true);
+  });
+
+  it("rejects figureSvg with onload= handler", () => {
+    const c = makeValidChallenge();
+    const withFigure: Challenge = {
+      ...c,
+      figureSvg:
+        '<svg viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg" onload="alert(1)"></svg>',
+      figureCaption: "Caption that is long enough to satisfy the min",
+    };
+    expect(validateObject(withFigure).errors.some((e) => e.includes("banned token"))).toBe(true);
+  });
+});

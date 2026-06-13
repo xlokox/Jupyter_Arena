@@ -45,6 +45,8 @@ export async function seedContent(admin: SupabaseClient): Promise<{
         concept_card: challenge.conceptCard ?? null,
         line_notes: challenge.lineNotes ?? null,
         takeaway: challenge.takeaway ?? null,
+        figure_svg: challenge.figureSvg ?? null,
+        figure_caption: challenge.figureCaption ?? null,
         is_published: true,
       },
       { onConflict: "id" },
@@ -62,6 +64,7 @@ export async function seedContent(admin: SupabaseClient): Promise<{
         is_correct: option.isCorrect,
         result_log: option.resultLog,
         rationale: option.rationale,
+        result_figure_svg: option.resultFigureSvg ?? null,
       })),
       { onConflict: "challenge_id,option_key" },
     );

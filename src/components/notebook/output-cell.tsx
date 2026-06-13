@@ -2,6 +2,7 @@ import { Loader2 } from "lucide-react";
 import type { Challenge } from "@/lib/content/schema";
 import type { AttemptState } from "@/store/workspace";
 import { en } from "@/i18n/en";
+import { FigurePanel } from "./figure-panel";
 
 interface OutputCellProps {
   challenge: Challenge;
@@ -10,6 +11,11 @@ interface OutputCellProps {
 
 export function OutputCell({ challenge, attempt }: OutputCellProps) {
   const { runState, lastRunOption } = attempt;
+  const ranOption =
+    lastRunOption ? challenge.options.find((o) => o.key === lastRunOption) : undefined;
+  // Post-fix figure: only on a successful run AND only when the option ships one.
+  const postFigureSvg =
+    runState === "solved" && ranOption?.resultFigureSvg ? ranOption.resultFigureSvg : null;
 
   let body: React.ReactNode;
   let tone = "text-danger";
@@ -30,12 +36,10 @@ export function OutputCell({ challenge, attempt }: OutputCellProps) {
     );
     tone = "text-muted";
   } else if (runState === "solved") {
-    const option = challenge.options.find((o) => o.key === lastRunOption);
-    body = option?.resultLog ?? challenge.correctOutput;
+    body = ranOption?.resultLog ?? challenge.correctOutput;
     tone = "text-success";
   } else if (runState === "failed") {
-    const option = challenge.options.find((o) => o.key === lastRunOption);
-    body = option?.resultLog ?? challenge.traceback;
+    body = ranOption?.resultLog ?? challenge.traceback;
     tone = "text-danger";
   } else {
     // Idle: the notebook arrives broken — the red traceback is the starting state.
@@ -43,21 +47,32 @@ export function OutputCell({ challenge, attempt }: OutputCellProps) {
   }
 
   return (
-    <section aria-label={en.workspace.outputCellAria} className="flex gap-3">
-      <span className="hidden w-16 shrink-0 pt-3 text-end font-mono text-xs text-danger sm:block">
-        {en.workspace.outLabel} [1]:
-      </span>
-      <div
-        aria-live="polite"
-        className="min-w-0 flex-1 overflow-hidden rounded-md border border-border bg-code-bg"
-      >
-        <pre
-          key={`${runState}-${lastRunOption ?? "none"}`}
-          className={`overflow-x-auto whitespace-pre-wrap p-3 font-mono text-xs leading-5 motion-safe:transition-colors ${tone} ${anim}`}
+    <section aria-label={en.workspace.outputCellAria} className="flex flex-col gap-3">
+      <div className="flex gap-3">
+        <span className="hidden w-16 shrink-0 pt-3 text-end font-mono text-xs text-danger sm:block">
+          {en.workspace.outLabel} [1]:
+        </span>
+        <div
+          aria-live="polite"
+          className="min-w-0 flex-1 overflow-hidden rounded-md border border-border bg-code-bg"
         >
-          {body}
-        </pre>
+          <pre
+            key={`${runState}-${lastRunOption ?? "none"}`}
+            className={`overflow-x-auto whitespace-pre-wrap p-3 font-mono text-xs leading-5 motion-safe:transition-colors ${tone} ${anim}`}
+          >
+            {body}
+          </pre>
+        </div>
       </div>
+      {postFigureSvg && challenge.figureCaption && (
+        <div className="sm:ms-[76px]">
+          <FigurePanel
+            svg={postFigureSvg}
+            caption={challenge.figureCaption}
+            variant="after"
+          />
+        </div>
+      )}
     </section>
   );
 }
