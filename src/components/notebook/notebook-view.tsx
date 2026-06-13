@@ -12,6 +12,7 @@ import { OutputCell } from "./output-cell";
 import { ControlCell } from "./control-cell";
 import { SolvePanel } from "./solve-panel";
 import { FigurePanel } from "./figure-panel";
+import { GlossaryDisclosure } from "./glossary-disclosure";
 import { useWorkspaceStore, getAttempt, type OptionKey } from "@/store/workspace";
 import { useAuthStore } from "@/store/auth";
 import { submitAttemptServer } from "@/lib/game/server-progress";
@@ -276,6 +277,10 @@ function LoadedNotebook({
       >
         <Markdown>{challenge.descriptionMd}</Markdown>
       </section>
+
+      {challenge.glossary && challenge.glossary.length > 0 && (
+        <GlossaryDisclosure entries={challenge.glossary} />
+      )}
 
       {challenge.figureSvg && challenge.figureCaption && (
         <FigurePanel

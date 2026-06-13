@@ -95,6 +95,13 @@ export const ChallengeSchema = z.object({
   // Reasoning vs debugging track. Optional; undefined ≡ "debugging" (default).
   // Surfaced as a sidebar filter + mission badge — no gating, no XP change.
   track: z.enum(TRACKS).optional(),
+  // In-context glossary for jargon used in the briefing/tutorial. Optional;
+  // capped at 8 entries so the disclosure stays focused. Each entry's
+  // definition is rendered as Markdown — keep it to a single paragraph.
+  glossary: z
+    .array(z.object({ term: z.string().min(1).max(60), definitionMd: z.string().min(8) }))
+    .max(8)
+    .optional(),
 });
 
 export type Sector = z.infer<typeof SectorSchema>;

@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { admin, createTestUser, lockedChallengeOfDifficulty, PY_001, submit } from "./helpers";
+import {
+  admin,
+  createTestUser,
+  dailyChallengeIdServer,
+  lockedChallengeOfDifficulty,
+  PY_001,
+  submit,
+} from "./helpers";
 
 /**
  * Python Fundamentals sector — the second ungated on-ramp. Same mechanism as
@@ -33,7 +40,10 @@ describe("ungated Python Fundamentals sector", () => {
       .eq("id", PY_001);
     if (lockError) throw new Error(lockError.message);
 
-    const gatedLocked = await lockedChallengeOfDifficulty("hard");
+    // Exclude today's daily pick — exempt from gating, would collide with the
+    // alphabetically-first hard gated challenge on some UTC days.
+    const daily = await dailyChallengeIdServer();
+    const gatedLocked = await lockedChallengeOfDifficulty("hard", daily);
     const user = await createTestUser(); // fresh => level 1
 
     const result = await submit(user, PY_001, "a");

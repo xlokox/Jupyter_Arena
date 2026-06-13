@@ -192,6 +192,8 @@ export const en = {
     trackDebugging: "Debugging",
     trackReasoning: "Reasoning",
     trackFilterAria: "Mission track",
+    glossaryAria: "Glossary for this mission",
+    glossaryHeading: "Glossary",
   },
   landing: {
     navAria: "Main navigation",

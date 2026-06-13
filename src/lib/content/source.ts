@@ -42,6 +42,7 @@ interface ChallengeRow {
   figure_svg?: string | null;
   figure_caption?: string | null;
   track?: string | null;
+  glossary?: Array<{ term: string; definitionMd: string }> | null;
   challenge_options: Array<{
     option_key: string;
     label: string;
@@ -119,6 +120,7 @@ export function mapChallengeRow(row: ChallengeRow): Challenge {
     figureCaption: row.figure_caption ?? undefined,
     track:
       row.track === "debugging" || row.track === "reasoning" ? row.track : undefined,
+    glossary: row.glossary ?? undefined,
   });
 }
 
