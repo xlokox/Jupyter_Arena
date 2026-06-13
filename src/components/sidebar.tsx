@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, CheckCircle2, FileCode2, Lock, Search, X } from "lucide-react";
+import { BookOpen, Brain, CheckCircle2, FileCode2, Lock, Search, X } from "lucide-react";
 import type { ChallengeMeta, SectorId } from "@/lib/content/schema";
 import { DIFFICULTIES, SECTOR_IDS } from "@/lib/content/schema";
 import { ChallengeIcon } from "@/components/challenge-icon";
@@ -12,6 +12,7 @@ import {
   useWorkspaceStore,
   type DifficultyFilter,
   type SidebarTab,
+  type TrackFilter,
 } from "@/store/workspace";
 import { levelForXp } from "@/lib/game/xp";
 import { useFocusTrap } from "@/lib/use-focus-trap";
@@ -76,6 +77,8 @@ function SidebarContent({ challenges }: { challenges: ChallengeMeta[] }) {
   const sectorFilter = useWorkspaceStore((s) => s.sectorFilter);
   const difficultyFilter = useWorkspaceStore((s) => s.difficultyFilter);
   const setDifficultyFilter = useWorkspaceStore((s) => s.setDifficultyFilter);
+  const trackFilter = useWorkspaceStore((s) => s.trackFilter);
+  const setTrackFilter = useWorkspaceStore((s) => s.setTrackFilter);
   const searchQuery = useWorkspaceStore((s) => s.searchQuery);
   const setSearchQuery = useWorkspaceStore((s) => s.setSearchQuery);
   const activeChallengeId = useWorkspaceStore((s) => s.activeChallengeId);
@@ -90,8 +93,19 @@ function SidebarContent({ challenges }: { challenges: ChallengeMeta[] }) {
   const visible = filterChallenges(challenges, {
     sector: sectorFilter,
     difficulty: difficultyFilter,
+    track: trackFilter,
     query: searchQuery,
   });
+
+  // Show the track chip row only when the *currently selected scope* contains
+  // both tracks. If the user filters to a sector with only debugging missions,
+  // the row stays hidden — no dead controls.
+  const scopeForTracks = challenges.filter(
+    (c) => sectorFilter === "all" || c.sector === sectorFilter,
+  );
+  const hasDebugging = scopeForTracks.some((c) => (c.track ?? "debugging") === "debugging");
+  const hasReasoning = scopeForTracks.some((c) => c.track === "reasoning");
+  const showTrackFilter = hasDebugging && hasReasoning;
 
   return (
     <div className="flex h-full flex-col">
@@ -158,6 +172,41 @@ function SidebarContent({ challenges }: { challenges: ChallengeMeta[] }) {
             );
           })}
         </div>
+        {showTrackFilter && (
+          <div
+            role="group"
+            aria-label={en.workspace.trackFilterAria}
+            className="mt-2 flex flex-wrap gap-1.5"
+            data-track-filter
+          >
+            {(
+              [
+                { id: "all" as const, label: en.workspace.trackAll },
+                { id: "debugging" as const, label: en.workspace.trackDebugging },
+                { id: "reasoning" as const, label: en.workspace.trackReasoning },
+              ] satisfies Array<{ id: TrackFilter; label: string }>
+            ).map(({ id, label }) => {
+              const isActive = trackFilter === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  aria-pressed={isActive}
+                  onClick={() => setTrackFilter(id)}
+                  data-track-chip={id}
+                  className={`flex items-center gap-1 rounded-full border px-2 py-1 font-mono text-[10px] uppercase tracking-wide transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent ${
+                    isActive
+                      ? "border-accent bg-accent/10 text-accent"
+                      : "border-border text-muted hover:text-text"
+                  }`}
+                >
+                  {id === "reasoning" && <Brain className="size-3" aria-hidden />}
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {sidebarTab === "missions" && <SectorRings challenges={challenges} attempts={attempts} />}
@@ -234,6 +283,16 @@ function SidebarContent({ challenges }: { challenges: ChallengeMeta[] }) {
                             className="size-4 shrink-0 text-success"
                             aria-label={en.sidebar.solvedAria}
                           />
+                        )}
+                        {sidebarTab === "missions" && challenge.track === "reasoning" && (
+                          <span
+                            data-reasoning-badge
+                            title={en.workspace.reasoningBadge}
+                            className="inline-flex items-center gap-0.5 rounded-full border border-accent/40 bg-accent/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-accent"
+                          >
+                            <Brain className="size-2.5" aria-hidden />
+                            {en.workspace.reasoningBadge}
+                          </span>
                         )}
                         <DifficultyBadge difficulty={challenge.difficulty} />
                       </>

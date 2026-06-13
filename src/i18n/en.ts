@@ -187,6 +187,11 @@ export const en = {
     figurePanelAria: "Figure shown for this mission",
     figureBeforeFix: "Before — this is the broken chart your code produces",
     figureAfterFix: "After — your fix renders the corrected chart",
+    reasoningBadge: "Reasoning",
+    trackAll: "All",
+    trackDebugging: "Debugging",
+    trackReasoning: "Reasoning",
+    trackFilterAria: "Mission track",
   },
   landing: {
     navAria: "Main navigation",

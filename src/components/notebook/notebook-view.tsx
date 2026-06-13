@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { GraduationCap, Loader2, Lock, RefreshCw } from "lucide-react";
+import { Brain, GraduationCap, Loader2, Lock, RefreshCw } from "lucide-react";
 import type { Challenge, ChallengeMeta } from "@/lib/content/schema";
 import { useChallenge } from "@/lib/content/use-challenge";
 import { Markdown } from "@/components/markdown";
@@ -215,6 +215,16 @@ function LoadedNotebook({
       <ChallengeIcon name={challenge.icon} className="size-5 text-accent" />
       <h1 className="font-mono text-base font-semibold text-text md:text-lg">{challenge.title}</h1>
       <DifficultyBadge difficulty={challenge.difficulty} />
+      {challenge.track === "reasoning" && (
+        <span
+          data-reasoning-badge
+          title={en.workspace.reasoningBadge}
+          className="inline-flex items-center gap-1 rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-accent"
+        >
+          <Brain className="size-3" aria-hidden />
+          {en.workspace.reasoningBadge}
+        </span>
+      )}
       <span className="text-xs text-muted">{en.sectors[challenge.sector]}</span>
     </header>
   );

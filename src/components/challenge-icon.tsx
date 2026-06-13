@@ -62,6 +62,7 @@ const ICONS: Record<string, LucideIcon> = {
   boxes: Boxes,
   braces: Braces,
   brain: Brain,
+  "brain-circuit": Brain,
   bug: Bug,
   clock: Clock,
   cpu: Cpu,

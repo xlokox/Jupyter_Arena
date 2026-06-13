@@ -29,6 +29,7 @@ export type OptionKey = "a" | "b" | "c";
 export type RunState = "idle" | "running" | "solved" | "failed";
 export type SectorFilter = SectorId | "all";
 export type DifficultyFilter = Difficulty | "all";
+export type TrackFilter = "all" | "debugging" | "reasoning";
 export type SidebarTab = "missions" | "tutorials";
 export type WorkspaceView = "mission" | "tutorial";
 
@@ -85,6 +86,8 @@ interface WorkspaceStore {
   sidebarOpen: boolean;
   sectorFilter: SectorFilter;
   difficultyFilter: DifficultyFilter;
+  /** All / Debugging / Reasoning. UI surfaces it only when the active sector has both tracks. */
+  trackFilter: TrackFilter;
   searchQuery: string;
   attempts: Record<string, AttemptState>;
   stats: GameStats;
@@ -106,6 +109,7 @@ interface WorkspaceStore {
   setSidebarOpen: (open: boolean) => void;
   setSectorFilter: (filter: SectorFilter) => void;
   setDifficultyFilter: (filter: DifficultyFilter) => void;
+  setTrackFilter: (filter: TrackFilter) => void;
   setSearchQuery: (query: string) => void;
   selectOption: (challengeId: string, option: OptionKey) => void;
   startRun: (challengeId: string) => void;
@@ -193,6 +197,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       sidebarOpen: false,
       sectorFilter: "all",
       difficultyFilter: "all",
+      trackFilter: "all",
       searchQuery: "",
       attempts: {},
       stats: INITIAL_STATS,
@@ -213,6 +218,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
       setSectorFilter: (sectorFilter) => set({ sectorFilter }),
       setDifficultyFilter: (difficultyFilter) => set({ difficultyFilter }),
+      setTrackFilter: (trackFilter) => set({ trackFilter }),
       setSearchQuery: (searchQuery) => set({ searchQuery }),
 
       selectOption: (challengeId, option) =>
@@ -495,17 +501,26 @@ export interface FilterableChallenge {
   difficulty: Difficulty;
   title: string;
   conceptTags: string[];
+  /** Optional on the type — debugging is the default for older callers. */
+  track?: "debugging" | "reasoning";
 }
 
 /** Pure filter used by the sidebar; exported for tests and reuse. */
 export function filterChallenges<T extends FilterableChallenge>(
   challenges: readonly T[],
-  filters: { sector: SectorFilter; difficulty: DifficultyFilter; query: string },
+  filters: {
+    sector: SectorFilter;
+    difficulty: DifficultyFilter;
+    query: string;
+    track?: TrackFilter;
+  },
 ): T[] {
   const query = filters.query.trim().toLowerCase();
+  const trackFilter = filters.track ?? "all";
   return challenges.filter((challenge) => {
     if (filters.sector !== "all" && challenge.sector !== filters.sector) return false;
     if (filters.difficulty !== "all" && challenge.difficulty !== filters.difficulty) return false;
+    if (trackFilter !== "all" && (challenge.track ?? "debugging") !== trackFilter) return false;
     if (query === "") return true;
     return (
       challenge.title.toLowerCase().includes(query) ||

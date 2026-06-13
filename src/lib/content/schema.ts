@@ -11,6 +11,10 @@ export const SECTOR_IDS = ["py", "da", "ml", "dl", "fullstack", "db"] as const;
 export const DIFFICULTIES = ["easy", "medium", "hard", "very_hard"] as const;
 export const LANGUAGES = ["python", "jsx", "javascript", "sql"] as const;
 export const OPTION_KEYS = ["a", "b", "c"] as const;
+/** Track label — `debugging` is the default (fix-the-bug missions); `reasoning`
+ * is the judgment track (interpretive choices, no code patch). */
+export const TRACKS = ["debugging", "reasoning"] as const;
+export type Track = (typeof TRACKS)[number];
 
 export const SectorSchema = z.object({
   id: z.enum(SECTOR_IDS),
@@ -88,6 +92,9 @@ export const ChallengeSchema = z.object({
   // runtime executes nothing — "content is data, not code."
   figureSvg: figureSvgField.optional(),
   figureCaption: z.string().min(8).max(160).optional(),
+  // Reasoning vs debugging track. Optional; undefined ≡ "debugging" (default).
+  // Surfaced as a sidebar filter + mission badge — no gating, no XP change.
+  track: z.enum(TRACKS).optional(),
 });
 
 export type Sector = z.infer<typeof SectorSchema>;
@@ -107,6 +114,8 @@ export interface ChallengeMeta {
   estMinutes: number;
   /** Minimum player level required to attempt this challenge (client display + anon gate). */
   unlockLevel: number;
+  /** Mission track — never undefined on the meta (default 'debugging' applied in toMeta). */
+  track: Track;
 }
 
 export const toMeta = (
@@ -125,6 +134,8 @@ export const toMeta = (
   unlockLevel: ungatedSectors?.has(c.sector)
     ? 1
     : (c.unlockLevelOverride ?? UNLOCK_LEVELS[c.difficulty] ?? 1),
+  // null/undefined on the row means the default fix-the-bug track.
+  track: c.track ?? "debugging",
 });
 export type ChallengeOption = z.infer<typeof ChallengeOptionSchema>;
 export type Challenge = z.infer<typeof ChallengeSchema>;
