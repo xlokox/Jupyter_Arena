@@ -1,0 +1,107 @@
+{
+  "da": {
+    "total": 15,
+    "difficulty": {
+      "easy": 0,
+      "medium": 0,
+      "hard": 0,
+      "very_hard": 0,
+      "unknown": 0
+    },
+    "tracks": {
+      "debugging": 0,
+      "reasoning": 0,
+      "unknown": 0
+    },
+    "py_da_features": {
+      "conceptCard": 0,
+      "lineNotes": 0,
+      "take_away": 0,
+      "missing": 0
+    }
+  },
+  "ml": {
+    "total": 15,
+    "difficulty": {
+      "easy": 0,
+      "medium": 0,
+      "hard": 0,
+      "very_hard": 0,
+      "unknown": 0
+    },
+    "tracks": {
+      "debugging": 0,
+      "reasoning": 0,
+      "unknown": 0
+    },
+    "py_da_features": {
+      "conceptCard": 0,
+      "lineNotes": 0,
+      "take_away": 0,
+      "missing": 0
+    }
+  },
+  "dl": {
+    "total": 15,
+    "difficulty": {
+      "easy": 0,
+      "medium": 0,
+      "hard": 0,
+      "very_hard": 0,
+      "unknown": 0
+    },
+    "tracks": {
+      "debugging": 0,
+      "reasoning": 0,
+      "unknown": 0
+    },
+    "py_da_features": {
+      "conceptCard": 0,
+      "lineNotes": 0,
+      "take_away": 0,
+      "missing": 0
+    }
+  },
+  "fullstack": {
+    "total": 15,
+    "difficulty": {
+      "easy": 0,
+      "medium": 0,
+      "hard": 0,
+      "very_hard": 0,
+      "unknown": 0
+    },
+    "tracks": {
+      "debugging": 0,
+      "reasoning": 0,
+      "unknown": 0
+    },
+    "py_da_features": {
+      "conceptCard": 0,
+      "lineNotes": 0,
+      "take_away": 0,
+      "missing": 0
+    }
+  },
+  "db": {
+    "total": 15,
+    "difficulty": {
+      "easy": 0,
+      "medium": 0,
+      "hard": 0,
+      "very_hard": 0,
+      "unknown": 0
+    },
+    "tracks": {
+      "debugging": 0,
+      "reasoning": 0,
+      "unknown": 0
+    },
+    "py_da_features": {
+      "conceptCard": 0,
+      "lineNotes": 0,
+      "take_away": 0,
+      "missing": 0
+    }
+  }
+}
