@@ -1,0 +1,65 @@
+{
+  "id": "py-027-y2k-two-digit-year",
+  "sector": "py",
+  "difficulty": "medium",
+  "title": "27_renewal_date.ipynb",
+  "language": "python",
+  "icon": "clock",
+  "conceptTags": ["dates", "y2k", "datetime"],
+  "descriptionMd": "## Mission: One-Year Renewal Date\n\nYou have a small script that takes a 2-digit year (`\"99\"` for 1999) and prints the year exactly one year later. For input `\"99\"` you expect `\"2000\"`. Your function prints `\"19100\"`.\n\nWelcome to Y2K in miniature — the single most expensive software bug class in history. Through the 1990s, billions of dollars were spent rewriting code that stored years as 2 digits because the original authors couldn't imagine their code would still be running in 2000. The bug your code reproduces is the **same shape**: storing the year as text, prepending `\"19\"` for display, and breaking the moment the actual year wraps. Fix it by parsing the full integer year and using `datetime`.",
+  "initialCode": "# Read a 2-digit year, print the next year (Y2K-style buggy version).\ndef next_year(yy: str) -> str:\n    # Authors assumed every year started with 19.\n    full = \"19\" + yy\n    next_yy = int(yy) + 1\n    return \"19\" + str(next_yy)\n\nrenewed = next_year(\"99\")\nprint(f\"input='99', renewed year = {renewed}\")",
+  "buggyLineStart": 5,
+  "buggyLineEnd": 6,
+  "traceback": "input='99', renewed year = 19100\n# expected: 2000 — but '99' + 1 became 100, and the code prepended '19' to get '19100'",
+  "correctOutput": "input='99', renewed year = 2000\n# 1999 + 1 = 2000 — the renewal lands in the right century",
+  "options": [
+    {
+      "key": "a",
+      "label": "Resolve the full 4-digit year first, then add 1, using `datetime` for arithmetic",
+      "patchCode": "from datetime import date\n\n# Read a 2-digit year, print the next year (Y2K-safe version).\ndef next_year(yy: str) -> str:\n    # Pick a pivot: 00..49 -> 2000..2049; 50..99 -> 1950..1999.\n    full = 2000 + int(yy) if int(yy) < 50 else 1900 + int(yy)\n    return str(date(full + 1, 1, 1).year)\n\nrenewed = next_year(\"99\")\nprint(f\"input='99', renewed year = {renewed}\")",
+      "isCorrect": true,
+      "resultLog": "input='99', renewed year = 2000",
+      "rationale": "Two corrections in one fix: (1) **resolve the full 4-digit year** by picking a pivot — the convention `00..49 -> 21st century, 50..99 -> 20th century` is the canonical Y2K-era mitigation (it's how Excel and many SQL drivers still interpret 2-digit years). (2) Use `datetime` so the arithmetic happens on a real date and the result is always 4 digits. The original code did string concatenation pretending to be arithmetic — the textbook Y2K mistake."
+    },
+    {
+      "key": "b",
+      "label": "Pad the result to 4 characters: `f\"19{next_yy:02d}\"`",
+      "patchCode": "# Read a 2-digit year, print the next year.\ndef next_year(yy: str) -> str:\n    next_yy = int(yy) + 1\n    return f\"19{next_yy:02d}\"\n\nrenewed = next_year(\"99\")\nprint(f\"input='99', renewed year = {renewed}\")",
+      "isCorrect": false,
+      "resultLog": "input='99', renewed year = 19100",
+      "rationale": "`{next_yy:02d}` pads to *at least* 2 digits — it doesn't truncate. `100` formatted with `:02d` is still `100`, so the output is `\"19100\"` exactly as before. The format spec is a width minimum, not a maximum. And even if you truncated, you'd get `\"1900\"` and silently land in 1900 instead of 2000 — the *original* Y2K bug, faithfully reproduced."
+    },
+    {
+      "key": "c",
+      "label": "Hard-code the `\"19\"` prefix as `\"20\"` instead",
+      "patchCode": "# Read a 2-digit year, print the next year.\ndef next_year(yy: str) -> str:\n    next_yy = int(yy) + 1\n    return \"20\" + str(next_yy)\n\nrenewed = next_year(\"99\")\nprint(f\"input='99', renewed year = {renewed}\")",
+      "isCorrect": false,
+      "resultLog": "input='99', renewed year = 20100",
+      "rationale": "Same shape of bug, different decade. The script now claims `\"99\" + 1 = 20100`. The real fix isn't to swap one bad assumption for another — it's to **stop storing years as two digits in the first place**. Resolve the full 4-digit year at parse time and the bug class disappears."
+    }
+  ],
+  "hints": [
+    "Where does the `\"19\"` get glued back on? Read line 5 carefully — string concatenation is pretending to be arithmetic.",
+    "Resolve the **full 4-digit year** at the boundary (input parsing) and use `datetime.date` for the arithmetic."
+  ],
+  "explanationMd": "### Why the bug occurs\nThe original code stored years as 2-character strings (`\"99\"`) and pretended `\"19\" + yy` was always the right way back to a 4-digit year. That's fine until `int(\"99\") + 1` rolls into 100 and the prepended `\"19\"` produces the nonsense `\"19100\"`. This is the **exact shape** of the Y2K bug that cost banks, governments, and insurance companies a documented ~$300 billion globally to fix in the late 1990s (sources: U.S. Department of Commerce, *The Economic Impact of Y2K*; Gartner estimates from 1998). The single most expensive remediation effort in software history, all caused by a storage-format shortcut.\n\n### Why the fix is correct\nTwo improvements that turn a fragile pattern into a robust one:\n1. **Resolve the full year at parse time.** The Y2K-era convention (00–49 → 2000s, 50–99 → 1900s) is the canonical pivot — used by Excel, JDBC drivers, and many legacy SQL types. Pick it explicitly so the rest of the system can stop guessing.\n2. **Use `datetime` for arithmetic.** A real `date` object refuses to drift; adding a year either lands on a valid date or raises. The string-prepend hack from the original code can't be silently wrong if it doesn't exist.\n\nFor any new code, store years as 4-digit integers (or full `date`/`datetime` objects) from the boundary inward. Two-digit years should never appear as a *stored* representation again — only as a display format, if needed.",
+  "recruiterReview": "Strong — you didn't just patch the math, you fixed the **data shape**. Two-digit-year storage is a class of bug, not a single bug. The pivot you used is the same one Excel, JDBC, and many spec-conformant SQL drivers use (typically pivot=50). One follow-up for production code: log the pivot decision on parse (so when a 2-digit year is interpreted as 1999 vs 2099 it's auditable) and consider rejecting 2-digit input entirely past a certain ingestion boundary. The Y2K story cost the industry hundreds of billions — turning that into a hard data contract is worth doing once. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Y2K, In Code\n\nThe Y2K bug is the single most famous software bug class. Understanding the *shape* of it teaches a pattern you'll meet again — Y2038, the 64-bit Unix timestamp rollover, is the same shape on a different scale.\n\n### The original Y2K bug\nThroughout the 1960s–80s, programmers stored years as 2 digits — `99` for 1999 — to save memory (every byte mattered when RAM was kilobytes). At display time, they'd prepend `\"19\"`. When 99 + 1 rolled to 100, the prepend produced `\"19100\"` — or worse, with a truncating display, `\"1900\"`, which silently put dates back a century. Banks computed mortgage interest backwards. Insurance systems thought 100-year-old policies were 0 years old. Power grids couldn't schedule maintenance windows.\n\nThe global remediation effort cost an **estimated $300–600 billion** (U.S. Department of Commerce; OMB estimates; Gartner research) and consumed software engineering attention for years. The world avoided a major incident on January 1, 2000 specifically because of that work, not because the bug was unreal.\n\n### Why the fix shape matters\nThe canonical Y2K mitigation when you couldn't change the data was the **pivot**:\n- Years 00–49 → 2000–2049 (next century)\n- Years 50–99 → 1950–1999 (current century)\n\nThis pivot is still hard-coded in Excel's two-digit-year handling, many JDBC drivers, and a number of legacy SQL date columns. You'll see it for the rest of your career. The pivot is a Band-Aid; the real fix is **4-digit years stored as integers or full `date` objects**.\n\n### Y2038 — the same shape on a different scale\nUnix timestamps are stored as 32-bit signed integers counting seconds since 1970-01-01. The maximum value (2,147,483,647) is reached at **03:14:07 UTC on January 19, 2038**. After that, the counter overflows to negative and the date silently jumps back to December 1901. Same shape of bug; same root cause (storage format too narrow for the lifetime of the system).\n\nThe Y2038 fix is to use 64-bit timestamps — which Python's `datetime` has done forever, but C `time_t` on 32-bit systems and many embedded devices still uses 32-bit. Tens of millions of devices in production today will need patches or replacement.\n\n### The general lesson\nStorage decisions outlive the engineers who make them. When you pick a representation, ask:\n- Will this representation still be valid in 50 years?\n- What happens at the maximum value? Is the behaviour explicit or silent?\n- Is there a parse boundary where we can normalize early?\n\nFor dates: store **`datetime` objects** (or ISO 8601 strings like `\"2025-06-15\"`) end-to-end. Never store a 2-digit year and assume the century. Never store a Unix timestamp narrower than 64 bits if the system might live past 2038.\n\n### A modern example: the Twitter milliseconds rollover\nTwitter's status update IDs were originally 32-bit integers. They rolled over in mid-2009, requiring an emergency migration to 64-bit. Same shape, smaller blast radius. Every system that stores anything monotonic — timestamps, IDs, counters — needs to consider the rollover horizon.\n\n### Common reasoning mistakes\n- Storing 2-digit years \"because we'll fix it later.\"\n- Assuming the user input will always be in the current century.\n- Using `time_t` on a 32-bit field without reading the docs.\n- Letting a string-prepend hack pretend to be date arithmetic.\n\n### You just learned…\nY2K is **the shape of bug** where a too-narrow storage format eventually overflows. The pivot is a mitigation; the durable fix is to store dates as `datetime` (or full ISO strings) from the boundary inward. The same shape is waiting at Y2038 for systems still using 32-bit timestamps — and at every monotonic counter you'll ever pick a width for.",
+      "videos": [
+        { "title": "The Y2K bug, explained", "searchQuery": "y2k bug explained software programmer tutorial" },
+        { "title": "Y2038 — the next Y2K", "searchQuery": "year 2038 problem unix timestamp 32 bit explained" }
+      ]
+  },
+  "estMinutes": 7,
+  "version": 1,
+  "conceptCard": "This mission is about the **Y2K bug class** — too-narrow storage for time.\n\n- Storing year as 2 characters and prepending `\"19\"` breaks when `99 + 1 = 100`.\n- Same shape: Y2038 (32-bit Unix timestamps), Twitter's 32-bit status IDs in 2009.\n- Resolve full 4-digit years at the parse boundary; use `datetime` for arithmetic.\n\nThe code does `\"19\" + str(int(yy) + 1)` and prints `\"19100\"`. Pivot at parse, use `datetime`.",
+  "lineNotes": [
+    { "line": 3, "noteMd": "Function takes a **2-character year** — the historical Y2K storage format." },
+    { "line": 5, "noteMd": "Bug seed: the code assumes the year always starts with `\"19\"`. Y2K in miniature." },
+    { "line": 6, "noteMd": "**The bug.** `int(yy) + 1` produces `100`; prepending `\"19\"` gives `\"19100\"`. Use `datetime` for arithmetic and pivot at parse." },
+    { "line": 8, "noteMd": "Calls the function. Fixed version stores `2000` here." },
+    { "line": 9, "noteMd": "Prints the result. Fixed version reads `input='99', renewed year = 2000`." }
+  ],
+  "takeaway": "Y2K bugs come from too-narrow storage — store full 4-digit years (or datetime objects) end-to-end."
+}
