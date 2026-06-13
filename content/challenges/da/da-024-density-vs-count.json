@@ -1,0 +1,108 @@
+{
+  "id": "da-024-density-vs-count",
+  "sector": "da",
+  "difficulty": "medium",
+  "title": "24_compare_checkout_times.ipynb",
+  "language": "python",
+  "icon": "scale",
+  "conceptTags": [
+    "numpy",
+    "matplotlib",
+    "histogram",
+    "density"
+  ],
+  "descriptionMd": "## Mission: Compare Two User Groups' Checkout Times\n\nYou want to compare checkout-time distributions between two groups: **mobile** users (n = 3,000) and **desktop** users (n = 250). Overlay two histograms with `alpha=0.5` and the mobile distribution is so tall it completely buries the desktop distribution — you can't even see desktop's shape.\n\nThe distributions probably have similar shape — desktop just has fewer points. You don't want to know 'how many,' you want to know 'what shape.' The fix is **`density=True`** — each histogram is normalised so the area under it equals 1, making the **shapes** comparable regardless of sample size.",
+  "initialCode": "import numpy as np\nimport matplotlib.pyplot as plt\n\nrng = np.random.default_rng(0)\nmobile  = rng.normal(4.5, 1.2, size=3000).clip(min=0)\ndesktop = rng.normal(4.2, 1.0, size=250).clip(min=0)\n\nfig, ax = plt.subplots(figsize=(7, 4))\nax.hist(mobile,  bins='auto', alpha=0.5, label='mobile',  color='#7CD992')\nax.hist(desktop, bins='auto', alpha=0.5, label='desktop', color='#E8B65A')\nax.set_title('checkout_time_seconds.png')\nax.set_xlabel('checkout time (s)')\nax.set_ylabel('count')\nax.legend()\nplt.show()",
+  "buggyLineStart": 9,
+  "buggyLineEnd": 10,
+  "traceback": "Mobile distribution towers over desktop's; you cannot read desktop's shape at all.\n# Counts on the y-axis make groups of different sizes incomparable.",
+  "correctOutput": "Both distributions on the same density scale — shapes overlay cleanly; mobile centred slightly higher and slightly wider than desktop.",
+  "options": [
+    {
+      "key": "a",
+      "label": "Add `density=True` to both `hist` calls",
+      "patchCode": "import numpy as np\nimport matplotlib.pyplot as plt\n\nrng = np.random.default_rng(0)\nmobile  = rng.normal(4.5, 1.2, size=3000).clip(min=0)\ndesktop = rng.normal(4.2, 1.0, size=250).clip(min=0)\n\nfig, ax = plt.subplots(figsize=(7, 4))\nax.hist(mobile,  bins='auto', density=True, alpha=0.5, label='mobile',  color='#7CD992')\nax.hist(desktop, bins='auto', density=True, alpha=0.5, label='desktop', color='#E8B65A')\nax.set_title('checkout_time_seconds.png (density)')\nax.set_xlabel('checkout time (s)')\nax.set_ylabel('density')\nax.legend()\nplt.show()",
+      "isCorrect": true,
+      "resultLog": "Both histograms normalised; shapes overlay. Mobile and desktop both centred ~4s; mobile slightly wider. Shapes are now directly comparable.",
+      "rationale": "`density=True` makes the histogram show the **probability density** — each bar's height is `(count in bin) / (total count × bin width)`. The **area under each histogram sums to 1**, so the y-axis is comparable across groups of *any* size. This is the right way to overlay distributions; counts can only be compared between groups of the same size.",
+      "resultFigureSvg": "<svg viewBox=\"0 0 700 400\" xmlns=\"http://www.w3.org/2000/svg\" preserveAspectRatio=\"xMidYMid meet\" width=\"100%\" height=\"auto\"><rect x=\"0\" y=\"0\" width=\"700\" height=\"400\" fill=\"var(--code-bg, #11161D)\" rx=\"6\"/><text x=\"64\" y=\"22\" fill=\"var(--text, #E6E8EC)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"13\" font-weight=\"600\">checkout_times — density (shapes comparable across groups)</text><line x1=\"64\" y1=\"36\" x2=\"64\" y2=\"344\" stroke=\"var(--muted, #8B9099)\" stroke-width=\"1\"/><line x1=\"64\" y1=\"344\" x2=\"676\" y2=\"344\" stroke=\"var(--muted, #8B9099)\" stroke-width=\"1\"/><rect x=\"73.2\" y=\"255.0\" width=\"85.7\" height=\"89.0\" fill=\"#7CD992\" opacity=\"0.85\"/><text x=\"116.0\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">0-2</text><rect x=\"195.6\" y=\"179.7\" width=\"85.7\" height=\"164.3\" fill=\"#7CD992\" opacity=\"0.85\"/><text x=\"238.4\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">2-4</text><rect x=\"318.0\" y=\"90.8\" width=\"85.7\" height=\"253.2\" fill=\"#7CD992\" opacity=\"0.85\"/><text x=\"360.8\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">4-6</text><rect x=\"440.4\" y=\"220.8\" width=\"85.7\" height=\"123.2\" fill=\"#7CD992\" opacity=\"0.85\"/><text x=\"483.2\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">6-8</text><rect x=\"562.8\" y=\"302.9\" width=\"85.7\" height=\"41.1\" fill=\"#7CD992\" opacity=\"0.85\"/><text x=\"605.6\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">8-10</text><text x=\"56\" y=\"347\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">0</text><text x=\"56\" y=\"285.4\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">9</text><text x=\"56\" y=\"223.8\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">18</text><text x=\"56\" y=\"162.20000000000002\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">27</text><text x=\"56\" y=\"100.6\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">36</text><text x=\"56\" y=\"39\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">45</text><text x=\"370\" y=\"386\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"11\" text-anchor=\"middle\">time bucket (s)</text><text transform=\"translate(20, 190) rotate(-90)\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"11\" text-anchor=\"middle\">density</text></svg>"
+    },
+    {
+      "key": "b",
+      "label": "Sub-sample mobile down to 250 points to match desktop's size",
+      "patchCode": "import numpy as np\nimport matplotlib.pyplot as plt\n\nrng = np.random.default_rng(0)\nmobile  = rng.normal(4.5, 1.2, size=3000).clip(min=0)\ndesktop = rng.normal(4.2, 1.0, size=250).clip(min=0)\nmobile = rng.choice(mobile, size=250, replace=False)\n\nfig, ax = plt.subplots(figsize=(7, 4))\nax.hist(mobile, bins='auto', alpha=0.5, label='mobile', color='#E8B65A')\nax.hist(desktop, bins='auto', alpha=0.5, label='desktop', color='#7CD992')\nax.legend()\nplt.show()",
+      "isCorrect": false,
+      "resultLog": "Both groups n=250 now — but **you threw away 2,750 mobile observations**; the mobile histogram is now noisier and your statistical power is shot.",
+      "rationale": "Throwing away data to match group sizes is **almost always wrong**. The whole point of the larger sample is that you have more confidence in mobile's shape. Down-sampling makes mobile noisier without helping desktop, and it changes the question ('what does the mobile distribution look like?' is no longer answered by a representative sample). Use `density=True` instead."
+    },
+    {
+      "key": "c",
+      "label": "Use a log y-axis to compress the mobile histogram down",
+      "patchCode": "ax.hist(mobile,  bins='auto', alpha=0.5, label='mobile')\nax.hist(desktop, bins='auto', alpha=0.5, label='desktop')\nax.set_yscale('log')\nax.legend()\nplt.show()",
+      "isCorrect": false,
+      "resultLog": "Now you can see both — but log-y means 1 count and 10 counts look similar widths; you cannot compare shapes intuitively.",
+      "rationale": "Log-y is a tool for very-different-magnitude data, not for shape comparison. Once you log the y-axis the visual gap between a mode and the tail compresses; the eye reads ratios as additive distances. You'd lose the very thing you were trying to see — the shape contrast. `density=True` is the right tool: same y-scale (densities sum to 1), same shape comparison."
+    }
+  ],
+  "hints": [
+    "What's on the y-axis right now? Counts. How can you compare across groups of different sizes if the y-axis is counts?",
+    "Add `density=True` to both `hist` calls — each histogram becomes a probability density (area = 1), comparable across group sizes."
+  ],
+  "explanationMd": "### Why the bug occurs\nA histogram's default y-axis is **count** — the number of data points in each bin. For a group with 3,000 points, a typical bin holds ~150 points. For a group with 250 points, the same bin holds ~12. The 3,000-group's bars are ~12× taller, regardless of shape similarity.\n\nYou wanted to compare *shape* (where does the distribution centre, how wide is the spread, are the modes the same), and the chart instead tells you about *size* (one group is bigger).\n\n### Why the fix is correct\n`density=True` normalises the histogram so that the **integral (sum of bar areas) equals 1**. Each bar height is `(count in bin) / (total count × bin width)`. The y-axis becomes a **probability density** — values are unitless and comparable across groups.\n\nNow the two groups are on the same scale; the eye reads shape directly. This is the only honest way to overlay distributions of different sizes.\n\n### Density vs frequency\n- **`density=False`** (default): y-axis is count. Direct, but uncomparable across group sizes.\n- **`density=True`**: y-axis is density (area under curve = 1). Right choice for shape comparison.\n\n### A close cousin: `weights`\nFor more general normalisation:\n```python\nweights = np.ones_like(mobile) / len(mobile)\nax.hist(mobile, weights=weights, bins='auto')\n```\nBar heights now show **fraction of total** rather than count. Useful when you want percentages directly (a 0.15 bar means 15% of points fell there).\n\n### When you want both\nDraw two side-by-side panels — one density (for shape), one count (for size). The density panel shows distribution shape; the count panel shows that mobile has 12× more samples. The reader can answer both questions.",
+  "recruiterReview": "Strong — you recognised that **shape comparison and size comparison are two different questions**, and reached for density to answer the first one honestly. Down-sampling the larger group is the lazy fix that throws away information; density preserves both groups in full. Two follow-ups: 1) when groups have wildly different sizes, also draw a **KDE** overlay (`sns.kdeplot` or `histplot(kde=True)`) — the KDE is bin-free and even smoother for shape comparison. 2) Always include the sample sizes in the legend: `'mobile (n=3000)'` so the reader knows what they're looking at. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Density vs Count — Comparing Distributions Honestly\n\nWhenever you overlay two histograms, ask yourself: **am I comparing shape or size?** Counts answer 'how many'; density answers 'what shape.' These are different questions and need different y-axes.\n\n### The trap\nGroup A has 3,000 points; group B has 250. Their histograms with default `density=False`:\n- A's bars are ~12× taller in every bin.\n- B's distribution is functionally invisible.\n- The reader concludes 'A is taller everywhere' — which is true but useless.\n\nThe shape question — does A centre higher? Is A wider? Same modes? — is unanswerable.\n\n### `density=True` — the fix\n```python\nax.hist(group_a, density=True, alpha=0.5, label='A')\nax.hist(group_b, density=True, alpha=0.5, label='B')\n```\nEach histogram is normalised so its bars sum to 1 (area-wise). The y-axis is now **probability density**: how much probability mass per unit of x.\n\n- Heights are in units of `1 / x-units`.\n- A density of 0.4 at x=4 means 'around x=4, 40% of the distribution's mass per unit of x.'\n- Comparable across groups of any size.\n\n### What density mathematically is\nA histogram's density estimate is:\n```\ndensity[i] = count[i] / (n_total × bin_width[i])\n```\nThe area of bar i is `count[i] / n_total` — the fraction of points in that bin. Sum across bars: 1.\n\n### Density vs `weights=1/n`\nThe `weights` parameter is a more general tool:\n```python\nweights = np.ones_like(data) / len(data)\nax.hist(data, weights=weights)\n```\nNow bars show **fraction of total** (a 0.15 bar means 15% of points). The difference from density: weights doesn't divide by bin width, so the units stay unitless. Density's y-axis depends on bin width; weights's doesn't.\n\n**Use density when**: shapes have similar x-range and you want a true density curve.\n**Use weights=1/n when**: you want bars to be percentages and don't care about bin-width invariance.\n\n### The KDE alternative\nFor very different-sized groups, an overlaid **kernel density estimate** is even cleaner:\n```python\nimport seaborn as sns\nsns.histplot(group_a, stat='density', kde=True, label='A', alpha=0.4)\nsns.histplot(group_b, stat='density', kde=True, label='B', alpha=0.4)\n```\nThe KDE smooths bins entirely; you see smooth curves overlaid. Use when you want to focus on shape and don't care about precise bin counts.\n\n### Tell the reader the n\nWhenever you density-normalise, include the sample sizes in the legend so readers know what they're looking at:\n```python\nax.hist(group_a, density=True, label=f'A (n={len(group_a)})')\n```\nA reader who sees only the density chart might assume groups have similar size; the legend keeps them honest.\n\n### When NOT to use density\n- **Same group size**: counts are fine; density is unnecessary jargon.\n- **You actually care about counts**: 'how many users were in each bucket?' density removes that information.\n- **Audience is unfamiliar with density**: explain it, or use percentages (weights=1/n).\n\n### Side-by-side panels for both\nWhen sizes matter AND shapes matter, two panels:\n```python\nfig, (ax_density, ax_count) = plt.subplots(1, 2, figsize=(12, 4))\nax_density.hist([group_a, group_b], density=True, label=['A', 'B'])\nax_count.hist([group_a, group_b], density=False, label=['A', 'B'])\nfig.legend()\n```\nLeft panel: shape comparison. Right panel: size comparison. Reader gets both questions answered.\n\n### Common reasoning mistakes\n- Overlaying default-count histograms of different-sized groups and 'concluding' a shape difference.\n- Down-sampling the bigger group to match the smaller (throws away data and statistical power).\n- Density without sample sizes in the legend (reader doesn't know which curve is more trustworthy).\n- Reaching for log-y to 'compress' the bigger group (changes the interpretation of bar heights).\n\n### You just learned…\n**Density normalises bar heights so the area under each histogram sums to 1**, making **shapes comparable across groups of any size**. `density=True` is the right move whenever you overlay two distributions of different sizes. Counts answer 'how many'; density answers 'what shape' — they're different questions.",
+    "videos": [
+      {
+        "title": "Histogram density vs count",
+        "searchQuery": "matplotlib histogram density true tutorial"
+      },
+      {
+        "title": "Comparing two distributions in matplotlib",
+        "searchQuery": "compare two histograms matplotlib density tutorial"
+      }
+    ]
+  },
+  "estMinutes": 6,
+  "version": 1,
+  "conceptCard": "This mission is about **density vs count when comparing distributions**.\n\n- Default histograms use **counts** on the y-axis — incomparable across groups of different sizes.\n- `density=True` normalises so **area under each histogram = 1**; shapes become comparable.\n- Down-sampling to match group sizes throws away data; use density instead.\n\nThe code overlays two count-histograms of size 3000 vs 250; the smaller is invisible. Add `density=True`.",
+  "lineNotes": [
+    {
+      "line": 5,
+      "noteMd": "3,000 mobile observations."
+    },
+    {
+      "line": 6,
+      "noteMd": "Only 250 desktop observations — group sizes differ by 12×."
+    },
+    {
+      "line": 9,
+      "noteMd": "**The bug.** Default `density=False` (counts) makes mobile dwarf desktop. Add `density=True`."
+    },
+    {
+      "line": 10,
+      "noteMd": "Same fix here on the second hist call."
+    }
+  ],
+  "takeaway": "When overlaying groups of different sizes, use density=True — area under each histogram = 1, shapes become comparable.",
+  "glossary": [
+    {
+      "term": "probability density",
+      "definitionMd": "Function whose integral over an interval gives the probability of observing a value in that interval. Units of `1 / x-units`. Total integral over all x equals 1. Histograms with `density=True` estimate this from data."
+    },
+    {
+      "term": "normalization (of a histogram)",
+      "definitionMd": "Scaling bar heights so the histogram sums to a fixed total — usually 1 (density) or 100% (percentages via weights). Makes histograms of different-sized groups directly comparable."
+    },
+    {
+      "term": "`alpha` (matplotlib)",
+      "definitionMd": "Transparency parameter. `alpha=0.5` means 50% transparent; lets you overlay two histograms and see both. Combined with `density=True`, the foundation pattern for distribution comparison."
+    },
+    {
+      "term": "kernel density estimate (KDE)",
+      "definitionMd": "Continuous smooth curve estimating distribution shape. Independent of bin choice. `seaborn.histplot(kde=True)` overlays one for free; `seaborn.kdeplot(...)` draws KDE only. Particularly useful when comparing distributions of very different sizes."
+    }
+  ],
+  "figureSvg": "<svg viewBox=\"0 0 700 400\" xmlns=\"http://www.w3.org/2000/svg\" preserveAspectRatio=\"xMidYMid meet\" width=\"100%\" height=\"auto\"><rect x=\"0\" y=\"0\" width=\"700\" height=\"400\" fill=\"var(--code-bg, #11161D)\" rx=\"6\"/><text x=\"64\" y=\"22\" fill=\"var(--text, #E6E8EC)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"13\" font-weight=\"600\">checkout_times — counts (the big group dominates)</text><line x1=\"64\" y1=\"36\" x2=\"64\" y2=\"344\" stroke=\"var(--muted, #8B9099)\" stroke-width=\"1\"/><line x1=\"64\" y1=\"344\" x2=\"676\" y2=\"344\" stroke=\"var(--muted, #8B9099)\" stroke-width=\"1\"/><rect x=\"73.2\" y=\"254.0\" width=\"85.7\" height=\"90.0\" fill=\"#E8B65A\" opacity=\"0.85\"/><text x=\"116.0\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">0-2</text><rect x=\"195.6\" y=\"173.4\" width=\"85.7\" height=\"170.6\" fill=\"#E8B65A\" opacity=\"0.85\"/><text x=\"238.4\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">2-4</text><rect x=\"318.0\" y=\"83.4\" width=\"85.7\" height=\"260.6\" fill=\"#E8B65A\" opacity=\"0.85\"/><text x=\"360.8\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">4-6</text><rect x=\"440.4\" y=\"216.1\" width=\"85.7\" height=\"127.9\" fill=\"#E8B65A\" opacity=\"0.85\"/><text x=\"483.2\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">6-8</text><rect x=\"562.8\" y=\"301.4\" width=\"85.7\" height=\"42.6\" fill=\"#E8B65A\" opacity=\"0.85\"/><text x=\"605.6\" y=\"362\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"middle\">8-10</text><text x=\"56\" y=\"347\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">0</text><text x=\"56\" y=\"285.4\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">260</text><text x=\"56\" y=\"223.8\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">520</text><text x=\"56\" y=\"162.20000000000002\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">780</text><text x=\"56\" y=\"100.6\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">1k</text><text x=\"56\" y=\"39\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"10\" text-anchor=\"end\">1.3k</text><text x=\"370\" y=\"386\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"11\" text-anchor=\"middle\">time bucket (s)</text><text transform=\"translate(20, 190) rotate(-90)\" fill=\"var(--muted, #8B9099)\" font-family=\"ui-monospace, Menlo, monospace\" font-size=\"11\" text-anchor=\"middle\">count</text></svg>",
+  "figureCaption": "Before — counts on the y-axis; the bigger group (mobile, n=3000) dwarfs desktop (n=250)."
+}
