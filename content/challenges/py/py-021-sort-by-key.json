@@ -1,0 +1,78 @@
+{
+  "id": "py-021-sort-by-key",
+  "sector": "py",
+  "difficulty": "medium",
+  "title": "21_top_scores.ipynb",
+  "language": "python",
+  "icon": "list-ordered",
+  "conceptTags": ["sorted", "key", "lambda"],
+  "descriptionMd": "## Mission: Top Scores First\n\nYou have a list of `(name, score)` pairs and you want the **highest scores first**, so a leaderboard reads `('Ada', 92), ('Linus', 88), …`. You wrote `sorted(scores, reverse=True)` — and got `('Linus', 88)` first because Python sorted by the *name*, alphabetically descending.\n\nWith no `key=` argument, `sorted()` compares tuples element-by-element from the left — names first, scores second. You want to compare on the second element. Add a `key=` function so the sort happens by score.",
+  "initialCode": "scores = [(\"Ada\", 92), (\"Linus\", 88), (\"Guido\", 75), (\"Grace\", 99)]\nleaderboard = sorted(scores, reverse=True)\nprint(\"Top scores:\")\nfor name, score in leaderboard:\n    print(f\"  {name}: {score}\")",
+  "buggyLineStart": 2,
+  "buggyLineEnd": 2,
+  "traceback": "Top scores:\n  Linus: 88\n  Guido: 75\n  Grace: 99\n  Ada: 92",
+  "correctOutput": "Top scores:\n  Grace: 99\n  Ada: 92\n  Linus: 88\n  Guido: 75",
+  "options": [
+    {
+      "key": "a",
+      "label": "Pass `key=lambda row: row[1]` so the sort uses the score",
+      "patchCode": "scores = [(\"Ada\", 92), (\"Linus\", 88), (\"Guido\", 75), (\"Grace\", 99)]\nleaderboard = sorted(scores, key=lambda row: row[1], reverse=True)\nprint(\"Top scores:\")\nfor name, score in leaderboard:\n    print(f\"  {name}: {score}\")",
+      "isCorrect": true,
+      "resultLog": "Top scores:\n  Grace: 99\n  Ada: 92\n  Linus: 88\n  Guido: 75",
+      "rationale": "`key=` tells `sorted()` *what to compare*. The lambda receives each tuple as `row` and returns `row[1]` (the score), so Python sorts by score, biggest first under `reverse=True`. This pattern — `key=lambda x: x[some_index]` or `key=lambda x: x.attr` — is the most common Python sort, and reads cleanly once you've seen it a few times."
+    },
+    {
+      "key": "b",
+      "label": "Use `.sort()` in place: `scores.sort(reverse=True)`",
+      "patchCode": "scores = [(\"Ada\", 92), (\"Linus\", 88), (\"Guido\", 75), (\"Grace\", 99)]\nscores.sort(reverse=True)\nprint(\"Top scores:\")\nfor name, score in scores:\n    print(f\"  {name}: {score}\")",
+      "isCorrect": false,
+      "resultLog": "Top scores:\n  Linus: 88\n  Guido: 75\n  Grace: 99\n  Ada: 92",
+      "rationale": "`.sort()` modifies the list in place — useful when you don't need the original order — but it still defaults to comparing tuples left-to-right. Same wrong result. The bug isn't *where* the sorted list lives; it's *what* the sort key is."
+    },
+    {
+      "key": "c",
+      "label": "Sort the scores separately and reassemble",
+      "patchCode": "scores = [(\"Ada\", 92), (\"Linus\", 88), (\"Guido\", 75), (\"Grace\", 99)]\nnumbers = sorted([s for _, s in scores], reverse=True)\nleaderboard = [(n, s) for s in numbers for n, sc in scores if sc == s]\nprint(\"Top scores:\")\nfor name, score in leaderboard:\n    print(f\"  {name}: {score}\")",
+      "isCorrect": false,
+      "resultLog": "Top scores:\n  Grace: 99\n  Ada: 92\n  Linus: 88\n  Guido: 75",
+      "rationale": "Lands on the right output by hand-reconstructing pairs, but the code is far heavier than it needs to be, has nested loops you'd struggle to explain in a code review, and breaks if two scores tie (you'd reattach both names to each). `key=` is exactly the right tool — reach for it first."
+    }
+  ],
+  "hints": [
+    "Print `(\"Linus\", 88) < (\"Guido\", 75)` and `(\"Linus\", 88) < (\"Ada\", 99)` to see how Python compares tuples — it walks left to right.",
+    "Pass a `key=` function: `sorted(scores, key=lambda row: row[1], reverse=True)` tells Python to compare by the score, not the name."
+  ],
+  "explanationMd": "### Why the bug occurs\nPython compares tuples lexicographically — element by element from the left. So `(\"Linus\", 88) > (\"Guido\", 75)` not because `88 > 75` but because `\"Linus\" > \"Guido\"`; the score is never reached. `sorted(scores, reverse=True)` therefore orders names alphabetically descending and ignores the scores you actually care about.\n\n### Why the fix is correct\n`key=lambda row: row[1]` tells `sorted()` to call the function on each element and sort by the return value. The lambda returns the score, so Python compares scores. With `reverse=True` the largest score comes first. The general shape — `sorted(items, key=lambda x: x.some_field)` — is one of the most useful patterns in Python and turns up constantly in data work, sorting records, building leaderboards, and ranking results.\n\n`operator.itemgetter(1)` would also work and is marginally faster — `sorted(scores, key=itemgetter(1), reverse=True)`. Use lambdas when you're learning; switch to `itemgetter` / `attrgetter` for hot loops once you've internalised the pattern.",
+  "recruiterReview": "Good — you identified that `sorted()` with no key compares tuples left-to-right, then reached for a `key=` lambda, which is the standard idiom. Two things to file away for next time: 1) `operator.itemgetter(1)` is functionally equivalent and slightly faster in hot paths, and 2) sorts in Python are **stable**, so chaining `sorted(records, key=...)` calls works for multi-field sorts (sort by tiebreaker first, then by primary key second). Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Sorting With a `key=` Function\n\nSorting in Python is one of those things that *looks* easy until you sort something more complex than a list of numbers. The `key=` argument is the universal escape hatch.\n\n### The default sort: lexicographic\n```python\nsorted([3, 1, 2])             # [1, 2, 3]\nsorted([\"banana\", \"apple\"])    # ['apple', 'banana']\nsorted([(1, \"b\"), (1, \"a\")])   # [(1, 'a'), (1, 'b')]\n```\nFor a tuple, Python compares the first element first, then the second only as a tiebreaker — left-to-right, lexicographic.\n\n### When that's not what you want\nIn the mission, the data is `(name, score)` and you want order by score. The default sort orders by `name`. You need to tell `sorted()` to look at the score instead.\n\n### `key=` accepts any function\n```python\nsorted(scores, key=lambda row: row[1])\n```\nFor each tuple `row`, the lambda returns `row[1]` (the score). `sorted()` builds a parallel list of those return values and sorts the original list to match. The key function is called **once per item** — never compare-by-compare — so even a slow key function is fine.\n\n### Common shapes\n```python\n# Sort dicts by a field\nusers = [{\"name\": \"Ada\", \"score\": 92}, ...]\nsorted(users, key=lambda u: u[\"score\"], reverse=True)\n\n# Sort by string length\nsorted(words, key=len)              # `len` is itself a function\n\n# Sort case-insensitively\nsorted(words, key=str.lower)\n\n# Sort by multiple fields — primary, then secondary as a tiebreaker\nsorted(records, key=lambda r: (r[\"sector\"], -r[\"score\"]))\n```\n\n### Stability — a quiet superpower\nPython's sort is **stable**: items the key calls \"equal\" keep their original order. That means you can sort by tiebreaker first, then by the primary key:\n```python\nrecords = sorted(records, key=lambda r: r[\"name\"])      # secondary\nrecords = sorted(records, key=lambda r: r[\"score\"], reverse=True)  # primary\n```\nor in one call, with a tuple key as above. Both work; the tuple form is usually clearer once you're used to it.\n\n### `operator.itemgetter` / `attrgetter`\n```python\nfrom operator import itemgetter, attrgetter\nsorted(scores, key=itemgetter(1), reverse=True)\nsorted(users,  key=attrgetter(\"score\"), reverse=True)\n```\nSlightly faster than a lambda in hot paths, and often clearer. Use whichever your team uses.\n\n### Sorted vs in-place sort\n- `sorted(xs)` returns a **new** list, leaves `xs` alone.\n- `xs.sort()` sorts `xs` **in place**, returns `None`.\n\nIf you need both orderings later, `sorted()` is the right choice.\n\n### Common beginner mistakes\n- Forgetting `key=` and being surprised by lexicographic tuple order (the bug).\n- Writing `key=lambda x: x[1], reverse=True` *outside* the function call (a SyntaxError) — keep it inside the parens.\n- Returning a *mutating* key function — `key=lambda x: x.pop()` modifies the list as you sort it.\n\n### You just learned…\n`sorted()` accepts a `key=` function that says **what to compare**. `reverse=True` flips the order. The key is called once per item, sorts are stable, and `itemgetter`/`attrgetter` are faster cousins of the common lambda. This is the most-used Python sort idiom.",
+    "videos": [
+      {
+        "title": "Sorting in Python with key= and lambda",
+        "searchQuery": "python sorted key lambda tutorial beginner"
+      },
+      {
+        "title": "operator.itemgetter and attrgetter explained",
+        "searchQuery": "python operator itemgetter attrgetter sort key"
+      }
+    ]
+  },
+  "estMinutes": 6,
+  "version": 1,
+  "conceptCard": "This mission is about **sorting with a custom key**.\n\n- Without `key=`, `sorted()` compares tuples **left-to-right** (name first).\n- `key=lambda row: row[1]` tells Python to sort by the second element.\n- The sort is **stable** — equal keys keep their original order.\n\nThe code asks for the highest scores but sorts alphabetically by name. Add `key=` to sort by score.",
+  "lineNotes": [
+    {
+      "line": 1,
+      "noteMd": "A list of `(name, score)` tuples — the data is fine; the sort key is wrong."
+    },
+    {
+      "line": 2,
+      "noteMd": "**The bug.** `sorted(scores, reverse=True)` compares tuples left-to-right, so it sorts by **name**, not score. Add `key=lambda row: row[1]`."
+    },
+    {
+      "line": 4,
+      "noteMd": "Tuple unpacking — destructures each `(name, score)` pair as the loop walks the list."
+    }
+  ],
+  "takeaway": "sorted() compares tuples left-to-right by default; use key=lambda x: x[…] to pick the field."
+}
