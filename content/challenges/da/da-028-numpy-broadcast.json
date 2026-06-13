@@ -1,0 +1,100 @@
+{
+  "id": "da-028-numpy-broadcast",
+  "sector": "da",
+  "difficulty": "medium",
+  "title": "28_normalize_per_row.ipynb",
+  "language": "python",
+  "icon": "shuffle",
+  "conceptTags": [
+    "numpy",
+    "broadcasting",
+    "shape-mismatch"
+  ],
+  "descriptionMd": "## Mission: Normalize Each Row to Sum to 1\n\nYou have a `(1000, 5)` matrix — 1,000 users, 5 categories of spending. You want each **row** to sum to 1 (normalize per user). You wrote `matrix / matrix.sum()` and the result looks weird; checking `result.sum()` gives 1.0 but individual rows don't sum to anything meaningful.\n\nYou divided by the **scalar total** instead of by the **per-row total**. To divide row-by-row, you need an array of 1,000 row sums, broadcast against the `(1000, 5)` matrix. `matrix.sum(axis=1, keepdims=True)` gives you a `(1000, 1)` column of row sums; broadcast against `(1000, 5)` element-wise to normalize each row.",
+  "initialCode": "import numpy as np\n\nrng = np.random.default_rng(4)\nspending = rng.exponential(scale=50, size=(1000, 5))   # 1000 users, 5 categories\n\n# Try to normalize each row to sum to 1.\nrow_normalized = spending / spending.sum()\n\nprint('result shape:', row_normalized.shape)\nprint('whole-matrix sum:', row_normalized.sum().round(2))\nprint('first three row sums:', row_normalized.sum(axis=1)[:3].round(4))",
+  "buggyLineStart": 7,
+  "buggyLineEnd": 7,
+  "traceback": "result shape: (1000, 5)\nwhole-matrix sum: 1.0\nfirst three row sums: [0.0020 0.0009 0.0014]\n# Each row sums to its fraction of the global total — not 1 per row.",
+  "correctOutput": "result shape: (1000, 5)\nwhole-matrix sum: 1000.0\nfirst three row sums: [1. 1. 1.]\n# Each row sums to exactly 1.",
+  "options": [
+    {
+      "key": "a",
+      "label": "Divide by row sums with `keepdims=True`: `matrix / matrix.sum(axis=1, keepdims=True)`",
+      "patchCode": "import numpy as np\n\nrng = np.random.default_rng(4)\nspending = rng.exponential(scale=50, size=(1000, 5))\n\nrow_normalized = spending / spending.sum(axis=1, keepdims=True)\n\nprint('result shape:', row_normalized.shape)\nprint('whole-matrix sum:', row_normalized.sum().round(2))\nprint('first three row sums:', row_normalized.sum(axis=1)[:3].round(4))",
+      "isCorrect": true,
+      "resultLog": "result shape: (1000, 5)\nwhole-matrix sum: 1000.0\nfirst three row sums: [1. 1. 1.]",
+      "rationale": "`spending.sum(axis=1)` returns a `(1000,)` array of row sums. With `keepdims=True` it returns `(1000, 1)` — a column. **Broadcasting** then aligns `(1000, 5) / (1000, 1)` element-wise: each row of `spending` is divided by the matching row sum. The `keepdims=True` is the critical detail — without it, you'd get `(1000, 5) / (1000,)` which broadcasts **column-wise**, dividing each *column* by a per-user value, which isn't what you want either."
+    },
+    {
+      "key": "b",
+      "label": "Use `axis=1` without `keepdims`: `matrix / matrix.sum(axis=1)`",
+      "patchCode": "row_normalized = spending / spending.sum(axis=1)\nprint('shape:', row_normalized.shape)",
+      "isCorrect": false,
+      "resultLog": "ValueError: operands could not be broadcast together with shapes (1000,5) (1000,)\n# Shape mismatch: numpy can't align (1000, 5) with (1000,).",
+      "rationale": "`spending.sum(axis=1)` is `(1000,)` — a 1-D array. Broadcasting aligns the **trailing dimensions**: `(1000, 5)` vs `(1000,)` → numpy tries to broadcast the `(1000,)` as 5 columns of length 1000, which doesn't match. **You need `keepdims=True`** to get `(1000, 1)`, which broadcasts cleanly with `(1000, 5)`. This is the single most common broadcasting bug for analysts."
+    },
+    {
+      "key": "c",
+      "label": "Loop over rows and normalize each: `for i in range(len(spending)): spending[i] /= spending[i].sum()`",
+      "patchCode": "import numpy as np\n\nrng = np.random.default_rng(4)\nspending = rng.exponential(scale=50, size=(1000, 5))\n\nfor i in range(len(spending)):\n    spending[i] = spending[i] / spending[i].sum()\n\nprint('first three row sums:', spending.sum(axis=1)[:3].round(4))",
+      "isCorrect": false,
+      "resultLog": "first three row sums: [1. 1. 1.]\n# Works, but 1000 Python-level iterations; ~100× slower than the vectorized version.",
+      "rationale": "Correct answer; awful performance. A Python loop processes 1,000 rows one at a time; the vectorized `keepdims=True` version does the same work in one numpy call running compiled C code. On 1,000 rows the difference is milliseconds vs sub-millisecond. On 10M rows it's the difference between *seconds* and *minutes*. **Vectorize whenever you can**; loops are a smell in numpy code."
+    }
+  ],
+  "hints": [
+    "Print `spending.sum(axis=1).shape` — it's `(1000,)`, a 1-D vector. To broadcast as a column, you need `(1000, 1)` — that's what `keepdims=True` gives you.",
+    "Use `spending / spending.sum(axis=1, keepdims=True)`. The `(1000, 1)` row-sum column broadcasts element-wise against the `(1000, 5)` matrix."
+  ],
+  "explanationMd": "### Why the bug occurs\nnumpy's broadcasting aligns operands by **trailing dimensions**, padding with size-1 dimensions on the left as needed. For `(1000, 5) / (1000,)`, numpy tries:\n- `(1000, 5)` ← unchanged\n- `(1000,)` → padded to `(1, 1000)` — that's the shape numpy interprets it as.\n\nThe trailing dimensions are `5` and `1000` — mismatch. Hence the `ValueError`.\n\nFor `(1000, 5) / (1000, 1)` (after `keepdims=True`):\n- `(1000, 5)` ← unchanged\n- `(1000, 1)` ← unchanged\n\nTrailing dims: `5` and `1`. The `1` is broadcastable — numpy replicates the `(1000, 1)` column 5 times to match. Now each row is divided by its own row sum.\n\n### Why the fix is correct\n`keepdims=True` preserves the reduced dimension as size 1, so the result of `sum(axis=1, keepdims=True)` is `(1000, 1)` — broadcastable against `(1000, 5)`. This is the canonical numpy idiom for 'reduce along axis K but keep the axis for broadcasting.'\n\n### Three broadcasting rules to remember\n1. **Align trailing dimensions.** numpy pads with 1s on the left to make shapes the same length.\n2. **Size-1 dimensions broadcast.** A size-1 dim is replicated to match the other operand.\n3. **All non-1, non-equal dims are errors.** No silent reshaping.\n\nWith these three rules you can reason about any numpy operation. A `(1000, 5) / (1000, 1)` is fine; a `(1000, 5) / (1000,)` is not; a `(1000, 5) / (5,)` IS fine (numpy pads to `(1, 5)`, which broadcasts against `(1000, 5)`).\n\n### Always check shapes when something feels off\n```python\nprint(a.shape, b.shape, (a / b).shape)\n```\nIf the result shape isn't what you expected, broadcasting did something unexpected. **Type the shapes yourself before running an operation** when the shapes don't match exactly — you'll catch the bug before it ships.",
+  "recruiterReview": "Strong — you used `keepdims=True` and kept the operation vectorized. `keepdims` is one of those flags juniors skip and then debug for an hour; making it a habit pays dividends. Two follow-ups: 1) for very large matrices, prefer **`np.divide(a, b, out=a)`** to avoid allocating a copy. 2) When broadcasting feels confusing, write down the shapes on paper before typing — `(N, K) / (N, 1)` checks out as `(N, K)`; `(N, K) / (N,)` doesn't. Pen-and-paper resolves more numpy bugs than print statements. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## numpy Broadcasting — The Rules\n\nBroadcasting is what makes numpy fast and expressive, but it's also the #1 source of confusing bugs for analysts. Internalising the three rules below pays for itself within an hour.\n\n### Rule 1: Align trailing dimensions\nnumpy aligns shapes from the **right**, padding shorter shapes with size-1 dimensions on the **left**.\n\n```\n(3, 4, 5)   vs   (4, 5)\n         →   (1, 4, 5)\n```\nNow they share trailing `(4, 5)`. The leading `(3,)` broadcasts because `1` is broadcastable.\n\n### Rule 2: Size-1 dimensions broadcast\nA dimension of size 1 is replicated to match the other operand's size in that dimension.\n\n```\n(3, 4) + (1, 4)  → both treated as (3, 4)\n(3, 4) + (3, 1)  → both treated as (3, 4)\n(3, 1) + (1, 4)  → both treated as (3, 4)   # outer product shape\n```\n\n### Rule 3: All other dimensions must be exactly equal\nNo size-1, no equal → error.\n```\n(3, 4) + (3, 5)  → ERROR (trailing 4 vs 5)\n```\n\n### The three classic analyst broadcasting patterns\n\n#### A) Subtract row means\n```python\nrow_means = X.mean(axis=1, keepdims=True)   # (n, 1)\ncentered = X - row_means                     # (n, k) - (n, 1) → (n, k)\n```\n\n#### B) Subtract column means\n```python\ncol_means = X.mean(axis=0)                   # (k,)\ncentered = X - col_means                     # (n, k) - (k,) → (n, k)\n```\nNote: this one *does* work without `keepdims=True`, because `(k,)` aligns to the trailing dim of `(n, k)` directly.\n\n#### C) Outer product\n```python\nx = np.arange(3)         # (3,)\ny = np.arange(4)         # (4,)\nouter = x[:, None] * y[None, :]   # (3, 1) × (1, 4) → (3, 4)\n```\n\n### Why `axis=1` needs `keepdims=True` but `axis=0` doesn't\n- `axis=0` reduces ROWS, leaving a `(k,)` shape. Trailing dim is `k`. Aligns with `(n, k)` directly.\n- `axis=1` reduces COLUMNS, leaving a `(n,)` shape. Trailing dim is `n`, which is `≠ k` — error.\n\n**To broadcast against the original shape after reducing along axis K, set `keepdims=True`.**\n\n### Debugging broadcasting errors\n1. **Print all operand shapes.**\n2. **Mentally apply the three rules.** Align right, pad left with 1s.\n3. **Look for the failing dimension.** It's almost always 'a size-1 dim is missing where I needed one.'\n4. **Add `[:, None]` or `[None, :]` to inject the missing dim.**\n\n```python\na = np.array([1, 2, 3])              # (3,)\nb = np.array([10, 20])               # (2,)\na[:, None] + b[None, :]              # (3, 1) + (1, 2) → (3, 2) outer sum\n```\n\n### When NOT to use broadcasting\n- **Aggregation over groups** (groupby): use `pandas.DataFrame.groupby` or `np.add.reduceat`.\n- **Truly element-wise operations on labeled data** (pandas Series): pandas' alignment is smarter than raw numpy broadcasting.\n- **GPU-accelerated work**: use `torch` or `jax`; broadcasting rules are the same.\n\n### Common reasoning mistakes\n- Forgetting `keepdims=True` after `axis=1` reduction.\n- Confusing `axis=0` (reduces rows; leaves shape `(k,)`) with `axis=1` (reduces cols; leaves shape `(n,)`).\n- Writing Python loops over rows when broadcasting would work.\n- Trying `(N, K) / (K, N)` (transposed) and getting an error instead of the matrix product.\n\n### You just learned…\n**numpy aligns shapes from the right, broadcasts size-1 dims, errors on mismatches.** For reductions along `axis=1`, use `keepdims=True` to get a `(n, 1)` shape that broadcasts against the original `(n, k)`. Always print shapes when something feels off — broadcasting is precise, but your mental model has to match it.",
+    "videos": [
+      {
+        "title": "numpy broadcasting rules",
+        "searchQuery": "numpy broadcasting rules tutorial beginner"
+      },
+      {
+        "title": "keepdims and reductions",
+        "searchQuery": "numpy keepdims sum mean axis tutorial"
+      }
+    ]
+  },
+  "estMinutes": 6,
+  "version": 1,
+  "conceptCard": "This mission is about **numpy broadcasting and `keepdims`**.\n\n- Broadcasting aligns shapes from the **trailing** dimension, padding with 1s on the left.\n- `axis=1` reduction returns a `(n,)` shape; **add `keepdims=True`** to get `(n, 1)` for broadcasting against the original `(n, k)`.\n- Always print shapes when something feels off.\n\nThe code divides by the global total instead of per-row totals. Use `keepdims=True`.",
+  "lineNotes": [
+    {
+      "line": 4,
+      "noteMd": "1000 users × 5 categories. The grain of the report is the user."
+    },
+    {
+      "line": 7,
+      "noteMd": "**The bug.** `matrix.sum()` is the global sum; you want **row sums**. Use `matrix.sum(axis=1, keepdims=True)` so the broadcast aligns row-wise."
+    }
+  ],
+  "takeaway": "When reducing with axis=1, use keepdims=True so the result broadcasts cleanly against the original shape.",
+  "glossary": [
+    {
+      "term": "broadcasting (numpy)",
+      "definitionMd": "numpy's rule for combining arrays of different shapes element-wise. Aligns shapes from the **right**, pads shorter shapes with size-1 dims on the left, and replicates size-1 dims to match the other operand. Element-wise without explicit loops."
+    },
+    {
+      "term": "`keepdims=True`",
+      "definitionMd": "Parameter on numpy reductions (`sum`, `mean`, `std`, `max`, …). Keeps the reduced axis as size 1 so the result has the same number of dimensions as the input. Essential for broadcasting reductions back against the original array."
+    },
+    {
+      "term": "`axis` parameter",
+      "definitionMd": "Specifies the axis along which a reduction operates. **`axis=0` reduces ROWS** (collapses the row dimension, returns a per-column result). **`axis=1` reduces COLUMNS** (collapses the column dimension, returns a per-row result). Counter-intuitive at first; memorise it."
+    },
+    {
+      "term": "vectorization",
+      "definitionMd": "Replacing Python loops with numpy operations that process whole arrays in compiled C. Typically 50-1000× faster than the equivalent loop. The main reason numpy exists."
+    },
+    {
+      "term": "`[:, None]` (slicing trick)",
+      "definitionMd": "Equivalent to `[:, np.newaxis]`. Inserts a size-1 dimension. Turns `(n,)` into `(n, 1)`. Use to make a 1-D vector broadcast as a column. `[None, :]` makes it broadcast as a row."
+    }
+  ]
+}

@@ -1,0 +1,104 @@
+{
+  "id": "da-030-random-seed-reproducibility",
+  "sector": "da",
+  "difficulty": "medium",
+  "title": "30_two_runs_disagree.ipynb",
+  "language": "python",
+  "icon": "rotate-ccw",
+  "conceptTags": [
+    "numpy",
+    "random",
+    "reproducibility"
+  ],
+  "descriptionMd": "## Mission: 'I Ran the A/B Sim Twice and Got Two Answers'\n\nYou ran a simulation to estimate the variance of an A/B test outcome under random user allocation. The first run reported `effect = 1.23%`; you re-ran the same code five minutes later and got `effect = 0.97%`. Your colleague will see *both* numbers in the deck and ask which is right.\n\nWithout a **seed**, every run of numpy's random sampler produces different values. For an analyst, this means **your results are not reproducible** — no one can verify them, and you can't track down a discrepancy. Seed your random generator with `numpy.random.default_rng(seed)` and the same code produces the same output every time.",
+  "initialCode": "import numpy as np\n\n# Simulate one A/B test outcome with no seed.\ndef one_run():\n    # 5,000 users assigned to A or B; B has a +0.5% lift in conversion.\n    rng = np.random.default_rng()   # ← no seed\n    n = 5000\n    group = rng.choice(['A', 'B'], size=n)\n    base_p = 0.10\n    converted = (rng.uniform(size=n) < (base_p + 0.005 * (group == 'B'))).astype(int)\n    p_a = converted[group == 'A'].mean()\n    p_b = converted[group == 'B'].mean()\n    return p_b - p_a\n\nrun1 = one_run()\nrun2 = one_run()\nprint(f'run1 effect: {run1:.4f}')\nprint(f'run2 effect: {run2:.4f}')\nprint('reproducible?', run1 == run2)",
+  "buggyLineStart": 6,
+  "buggyLineEnd": 6,
+  "traceback": "run1 effect: 0.0123\nrun2 effect: 0.0097\nreproducible? False\n# Two runs of the same code disagree — no one can verify the deck.",
+  "correctOutput": "run1 effect: 0.0123\nrun2 effect: 0.0123\nreproducible? True\n# Same seed → same random draws → same output. Reproducible.",
+  "options": [
+    {
+      "key": "a",
+      "label": "Pass a fixed integer to `default_rng(42)` — the modern numpy seed pattern",
+      "patchCode": "import numpy as np\n\ndef one_run(seed: int = 42):\n    rng = np.random.default_rng(seed)\n    n = 5000\n    group = rng.choice(['A', 'B'], size=n)\n    base_p = 0.10\n    converted = (rng.uniform(size=n) < (base_p + 0.005 * (group == 'B'))).astype(int)\n    p_a = converted[group == 'A'].mean()\n    p_b = converted[group == 'B'].mean()\n    return p_b - p_a\n\nrun1 = one_run()\nrun2 = one_run()\nprint(f'run1 effect: {run1:.4f}')\nprint(f'run2 effect: {run2:.4f}')\nprint('reproducible?', run1 == run2)",
+      "isCorrect": true,
+      "resultLog": "run1 effect: 0.0123\nrun2 effect: 0.0123\nreproducible? True",
+      "rationale": "`numpy.random.default_rng(seed)` is **the modern numpy random API** (since 1.17, 2019). Pass an integer (anything works — 42 is the cliché, but use whatever) and the sequence of random numbers is identical on every run. **Each function that needs randomness should accept a `seed` parameter** with a sensible default. For a Monte Carlo simulation, you'd run with many different seeds and aggregate — but each individual run is reproducible."
+    },
+    {
+      "key": "b",
+      "label": "Use the legacy global state: `np.random.seed(42)`",
+      "patchCode": "import numpy as np\n\nnp.random.seed(42)   # ← legacy global state\n\ndef one_run():\n    n = 5000\n    group = np.random.choice(['A', 'B'], size=n)\n    base_p = 0.10\n    converted = (np.random.uniform(size=n) < (base_p + 0.005 * (group == 'B'))).astype(int)\n    p_a = converted[group == 'A'].mean()\n    p_b = converted[group == 'B'].mean()\n    return p_b - p_a\n\nrun1 = one_run()\nrun2 = one_run()\nprint(f'run1 effect: {run1:.4f}')\nprint(f'run2 effect: {run2:.4f}')\nprint('reproducible?', run1 == run2)",
+      "isCorrect": false,
+      "resultLog": "run1 effect: 0.0107\nrun2 effect: 0.0091\nreproducible? False\n# Two runs of the same code STILL disagree — because run1 advanced the global RNG state, leaving run2 starting from where run1 left off.",
+      "rationale": "`np.random.seed` sets the **global RNG state**, but every random call advances it. Calling `one_run()` twice consumes one batch of randoms for run1; run2 starts where run1 left off. Same code, different outputs. The fix is to reset the seed *inside* `one_run` — or use the modern `default_rng(seed)` pattern which creates a *local* generator per call. **Global random state is one of the most common reproducibility bugs**; the modern API replaced it for exactly this reason."
+    },
+    {
+      "key": "c",
+      "label": "Run more iterations and take the average — variance washes out",
+      "patchCode": "import numpy as np\n\nrng = np.random.default_rng()\n\ndef one_run():\n    n = 5000\n    group = rng.choice(['A', 'B'], size=n)\n    base_p = 0.10\n    converted = (rng.uniform(size=n) < (base_p + 0.005 * (group == 'B'))).astype(int)\n    return converted[group == 'B'].mean() - converted[group == 'A'].mean()\n\nresults = [one_run() for _ in range(1000)]\nprint(f'mean effect across 1000 runs: {np.mean(results):.4f}')",
+      "isCorrect": false,
+      "resultLog": "mean effect across 1000 runs: 0.0049\n# Tighter answer; but you still can't reproduce the 0.0049 — it's *also* random.",
+      "rationale": "A Monte Carlo average IS a useful technique — variance does wash out as N grows — but the *average itself* still depends on the random seed. Without a seed, the average of 1000 runs is also not reproducible (it'll be close, but not identical). **Reproducibility and convergence are independent problems**: even when you average over many runs to reduce variance, you should still seed the runs so the average is bit-exact replayable. The two together: seed your simulations *and* run many of them."
+    }
+  ],
+  "hints": [
+    "Without a seed, `default_rng()` uses the OS's entropy source — different on every run. Pass an integer seed for determinism.",
+    "Use `np.random.default_rng(42)` — the modern numpy random API. Each function with randomness should accept `seed` as a parameter."
+  ],
+  "explanationMd": "### Why the bug occurs\n`np.random.default_rng()` (no argument) seeds from the OS's entropy source — different on every run. Without a fixed seed, the same code produces different numbers every time. For exploratory work this is fine; for a *result you want to verify* it's a reproducibility bug.\n\n### Why the fix is correct\nPassing an integer to `default_rng(seed)` initialises the pseudo-random generator deterministically. The same seed produces the same sequence of pseudo-random numbers, every run, on every machine, forever. This is the foundation of **scientific reproducibility** in any code that uses randomness.\n\n### Modern vs legacy numpy random\nnumpy has two random APIs:\n- **Legacy (pre-1.17, 2019)**: `np.random.seed(42)`, `np.random.randn(...)`, global state.\n- **Modern (1.17+)**: `np.random.default_rng(42)`, `rng.normal(...)`, local generator instances.\n\n**Always prefer the modern API.** It avoids global state bugs (option B's pitfall), supports better PRNG algorithms (`PCG64` by default vs the legacy Mersenne Twister), and makes seeding visible at the call site.\n\nThe legacy API still works for backwards compatibility, but new code should not use it.\n\n### Patterns for reproducibility in analysis code\n\n#### Pattern 1: top-of-script seed\n```python\nSEED = 42\nrng = np.random.default_rng(SEED)\n# use rng.normal, rng.choice, ... throughout the script\n```\nFor exploratory notebooks. One seed, reused.\n\n#### Pattern 2: function-level seed parameter\n```python\ndef simulate(n: int, *, seed: int = 0) -> float:\n    rng = np.random.default_rng(seed)\n    ...\n```\nFor library code or shared functions. Each call is independently reproducible; caller controls the seed.\n\n#### Pattern 3: Monte Carlo with seeded sub-runs\n```python\nresults = [simulate(n, seed=i) for i in range(1000)]\nmean_effect = np.mean(results)\n```\nEach sub-run is reproducible (seed=i); the aggregate is reproducible (same set of seeds); variance washes out from averaging. **Best practice for stochastic estimation.**\n\n### Reproducibility caveats\n- **PRNG output isn't guaranteed across numpy major versions.** numpy 1.17 → 2.0 may shift the legacy stream. The modern API (`default_rng`) is more stable but not bit-exact across all versions.\n- **Different OS / architectures** can produce slightly different floats from the same seed (in edge cases). For most analyst work this is invisible; for cryptographic or scientific work check the spec.\n- **Parallel code** needs careful seed management. `rng.spawn(n)` (numpy 1.25+) creates `n` independent child generators with reproducible streams.\n\n### Tracking down a 'two runs disagree' bug\n1. Are any random calls unseeded? Search for `np.random.<anything>` without a prior `default_rng(seed)`.\n2. Is the RNG passed through to all helpers? If `simulate()` creates `rng = default_rng(seed)` but calls `helper()` that creates its own `default_rng()` (no seed), you've leaked randomness.\n3. Does the code depend on dictionary iteration order, set ordering, or wall-clock time? Those add non-determinism beyond the RNG.",
+  "recruiterReview": "Strong — you used the modern `default_rng(seed)` pattern and recognised the global-state trap of `np.random.seed`. Two follow-ups for production: 1) for stakeholder-facing reports, **log the seed** alongside the result (`'effect=0.0123 (seed=42)'`) so the number is verifiable. 2) For Monte Carlo work, prefer `rng.spawn(n)` (numpy 1.25+) to generate `n` independent reproducible sub-generators for parallel runs. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Reproducible Randomness — `default_rng(seed)`\n\nReproducibility is a foundation of any numerical work that's going to be reviewed, replayed, or extended. Random code without a seed is **the most common reproducibility bug**, and the fix is one line.\n\n### Why reproducibility matters\nWithout a seed:\n- Your colleague can't replicate your number.\n- A bug discovered next week can't be replayed from the same data.\n- A regression test can't compare 'before' to 'after.'\n- You can't track which version of the code produced which number.\n\nWith a seed:\n- Every run produces the same number.\n- Any reviewer can verify.\n- Regression tests are possible.\n- The seed becomes a tracking dimension: `'effect=0.012 (seed=42)'` is fully replayable.\n\n### Modern numpy random — `default_rng`\n```python\nrng = np.random.default_rng(seed=42)\nx = rng.normal(0, 1, size=1000)\ny = rng.choice([0, 1], size=100)\n```\n- `default_rng(seed)` returns a `numpy.random.Generator` instance.\n- The instance has methods for all distributions: `normal`, `uniform`, `choice`, `integers`, `permutation`, etc.\n- **All methods consume the generator's state**, so consecutive calls produce independent streams.\n- Two generators with the same seed produce identical streams; two with different seeds are independent.\n\n### Legacy API (do not use in new code)\n```python\nnp.random.seed(42)\nx = np.random.normal(0, 1, size=1000)\n```\nThis uses a **single global generator state**. Problems:\n- Any other code (a third-party library, an import side effect) that calls `np.random.<anything>` modifies that state. Your seed doesn't guarantee reproducibility if anything else is touching it.\n- Threading is dangerous: two threads share the state, race conditions corrupt streams.\n- The legacy generator uses Mersenne Twister; the modern one uses PCG64, with better statistical properties.\n\n**Use `default_rng` everywhere.**\n\n### Patterns by use case\n\n#### Exploratory notebook\n```python\nSEED = 42\nrng = np.random.default_rng(SEED)\n# use rng.* throughout\n```\nOne seed at the top; reused for the session.\n\n#### Library / shared function\n```python\ndef bootstrap_mean(data, n_boot=10000, *, seed=0):\n    rng = np.random.default_rng(seed)\n    return [rng.choice(data, size=len(data), replace=True).mean() for _ in range(n_boot)]\n```\nEvery function that uses randomness takes a `seed` parameter. The caller controls reproducibility.\n\n#### Monte Carlo\n```python\nseeds = range(1000)\nresults = [simulate(seed=s) for s in seeds]\nestimate = np.mean(results)\nci = np.percentile(results, [2.5, 97.5])\n```\nEach run is reproducible; the aggregate (mean + CI) is reproducible; variance washes out from averaging. **The right pattern for stochastic estimation.**\n\n#### Parallel Monte Carlo (numpy ≥ 1.25)\n```python\nrng = np.random.default_rng(42)\nchildren = rng.spawn(1000)   # 1000 independent reproducible sub-generators\nresults = [simulate(child) for child in children]   # can be parallelised\n```\n`spawn` is the right way to seed sub-generators for parallel work; don't pass the same seed to multiple workers or you'll get identical streams.\n\n### Mixing numpy with other random sources\nIf your simulation also uses Python's `random`, `torch`, or `sklearn`'s `random_state`, **seed each one separately**:\n```python\nimport random\nrandom.seed(42)\nimport torch\ntorch.manual_seed(42)\nrng = np.random.default_rng(42)\nclf = RandomForestClassifier(random_state=42)\n```\nSeeding one doesn't seed the others. For sklearn, pass `random_state=42` to any estimator that uses randomness (sampling, splits, init).\n\n### Reproducibility caveats\n- **numpy version**: the modern `default_rng` is stable across patch versions but not guaranteed bit-exact across major versions. Pin numpy in `requirements.txt`.\n- **OS / CPU architecture**: floats are usually identical; tail-edge cases may differ. For analytics this is invisible; for ultra-precise sci work, check.\n- **Threading / parallel**: use `rng.spawn` not separate `default_rng(seed)` calls.\n- **Dictionary / set ordering**: Python 3.7+ dicts are insertion-ordered; sets are not. If your code depends on set iteration order, you're still non-deterministic even with a seed.\n\n### Logging seeds for verifiable results\nFor any number that ships to stakeholders:\n```python\nlog.info(f'effect={effect:.4f} seed={seed} numpy_version={np.__version__}')\n```\nA reviewer can replicate the number with just the seed and the version. This is what 'reproducible analytics' actually looks like in practice.\n\n### Common reasoning mistakes\n- Using `default_rng()` without a seed for results that need to be reproducible.\n- Using legacy `np.random.seed` and being surprised when a library touches global state.\n- Seeding numpy but forgetting Python `random` or `torch` or sklearn `random_state`.\n- Re-seeding inside a loop with the same seed (every iteration produces identical 'random' values).\n- Believing that averaging many runs replaces reproducibility (no — average over seeded runs).\n\n### You just learned…\n**Reproducibility is one line: `rng = np.random.default_rng(seed)`**. The modern API gives you local generator state, better PRNG quality, and clean function-level reproducibility. Every random function in your codebase should accept a `seed` parameter; log seeds alongside published results so reviewers can verify them.",
+    "videos": [
+      {
+        "title": "numpy default_rng tutorial",
+        "searchQuery": "numpy default_rng modern random tutorial"
+      },
+      {
+        "title": "Reproducible Monte Carlo",
+        "searchQuery": "monte carlo simulation seed reproducible python tutorial"
+      }
+    ]
+  },
+  "estMinutes": 6,
+  "version": 1,
+  "conceptCard": "This mission is about **reproducible random sampling**.\n\n- `np.random.default_rng()` (no seed) is OS-entropy-seeded — different on every run.\n- `np.random.default_rng(42)` is **deterministic** — same code, same result, every run, every machine.\n- Functions that use randomness should accept a `seed` parameter; legacy `np.random.seed` has global-state hazards.\n\nThe code uses `default_rng()` without a seed; two runs give different answers. Pass a seed.",
+  "lineNotes": [
+    {
+      "line": 4,
+      "noteMd": "Function that produces a stochastic estimate."
+    },
+    {
+      "line": 6,
+      "noteMd": "**The bug.** `default_rng()` without an argument uses OS entropy — different every run. Pass an integer seed."
+    },
+    {
+      "line": 7,
+      "noteMd": "5000 random user assignments — depends on the seed."
+    }
+  ],
+  "takeaway": "Reproducibility is one line: rng = np.random.default_rng(seed). Use the modern API; log seeds alongside results.",
+  "glossary": [
+    {
+      "term": "PRNG (pseudo-random number generator)",
+      "definitionMd": "Algorithm that produces a deterministic stream of numbers that *look* random. Seeded once; same seed → same stream. 'Pseudo' because they're not truly random — they're cryptographic-quality predictability."
+    },
+    {
+      "term": "seed",
+      "definitionMd": "Initial state of a PRNG. Same seed → same stream. Without a seed, the OS entropy source is used (clock + entropy pool) and the stream differs every run."
+    },
+    {
+      "term": "`np.random.default_rng`",
+      "definitionMd": "Modern numpy random API (since 1.17, 2019). Returns a `Generator` instance with `normal`, `uniform`, `choice`, `integers`, etc. methods. **Always preferred** over the legacy `np.random.seed` + global state."
+    },
+    {
+      "term": "PCG64",
+      "definitionMd": "Default PRNG algorithm in modern numpy. Better statistical properties than the legacy Mersenne Twister; faster; smaller state. Used automatically by `default_rng`."
+    },
+    {
+      "term": "Monte Carlo simulation",
+      "definitionMd": "Running many random sub-simulations and aggregating their outputs to estimate a quantity. Variance shrinks like `1/sqrt(n)`. Best practice: each sub-run is seeded individually so the aggregate is reproducible."
+    }
+  ]
+}
