@@ -1,0 +1,86 @@
+{
+  "id": "da-046-inner-vs-left-join",
+  "sector": "da",
+  "difficulty": "easy",
+  "title": "46_orders_with_customer_email.ipynb",
+  "language": "python",
+  "icon": "git-branch",
+  "conceptTags": ["joins", "pandas", "data-quality"],
+  "descriptionMd": "## Mission: Orders With Customer Email\n\nThe ops team wants every order from May with the customer's email next to it. You wrote `orders.merge(customers, on='customer_id')` and shipped a CSV. Two days later ops emails back: *\"this report is missing ~30% of our orders — anonymous-checkout orders are nowhere to be found.\"*\n\nThis is the **canonical join bug in every retail / e-commerce / SaaS analytics codebase**. Your `merge` defaulted to `how='inner'`, which silently drops any row from the left table where the join key doesn't match anything on the right. Anonymous orders have `customer_id = NaN` — no match → dropped. The fix is a one-character change (`how='left'`), but understanding *why* it's the right answer is what makes a senior analyst's reports trustworthy.",
+  "initialCode": "import pandas as pd\n\norders = pd.DataFrame({\n    \"order_id\":    [1001, 1002, 1003, 1004, 1005],\n    \"customer_id\": [50, 51, None, 52, None],   # anonymous checkout → NaN\n    \"amount\":      [42.00, 19.50, 12.00, 89.00, 7.50],\n})\ncustomers = pd.DataFrame({\n    \"customer_id\": [50, 51, 52],\n    \"email\":       [\"ada@example.com\", \"linus@example.com\", \"grace@example.com\"],\n})\n\nreport = orders.merge(customers, on=\"customer_id\")\nprint(f\"orders in report: {len(report)} of {len(orders)}\")\nprint(report[[\"order_id\", \"customer_id\", \"amount\", \"email\"]])",
+  "buggyLineStart": 12,
+  "buggyLineEnd": 12,
+  "traceback": "orders in report: 3 of 5\n   order_id  customer_id  amount               email\n0      1001         50.0   42.00     ada@example.com\n1      1002         51.0   19.50   linus@example.com\n2      1004         52.0   89.00   grace@example.com\n# anonymous orders 1003 and 1005 silently dropped",
+  "correctOutput": "orders in report: 5 of 5\n   order_id  customer_id  amount               email\n0      1001         50.0   42.00     ada@example.com\n1      1002         51.0   19.50   linus@example.com\n2      1003          NaN   12.00                 NaN\n3      1004         52.0   89.00   grace@example.com\n4      1005          NaN    7.50                 NaN",
+  "options": [
+    {
+      "key": "a",
+      "label": "Switch to a left join: `orders.merge(customers, on='customer_id', how='left')`",
+      "patchCode": "import pandas as pd\n\norders = pd.DataFrame({\n    \"order_id\":    [1001, 1002, 1003, 1004, 1005],\n    \"customer_id\": [50, 51, None, 52, None],\n    \"amount\":      [42.00, 19.50, 12.00, 89.00, 7.50],\n})\ncustomers = pd.DataFrame({\n    \"customer_id\": [50, 51, 52],\n    \"email\":       [\"ada@example.com\", \"linus@example.com\", \"grace@example.com\"],\n})\n\nreport = orders.merge(customers, on=\"customer_id\", how=\"left\")\nprint(f\"orders in report: {len(report)} of {len(orders)}\")\nprint(report[[\"order_id\", \"customer_id\", \"amount\", \"email\"]])",
+      "isCorrect": true,
+      "resultLog": "orders in report: 5 of 5\n   ... all 5 orders, anonymous rows have NaN email ...",
+      "rationale": "`how='left'` keeps **every row from the left table** (orders); for rows whose join key has no match on the right (anonymous orders), the right-side columns come through as `NaN`. The total count matches the source of truth (`orders`), and any downstream consumer can choose how to handle anonymous orders explicitly (filter them out *deliberately*, fill the email with `\"anonymous\"`, etc.). The key word is *explicit*: the right join type lets you decide what happens to unmatched rows instead of silently losing them."
+    },
+    {
+      "key": "b",
+      "label": "Filter the source so only orders with a customer ship: `orders = orders.dropna(subset=['customer_id'])`",
+      "patchCode": "import pandas as pd\n\norders = pd.DataFrame({\n    \"order_id\":    [1001, 1002, 1003, 1004, 1005],\n    \"customer_id\": [50, 51, None, 52, None],\n    \"amount\":      [42.00, 19.50, 12.00, 89.00, 7.50],\n})\ncustomers = pd.DataFrame({\n    \"customer_id\": [50, 51, 52],\n    \"email\":       [\"ada@example.com\", \"linus@example.com\", \"grace@example.com\"],\n})\n\norders = orders.dropna(subset=[\"customer_id\"])\nreport = orders.merge(customers, on=\"customer_id\")\nprint(f\"orders in report: {len(report)} of 5 source orders\")\nprint(report[[\"order_id\", \"customer_id\", \"amount\", \"email\"]])",
+      "isCorrect": false,
+      "resultLog": "orders in report: 3 of 5 source orders\n# explicitly dropped anonymous orders — ops still gets the same 'where are 2 orders?' email tomorrow",
+      "rationale": "Drops the same rows the bug dropped, but now you wrote the bug yourself. Ops wanted **every order**; you decided some orders don't count. Sometimes that's the right call — but it should be a *documented business decision* (\"we exclude anonymous orders from this report because…\"), not an upstream filter applied silently. The default report should preserve every row; let consumers filter when they need to."
+    },
+    {
+      "key": "c",
+      "label": "Right join instead — keep every customer row: `how='right'`",
+      "patchCode": "import pandas as pd\n\norders = pd.DataFrame({\n    \"order_id\":    [1001, 1002, 1003, 1004, 1005],\n    \"customer_id\": [50, 51, None, 52, None],\n    \"amount\":      [42.00, 19.50, 12.00, 89.00, 7.50],\n})\ncustomers = pd.DataFrame({\n    \"customer_id\": [50, 51, 52],\n    \"email\":       [\"ada@example.com\", \"linus@example.com\", \"grace@example.com\"],\n})\n\nreport = orders.merge(customers, on=\"customer_id\", how=\"right\")\nprint(f\"orders in report: {len(report)} of {len(orders)}\")\nprint(report[[\"order_id\", \"customer_id\", \"amount\", \"email\"]])",
+      "isCorrect": false,
+      "resultLog": "orders in report: 3 of 5\n# right join keeps every customer; the anonymous orders are STILL dropped because they have no customer to match",
+      "rationale": "A right join keeps every row from the *customers* table — which doesn't help, because the anonymous-checkout problem is on the *orders* side. The same three matched rows survive. The directionality matters: when the report's grain is 'every order,' the left side must be `orders` and the join must be `how='left'`. The `how='right'` form exists for completeness but is rarely the right tool; reshape the join so the table you want to preserve is on the left and use `how='left'`."
+    }
+  ],
+  "hints": [
+    "Print `orders['customer_id'].isna().sum()`. Two `NaN` values — and `inner` join drops every row whose key has no match.",
+    "Pass `how='left'` to `merge` so every order survives the join; unmatched rows get `NaN` for the right-side columns."
+  ],
+  "explanationMd": "### Why the bug occurs\n`DataFrame.merge` defaults to `how='inner'`. An inner join keeps a row only when the join key is present in **both** tables. For rows where `orders.customer_id` is `NaN`, there's nothing to match in `customers`, so they're dropped — silently, without a warning. The count goes down, the report ships, and the bug appears in downstream summaries days later.\n\nThis exact bug shape is the most common reporting incident in retail / e-commerce / SaaS analytics. It also shows up in:\n- **Server logs joined to user records** (some logs from anonymous sessions).\n- **Event streams joined to a session table** (the session expired and was deleted).\n- **Sales joined to a referral source** (most sales have no referrer; an inner join shows only the referred sales).\n\nAny time the **grain** of your report (the thing you want to count) doesn't match the table on the right of your join, an inner join will quietly filter rows you wanted.\n\n### Why the fix is correct\n`how='left'` declares: *every row from the left table survives, regardless of whether it matches on the right*. Unmatched rows get `NaN` for the right-side columns. The row count of `orders` is preserved; downstream consumers can choose to filter, fill, or report-as-is on the unmatched rows.\n\nThe broader principle: **the table whose grain matches your report belongs on the left**, and use `how='left'`. The default `how='inner'` is correct only when both tables must contribute to the row (e.g. `orders × order_lines` where you really do want only orders that have lines). When in doubt, do a `len()` before-and-after check — a join that changes your row count is a join that changed the answer.\n\n### Pandas vs SQL — same semantics\n| Pandas | SQL | Keeps |\n|---|---|---|\n| `how='inner'` | `INNER JOIN` | Only matched rows |\n| `how='left'` | `LEFT [OUTER] JOIN` | All left + matched right |\n| `how='right'` | `RIGHT [OUTER] JOIN` | All right + matched left |\n| `how='outer'` | `FULL [OUTER] JOIN` | All left + all right (NaN where missing) |\n| `how='cross'` | `CROSS JOIN` | Cartesian product (rare; explicit only) |\n\nThe pandas defaults to `inner`; SQL has no default and requires you to type the join type. **Always type `how=` explicitly when reading/reviewing pandas code** — the default is the most common bug.",
+  "recruiterReview": "Strong — you didn't just patch the count, you named *why* an inner join was wrong: the report's grain is 'every order' and the table on the right doesn't always have a match. That's the senior-analyst instinct. Two follow-ups for production: 1) **assert your row count** after every join — `assert len(report) == len(orders), f'lost {len(orders) - len(report)} rows'`. Cheap, catches this class of bug at write time. 2) For anonymous-handling, agree with ops up front: 'should anonymous orders show in the report as `email=NULL`, as a separate \"anonymous\" total, or be excluded entirely?' Document the decision in the report description. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Inner, Left, Right, Outer — Picking the Right Join\n\nJoins are where reports go wrong. A wrong join doesn't crash — it produces an honest-looking but silently-wrong answer. Picking the right join is the single most important pandas/SQL skill a junior analyst can develop.\n\n### The four join types, with one example each\nGiven two tables — `orders` (left) and `customers` (right):\n\n#### `how='inner'` — keep only matched rows\n```\norders        customers       inner\norder=1,c=50  c=50            order=1,c=50,email=A\norder=2,c=51  c=51            order=2,c=51,email=B\norder=3,c=NaN c=52            order=4,c=52,email=C\norder=4,c=52\norder=5,c=NaN\n```\nOnly orders with a matching customer survive. Anonymous orders (3, 5) and unsold customers (none here) are dropped. **The right tool when you genuinely require both sides to contribute** (e.g. customer-orders summary should drop customers who never ordered).\n\n#### `how='left'` — keep every row from the left\n```\norders        customers       left\norder=1,c=50  c=50            order=1,c=50,email=A\norder=2,c=51  c=51            order=2,c=51,email=B\norder=3,c=NaN c=52            order=3,c=NaN,email=NaN\norder=4,c=52                  order=4,c=52,email=C\norder=5,c=NaN                 order=5,c=NaN,email=NaN\n```\nThe row count matches `orders`. Unmatched rows have `NaN` on the right. **The right tool when your report's grain is the left table** (\"every order with optional customer info\").\n\n#### `how='right'` — keep every row from the right\nRarely used in practice — flip the tables and use `left` instead. The form exists for SQL parity.\n\n#### `how='outer'` — keep everything\n```\norder=1,c=50,email=A    (matched)\norder=2,c=51,email=B    (matched)\norder=3,c=NaN,email=NaN (unmatched left)\norder=4,c=52,email=C    (matched)\norder=5,c=NaN,email=NaN (unmatched left)\n# no unmatched right rows in this example\n```\n**The right tool when both tables independently matter** — e.g. \"give me every customer AND every order, with NaN where they don't line up.\" Common in data-quality audits (\"which customers have orders we can't link?\").\n\n### How to pick — three questions\n1. **What is the grain of the report?** (\"One row per order\" vs \"one row per customer\" vs \"one row per (customer, month)\".) The table whose rows == the grain is the LEFT table.\n2. **What should happen to unmatched rows?** Keep with NaN → outer join (left/right/full depending on which side). Drop → inner.\n3. **Does the row count match expectations after?** If `len(after) != len(left_table)` for a left join, **you have data-quality issues to investigate** (duplicate keys on the right, NaN keys, type mismatch).\n\n### The duplicate-on-the-right trap\nIf the right table has **multiple rows per join key**, a left join produces **more rows than the left table** — pandas fan-outs. Always check:\n```python\nassert customers[\"customer_id\"].is_unique, \"customers not unique on customer_id\"\n```\nbefore joining. Or use `validate='m:1'` on `merge` — pandas raises if the right side isn't unique.\n\n### Pandas vs SQL semantics — identical\nThe table above of `how=` to SQL keywords is exact: pandas `merge` is faithful to ANSI SQL join semantics. The only quirk is that pandas defaults to `inner` while SQL has no default — read both with that in mind.\n\n### Type-coercion gotcha\nIf `orders.customer_id` is `int64` and `customers.customer_id` is `object` (string), the join produces **zero matches** despite identical-looking values. Verify dtypes first:\n```python\nassert orders[\"customer_id\"].dtype == customers[\"customer_id\"].dtype\n```\nOr coerce explicitly. This is a top reason \"my join returned nothing\" on Stack Overflow.\n\n### Common reasoning mistakes\n- Trusting the default `how='inner'` when the grain is the left table.\n- Skipping the `len()` before/after check (the cheapest possible row-count guard).\n- Joining without verifying key uniqueness on the right (fan-out → silently wrong totals).\n- Type-mismatched join keys producing zero matches.\n- Using right joins (just flip the tables and use left).\n\n### You just learned…\nThe **grain** of your report determines which side is left and which is right. `how='inner'` only when both must contribute; `how='left'` when the left's grain is the report's grain; `how='outer'` for data-quality audits. Always row-count-check before and after. The wrong join silently loses rows — and silent losses are the most expensive reporting bug there is.",
+    "videos": [
+      { "title": "Pandas merge inner vs left vs outer", "searchQuery": "pandas merge join inner left outer tutorial beginner" },
+      { "title": "SQL joins explained visually", "searchQuery": "sql join types inner left outer venn diagram tutorial" }
+    ]
+  },
+  "estMinutes": 6,
+  "version": 1,
+  "conceptCard": "This mission is about **picking the right join type**.\n\n- `merge` defaults to `how='inner'` — silently drops rows that don't match on the right.\n- `how='left'` keeps every row from the left, with `NaN` for unmatched right columns.\n- The **grain** of your report decides which table is left and which `how=` to use.\n\nThe code uses the default inner join; anonymous orders (`customer_id = NaN`) get silently dropped. `how='left'` preserves every order.",
+  "lineNotes": [
+    { "line": 5, "noteMd": "Two orders have `None` (NaN) `customer_id` — anonymous checkout." },
+    { "line": 8, "noteMd": "The customer table has no row for anonymous; no key means no match." },
+    { "line": 12, "noteMd": "**The bug.** `merge` defaults to `how='inner'`. Anonymous-customer orders silently drop. Use `how='left'`." },
+    { "line": 14, "noteMd": "Notice 3 of 5 rows — the missing two are the bug's signature." }
+  ],
+  "takeaway": "merge defaults to inner — silently drops unmatched rows; use how='left' when the report's grain is the left table.",
+  "glossary": [
+    {
+      "term": "inner join",
+      "definitionMd": "Keeps a row only when the join key is present in **both** tables. The default for pandas `merge` and the explicit default in SQL. Silently drops rows that don't match — the most common cause of 'lost rows' reporting bugs."
+    },
+    {
+      "term": "left join",
+      "definitionMd": "Keeps **every row from the left table**; right-side columns are `NaN` (pandas) / `NULL` (SQL) for unmatched rows. The right choice when your report's grain matches the left table."
+    },
+    {
+      "term": "outer join",
+      "definitionMd": "Keeps every row from **both** tables; `NaN`/`NULL` on whichever side is missing. Useful for data-quality audits where both sides matter independently."
+    },
+    {
+      "term": "grain (of a report)",
+      "definitionMd": "The semantic 'thing' each row represents — 'one row per order,' 'one row per customer per month.' The grain determines which table is the source of truth for row count, and therefore which side of the join is left."
+    },
+    {
+      "term": "fan-out",
+      "definitionMd": "When a join produces more rows than the left table because the right table has duplicate join-key values. Detect with `df[key].is_unique` or `merge(..., validate='m:1')` — pandas raises if the right side isn't unique."
+    }
+  ]
+}
