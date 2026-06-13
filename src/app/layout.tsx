@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { SITE_URL } from "@/lib/site";
@@ -26,6 +26,11 @@ export const metadata: Metadata = {
     siteName: en.app.name,
   },
   twitter: { card: "summary", title: en.app.name, description: en.app.tagline },
+};
+
+// Match the browser UI (mobile address bar) to the page background (--bg).
+export const viewport: Viewport = {
+  themeColor: "#0a0c10",
 };
 
 export default function RootLayout({

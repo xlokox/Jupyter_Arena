@@ -57,6 +57,13 @@ body {
   color: var(--text);
 }
 
+/* The app is dark-only — tell the UA so native scrollbars and form controls
+   render dark (Section 8 palette), avoiding light scrollbars on the long
+   scroll-driven landing. */
+:root {
+  color-scheme: dark;
+}
+
 /* Global focus-visible safety net — ensures every keyboard-focusable element
    has a visible ring even when an explicit Tailwind focus-visible: class is
    absent. Individual components override this with their own styling. */
@@ -236,5 +243,221 @@ code {
   50% {
     transform: scale(1.12);
     opacity: 0.85;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+ * LANDING V2 — scroll-driven hero + "programming changed forever" story.
+ *
+ * A sticky stage exposes scroll progress as --lv2-p (0→1), written each frame
+ * by the useScrollProgress hook. Elements map a sub-window of that progress to
+ * a local 0→1 and key transform/opacity off it — compositor-only, tokens only.
+ *
+ * Mode classes (set on the section root by the hook after mount):
+ *   (none)         SSR / no-JS    → the static "initial" frame (broken cell +
+ *                                    all copy). The "after" layers are hidden.
+ *   .is-scrubbing  desktop+motion → continuous scrub via --lv2-p.
+ *   .is-step       mobile/coarse  → static solved frame; targets fade in on
+ *                                    scroll (IntersectionObserver, native
+ *                                    scrolling, never hijacked).
+ *   .is-reduced    reduced-motion → static solved frame, no motion.
+ * ════════════════════════════════════════════════════════════════════════ */
+
+/* Pin geometry — only the scrub mode turns the track into a tall pinned
+   stage; every other mode lays out as a normal-height section so no-JS and
+   mobile visitors never scroll past an empty pin. */
+.lv2-track,
+.lv2-stage {
+  position: relative;
+}
+.is-scrubbing .lv2-track {
+  min-height: var(--track-h, 200vh);
+}
+.is-scrubbing .lv2-stage {
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  overflow: hidden;
+}
+
+/* Reveal / vanish primitives. Baseline shows the broken cell (.lv2-out) and
+   hides the "after" layers (.lv2-in-*) → the SSR initial frame. */
+.lv2-in-up,
+.lv2-in-x {
+  opacity: 0;
+}
+.lv2-out {
+  opacity: 1;
+}
+
+.is-scrubbing .lv2-in-up,
+.is-scrubbing .lv2-in-x,
+.is-scrubbing .lv2-out {
+  --t: clamp(0, calc((var(--lv2-p, 0) - var(--start, 0)) / var(--span, 0.1)), 1);
+}
+.is-scrubbing .lv2-in-up {
+  opacity: var(--t);
+  transform: translateY(calc((1 - var(--t)) * var(--rise, 14px)));
+}
+.is-scrubbing .lv2-in-x {
+  opacity: var(--t);
+  transform: translateX(calc((1 - var(--t)) * var(--shift, 18px)));
+}
+.is-scrubbing .lv2-out {
+  opacity: calc(1 - var(--t));
+  transform: translateY(calc(var(--t) * -6px));
+}
+
+/* Static solved frame (reduced-motion). */
+.is-reduced .lv2-out {
+  opacity: 0;
+}
+.is-reduced .lv2-in-up,
+.is-reduced .lv2-in-x {
+  opacity: 1;
+  transform: none;
+}
+
+/* Mobile step: solved frame, but the "after" layers fade in as they scroll
+   into view (the hook adds .lv2-in via IntersectionObserver). */
+.is-step .lv2-out {
+  opacity: 0;
+}
+.is-step .lv2-in-up,
+.is-step .lv2-in-x {
+  opacity: 0;
+  transition:
+    opacity 0.5s ease-out,
+    transform 0.5s ease-out;
+}
+.is-step .lv2-in-up {
+  transform: translateY(14px);
+}
+.is-step .lv2-in-x {
+  transform: translateX(16px);
+}
+.is-step .lv2-in-up.lv2-in,
+.is-step .lv2-in-x.lv2-in {
+  opacity: 1;
+  transform: none;
+}
+
+/* Demo HUD XP bar fill — empty at the start, settles at 60% (30/50 XP). */
+.lv2-xpfill {
+  width: 0;
+}
+.is-scrubbing .lv2-xpfill {
+  width: calc(clamp(0, calc((var(--lv2-p, 0) - 0.72) / 0.16), 1) * 60%);
+}
+.is-reduced .lv2-xpfill,
+.is-step .lv2-xpfill {
+  width: 60%;
+  transition: width 0.6s ease-out;
+}
+
+/* ── Story beats — stacked & all readable by default; the scrub overlays and
+   crossfades them; mobile fades each in on scroll. ───────────────────────── */
+.lv2-beat {
+  position: relative;
+}
+.is-scrubbing .lv2-beat {
+  position: absolute;
+  inset: 0;
+  --fin: clamp(0, calc((var(--lv2-p, 0) - var(--in-start, 0)) / var(--in-span, 0.1)), 1);
+  --fout: clamp(0, calc((var(--out-start, 2) - var(--lv2-p, 0)) / var(--out-span, 0.1)), 1);
+  opacity: calc(var(--fin) * var(--fout));
+}
+.is-step .lv2-beat {
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity 0.5s ease-out,
+    transform 0.5s ease-out;
+}
+.is-step .lv2-beat.lv2-in {
+  opacity: 1;
+  transform: none;
+}
+
+/* ── Dev + robot SVG scene — animation is a scrub-only enhancement; every
+   other mode shows the final "augmented" pose (the natural class defaults). ─ */
+.lv2-svg-fade {
+  opacity: 1;
+}
+.is-scrubbing .lv2-svg-fade {
+  opacity: clamp(0, calc((var(--lv2-p, 0) - var(--start, 0)) / var(--span, 0.1)), 1);
+}
+/* Robot slides in from the right during the NOW beat. */
+.lv2-svg-x {
+  transform: none;
+}
+.is-scrubbing .lv2-svg-x {
+  --t: clamp(0, calc((var(--lv2-p, 0) - var(--start, 0)) / var(--span, 0.1)), 1);
+  transform: translateX(calc((1 - var(--t)) * var(--shift, 60px)));
+}
+/* The block that ships broken — visible only through the NOW beat. */
+.lv2-svg-show2 {
+  opacity: 0;
+}
+.is-scrubbing .lv2-svg-show2 {
+  opacity: calc(
+    clamp(0, calc((var(--lv2-p, 0) - 0.34) / 0.05), 1) *
+      clamp(0, calc((0.62 - var(--lv2-p, 0)) / 0.06), 1)
+  );
+}
+/* The fixed (green) block — present in the final pose; fades in over the red. */
+.lv2-svg-in3 {
+  opacity: 1;
+}
+.is-scrubbing .lv2-svg-in3 {
+  opacity: clamp(0, calc((var(--lv2-p, 0) - 0.6) / 0.1), 1);
+}
+/* The magnifier sweep — transient; hidden in the static pose. */
+.lv2-svg-mag {
+  opacity: 0;
+}
+.is-scrubbing .lv2-svg-mag {
+  opacity: calc(
+    clamp(0, calc((var(--lv2-p, 0) - 0.62) / 0.06), 1) *
+      clamp(0, calc((0.92 - var(--lv2-p, 0)) / 0.08), 1)
+  );
+  transform: translateX(calc((1 - clamp(0, calc((var(--lv2-p, 0) - 0.62) / 0.16), 1)) * 46px));
+}
+/* The developer leans toward the code in the AUGMENTED beat. */
+.lv2-svg-lean {
+  transform: none;
+}
+.is-scrubbing .lv2-svg-lean {
+  transform: translateX(calc(clamp(0, calc((var(--lv2-p, 0) - 0.62) / 0.18), 1) * -10px));
+}
+/* Soft team halo when the two end side by side. */
+.lv2-svg-glow {
+  opacity: 0.85;
+}
+.is-scrubbing .lv2-svg-glow {
+  opacity: calc(clamp(0, calc((var(--lv2-p, 0) - 0.82) / 0.12), 1) * 0.85);
+}
+
+/* The "scroll to debug" cue breathes until the visitor starts scrolling. */
+@keyframes lv2-cue {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.55;
+  }
+  50% {
+    transform: translateY(4px);
+    opacity: 1;
+  }
+}
+
+/* A streamed code block pulses while it carries the (unspotted) bug. */
+@keyframes lv2-block-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
   }
 }

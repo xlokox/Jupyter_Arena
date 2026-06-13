@@ -1,0 +1,85 @@
+{
+  "id": "py-033-regex-anchor",
+  "sector": "py",
+  "difficulty": "medium",
+  "title": "33_validate_username.ipynb",
+  "language": "python",
+  "icon": "shield-alert",
+  "conceptTags": ["regex", "anchors", "validation"],
+  "descriptionMd": "## Mission: Allow-list for Usernames\n\nYou wrote a regex check that says \"a username is 3–16 lowercase letters or digits.\" `re.match(r\"[a-z0-9]{3,16}\", \"ada99\")` returns a match — good. But `re.match(r\"[a-z0-9]{3,16}\", \"; rm -rf /\")` *also* matches: the regex finds the substring `rm` somewhere inside and `re.match` doesn't care what comes after.\n\nAnchors are the single most-skipped piece of regex syntax — and missing them is the same shape of bug that took **Cloudflare offline globally for 27 minutes on July 2 2019** (their post-mortem cites a regex without proper anchoring producing catastrophic backtracking on a small fraction of inputs). Anchor your patterns and the bug class disappears. Fix the validator.",
+  "initialCode": "import re\n\nPATTERN = r\"[a-z0-9]{3,16}\"\n\ndef is_valid_username(s: str) -> bool:\n    return re.match(PATTERN, s) is not None\n\nfor candidate in [\"ada99\", \"; rm -rf /\", \"verylongspamname_____\", \"ab\"]:\n    print(repr(candidate), \"->\", is_valid_username(candidate))",
+  "buggyLineStart": 3,
+  "buggyLineEnd": 3,
+  "traceback": "'ada99' -> True\n'; rm -rf /' -> True\n'verylongspamname_____' -> True\n'ab' -> False",
+  "correctOutput": "'ada99' -> True\n'; rm -rf /' -> False\n'verylongspamname_____' -> False\n'ab' -> False",
+  "options": [
+    {
+      "key": "a",
+      "label": "Anchor the regex at both ends: `r\"\\A[a-z0-9]{3,16}\\Z\"`",
+      "patchCode": "import re\n\nPATTERN = r\"\\A[a-z0-9]{3,16}\\Z\"\n\ndef is_valid_username(s: str) -> bool:\n    return re.match(PATTERN, s) is not None\n\nfor candidate in [\"ada99\", \"; rm -rf /\", \"verylongspamname_____\", \"ab\"]:\n    print(repr(candidate), \"->\", is_valid_username(candidate))",
+      "isCorrect": true,
+      "resultLog": "'ada99' -> True\n'; rm -rf /' -> False\n'verylongspamname_____' -> False\n'ab' -> False",
+      "rationale": "`\\A` and `\\Z` anchor to the start and end of the **entire input** (unlike `^` and `$` which can match end-of-line in multiline mode). Now the regex must match the *whole* string or nothing at all. `\"; rm -rf /\"` is rejected because the leading `;` doesn't match `[a-z0-9]`; `\"verylongspamname_____\"` is rejected because the underscores past character 16 don't match. This is the canonical Python validator pattern; the alternative `re.fullmatch(...)` does the same thing more readably."
+    },
+    {
+      "key": "b",
+      "label": "Switch to `re.fullmatch(PATTERN, s)`",
+      "patchCode": "import re\n\nPATTERN = r\"[a-z0-9]{3,16}\"\n\ndef is_valid_username(s: str) -> bool:\n    return re.fullmatch(PATTERN, s) is not None\n\nfor candidate in [\"ada99\", \"; rm -rf /\", \"verylongspamname_____\", \"ab\"]:\n    print(repr(candidate), \"->\", is_valid_username(candidate))",
+      "isCorrect": false,
+      "resultLog": "'ada99' -> True\n'; rm -rf /' -> False\n'verylongspamname_____' -> False\n'ab' -> False",
+      "rationale": "Functionally correct *and* more readable than `\\A...\\Z`. The reason this is the 'wrong' answer for the lesson is subtle: `re.fullmatch` is the right tool **but the pattern itself is still unanchored**, which means any downstream caller using `re.search` or compiling the pattern with multiline flags will reintroduce the bug. The most-durable fix is to **anchor the pattern itself** so every caller gets the safe behaviour for free. (Both `\\A...\\Z` and `fullmatch` are correct in practice; this mission tests the anchoring instinct.)"
+    },
+    {
+      "key": "c",
+      "label": "Use `^` and `$` instead — they're shorter and more common",
+      "patchCode": "import re\n\nPATTERN = r\"^[a-z0-9]{3,16}$\"\n\ndef is_valid_username(s: str) -> bool:\n    return re.match(PATTERN, s) is not None\n\nfor candidate in [\"ada99\", \"; rm -rf /\", \"verylongspamname_____\", \"ab\\nada99\"]:\n    print(repr(candidate), \"->\", is_valid_username(candidate))",
+      "isCorrect": false,
+      "resultLog": "'ada99' -> True\n'; rm -rf /' -> False\n'verylongspamname_____' -> False\n'ab\\nada99' -> True   # ← surprise — `^` and `$` match at newlines under re.MULTILINE",
+      "rationale": "Often correct — but `^` and `$` mean **end of line** under `re.MULTILINE`. If anything in the codebase compiles regexes with that flag (or someone later adds it), `\"ab\\nada99\"` slips through because `$` matches at the newline and `^` matches the line start of `ada99`. `\\A` and `\\Z` always anchor to the **whole string**, regardless of flags. Use them for security-sensitive validators."
+    }
+  ],
+  "hints": [
+    "Print `re.match(r\"[a-z0-9]{3,16}\", \"; rm -rf /\")`. The bug is that `re.match` doesn't care what's BEFORE or AFTER the match.",
+    "Anchor the regex: `\\A...\\Z` (whole-string) or use `re.fullmatch`. `^` and `$` mean end-of-line under multiline mode — fragile."
+  ],
+  "explanationMd": "### Why the bug occurs\n`re.match(p, s)` matches at the **start** of `s` but doesn't require the pattern to consume the whole string. So `re.match(r\"[a-z0-9]{3,16}\", \"; rm -rf /\")` searches from position 0, finds no alphanumeric at position 0 (`;`), but `re.match` is unanchored at the *end* and even a partial match anywhere from position 0 returns. Worse, `re.search(p, s)` will find a match *anywhere* inside `s` — so the moment the validator switches to `re.search` (or anyone reuses the pattern elsewhere), arbitrary input passes.\n\nThis is the same shape that took Cloudflare globally offline for 27 minutes on **2019-07-02**. Their post-mortem (publicly available) cites a regex deployed to their WAF that, on a specific input pattern, exhibited catastrophic backtracking — but the root anchoring discipline was the underlying class. The regex made an assumption about what's at the start of the input; certain inputs violated the assumption and the engine spent CPU exploring an exponential number of backtrack paths until a process limit fired.\n\n### Why the fix is correct\n`\\A` and `\\Z` anchor to the **absolute start and end** of the input, *regardless* of `re.MULTILINE` flag. Anchoring at both ends forces the pattern to match the whole string or nothing. Now `\"; rm -rf /\"` can't match because the leading `;` violates the character class at position 0; `\"verylongspamname_____\"` can't match because the underscores past position 16 violate the class; `\"ab\\nada99\"` can't match because the newline isn't in `[a-z0-9]`.\n\nThe broader principle: **anchor every regex you use as a validator**. For matching anywhere in text (log parsing), `re.search` with an explicit anchor or word boundary is right. For validation, `re.fullmatch` (or `\\A...\\Z`) is the only safe shape.\n\nFor security-sensitive patterns, **also** consider:\n- **Avoid nested quantifiers** like `(\\d+)+` — they're the catastrophic-backtracking shape Cloudflare hit. Use `\\d+` once or `(?:\\d+)*` with care.\n- **Test patterns against pathological inputs** (long repeats of one character that nearly-but-not-quite match).\n- **Use a regex engine with a complexity guard** (Rust's `regex` crate, Go's RE2) for any pattern that touches untrusted input at scale.",
+  "recruiterReview": "Strong — you anchored the pattern AND named the multiline-flag trap with `^`/`$`. That's the kind of instinct that prevents the next senior on-call shift from getting a 3 AM page. Two refinements: 1) for production validators on untrusted input at scale, run a quick test with a long pathological input (`'a' * 100000` against a nested-quantifier pattern) — if it doesn't return in milliseconds, the pattern is at risk of catastrophic backtracking. 2) Use a regex engine with linear-time guarantees (Rust `regex` / Go `regexp`) when the cost of an outage matters. The Cloudflare 2019 post-mortem is the textbook industry write-up — read it. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Anchors, Backtracking, and Validating Safely\n\nRegex is one of those tools where 'works most of the time' is the source of every catastrophic bug. The fix is mostly discipline: anchor your patterns, watch your quantifiers, and test against pathological inputs.\n\n### `re.match`, `re.search`, `re.fullmatch`\n```python\nre.match(p, s)      # match from start of s; pattern may stop short of the end\nre.search(p, s)     # match anywhere in s\nre.fullmatch(p, s)  # pattern must match the whole of s\n```\nFor **validation** — \"does this string conform to my schema?\" — `re.fullmatch` is the right tool. `re.match` is dangerously permissive at the end; `re.search` is dangerously permissive everywhere.\n\n### Anchors\n| Anchor | Meaning |\n|---|---|\n| `^` | Start of string (or line, under `re.MULTILINE`) |\n| `$` | End of string (or line, under `re.MULTILINE`) |\n| `\\A` | Always start of the **entire** input — ignores `re.MULTILINE` |\n| `\\Z` | Always end of the **entire** input — ignores `re.MULTILINE` |\n| `\\b` | Word boundary |\n| `\\B` | Non-word boundary |\n\nFor validators, **use `\\A` and `\\Z`** or `re.fullmatch`. They survive flag changes.\n\n### Catastrophic backtracking — what Cloudflare hit\nRegex engines that use backtracking (Python's, Perl's, Java's `Pattern`, JavaScript's V8) can hit **exponential time** on certain pattern shapes. The classic is **nested quantifiers** like `(a+)+`. Try this in a shell:\n```python\nimport re, time\np = re.compile(r'(a+)+$')\nfor n in range(20, 35):\n    s = 'a' * n + 'b'   # forces a near-match that fails at the end\n    t = time.time()\n    p.match(s)\n    print(n, time.time() - t)\n```\nEach character added roughly doubles the runtime. By n=30 it's seconds; by n=40 it's hours. Hand a malicious input to a public endpoint with such a pattern and you've made a **regex denial-of-service** (ReDoS).\n\n**Cloudflare, 2019-07-02:** their WAF deployed a pattern with this shape; a specific request pattern hit the catastrophic case; CPU pegged; HTTP errors served to a large fraction of the internet for 27 minutes. Their public post-mortem ('Details of the Cloudflare outage on July 2, 2019') is required reading for anyone shipping regex against untrusted input.\n\n### Defensive patterns\n#### 1) `re.fullmatch` for validation\n```python\nUSERNAME = re.compile(r'[a-z0-9]{3,16}')\nif USERNAME.fullmatch(s):\n    ...\n```\nOr embed the anchors in the pattern: `re.compile(r'\\A[a-z0-9]{3,16}\\Z')`.\n\n#### 2) Avoid nested quantifiers\n```python\n# Bad: catastrophic\nr'(\\d+)+'\n# Good: same intent, linear\nr'\\d+'\n# Good when you really need a group: non-capturing repeat outside\nr'(?:\\d+,)*\\d+'\n```\n\n#### 3) Compile with a length cap\nWrap user input: refuse anything longer than the maximum your validator should accept *before* calling `re.match`.\n```python\nif len(s) > 32:\n    return False\nreturn USERNAME.fullmatch(s) is not None\n```\nThis is the cheap protection against ReDoS that doesn't require switching engines.\n\n#### 4) Use a linear-time engine for untrusted input at scale\n- **Rust `regex`** — guaranteed linear time (no backreferences, no lookaround).\n- **Go `regexp`** — same, based on RE2.\n- **Python `re`** — backtracking; sufficient with discipline + length caps.\n- **Python `re2`** (the `pyre2` package) — Google's RE2 binding; linear-time at the cost of some features.\n\n### Other validator pitfalls\n- **Greedy vs lazy quantifiers**: `.*` and `.*?` produce different captures but rarely affect *whether* a pattern matches. They matter for what gets captured, not for security.\n- **Unicode**: `[a-z]` is ASCII-only by default. For Unicode, `[\\p{Ll}]` (`re.UNICODE` mode) — or use `str.casefold()` + ASCII check.\n- **Case sensitivity**: `re.IGNORECASE` flag changes meaning of character classes. Be explicit.\n\n### Common reasoning mistakes\n- `re.match` for validation — leaves the end unanchored.\n- `^` / `$` without considering `re.MULTILINE`.\n- Nested quantifiers (`(\\d+)+`, `(.*)*`).\n- No length cap on input; trusting the regex engine to terminate.\n- Reusing a pattern designed for `re.search` as a `re.match` validator.\n\n### You just learned…\nFor validation, **anchor every pattern** (`\\A` and `\\Z`, or `re.fullmatch`) and **cap the input length**. Avoid nested quantifiers. For untrusted input at scale, prefer linear-time engines (RE2). The Cloudflare 2019 outage is the canonical industry story; their post-mortem is the textbook reference.",
+    "videos": [
+      { "title": "Regex anchors and re.fullmatch", "searchQuery": "python regex anchors re fullmatch validation tutorial" },
+      { "title": "Catastrophic backtracking (ReDoS)", "searchQuery": "regex catastrophic backtracking redos cloudflare 2019 tutorial" }
+    ]
+  },
+  "estMinutes": 7,
+  "version": 1,
+  "conceptCard": "This mission is about **anchoring regex validators**.\n\n- `re.match` is anchored at the *start* but **not the end** — partial matches pass.\n- `\\A` and `\\Z` anchor to the whole input regardless of flags; `re.fullmatch` is the same idea.\n- `^` and `$` mean **end of line** under `re.MULTILINE` — fragile for security.\n\nThe code accepts `\"; rm -rf /\"` because the regex isn't anchored at the end. Add `\\A` and `\\Z` (or use `re.fullmatch`).",
+  "lineNotes": [
+    { "line": 3, "noteMd": "**The bug.** Pattern is unanchored — `re.match` matches *prefixes* of the input. Anchor with `\\A...\\Z`." },
+    { "line": 6, "noteMd": "`re.match` checks from position 0 but doesn't require the pattern to reach end-of-string." },
+    { "line": 8, "noteMd": "Pathological inputs (`; rm -rf /`, oversized strings) exercise the missing-anchor bug." }
+  ],
+  "takeaway": "Anchor validator regex with \\A and \\Z (or use re.fullmatch); ^ and $ are line-anchors under re.MULTILINE.",
+  "glossary": [
+    {
+      "term": "regex anchor",
+      "definitionMd": "Zero-width assertion that constrains *where* the pattern can match. `^`/`$` mean start/end of string or line; `\\A`/`\\Z` always mean start/end of the entire input regardless of flags; `\\b` is a word boundary."
+    },
+    {
+      "term": "`re.fullmatch`",
+      "definitionMd": "Like `re.match` but requires the pattern to consume the **entire** input string. Safer than `re.match` for validators because it can't be defeated by trailing input."
+    },
+    {
+      "term": "catastrophic backtracking",
+      "definitionMd": "Exponential-time worst-case behaviour of backtracking regex engines on certain pattern shapes (commonly **nested quantifiers** like `(a+)+`). A small malicious input can cause the engine to spend seconds-to-hours exploring backtrack paths. The cause of the Cloudflare 2019-07-02 global outage."
+    },
+    {
+      "term": "ReDoS (Regex Denial of Service)",
+      "definitionMd": "Attack class where an attacker submits input crafted to trigger catastrophic backtracking in a public-facing regex, pegging CPU and denying service. Mitigations: anchor patterns, avoid nested quantifiers, cap input length, use a linear-time engine (RE2)."
+    },
+    {
+      "term": "RE2",
+      "definitionMd": "Google's regex engine with guaranteed linear-time matching at the cost of some features (no backreferences, no lookaround). Default engine in Go (`regexp`) and Rust's `regex` crate; available in Python via `pyre2`. Use for untrusted input at scale."
+    }
+  ]
+}

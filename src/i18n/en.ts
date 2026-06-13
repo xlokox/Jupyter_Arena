@@ -252,6 +252,46 @@ export const en = {
     finalCtaPrimary: "Enter the Arena",
     finalCtaSecondary: "Try today's challenge",
     footerTagline: "Jupyter Arena — sharpen your debugging instincts.",
+    // ── Landing V2 — scroll-driven hero ─────────────────────────────────
+    heroV2: {
+      eyebrow: "Free debugging arena",
+      headline: "AI writes the code. Can you fix it?",
+      subheadline:
+        "A free debugging arena — 90 missions across 6 sectors, from your first line of Python to production bugs. Solve, level up, unlock harder missions.",
+      primaryCta: "Enter the Arena — free, no signup",
+      secondaryCta: "See why this matters",
+      scrollCue: "Scroll to debug",
+      stageAria:
+        "Animated demo: a broken notebook cell is debugged as you scroll, and the game interface assembles around it.",
+      cellTab: "report.py",
+      statusError: "error",
+      statusRunning: "running",
+      statusFixed: "passed",
+      xpChip: "+10 XP",
+      // Demo HUD — illustrative product chrome, not the visitor's own stats.
+      hudLevel: "Level 3",
+      hudRank: "Traceback Hunter",
+      hudStreak: "5 day streak",
+      hudXpLabel: "30 / 50 XP",
+      hudAria: "Example game interface",
+    },
+    // ── Landing V2 — "Programming changed forever" story ────────────────
+    story: {
+      eyebrow: "Why this exists",
+      heading: "Programming changed forever",
+      sceneAria:
+        "Illustration of a developer and an AI robot. The robot writes code fast; the developer reads it, catches the bug, and proves the fix — the two end side by side as a team.",
+      beat1Label: "Then",
+      beat1: "For decades, developers were paid to write code. Line by line. By hand.",
+      beat2Label: "Now",
+      beat2:
+        "Now AI writes most of it — in seconds. But it ships bugs with the same confidence as working code.",
+      beat3Label: "The augmented future",
+      beat3:
+        "The next generation of developers won't be valued for typing — they'll be valued for understanding: reading code, catching the bug, proving the fix. That's the exact skill this arena trains.",
+      cta: "Train the skill AI can't replace",
+      progressAria: "Story progress",
+    },
   },
   lock: {
     lockedAria: "Locked — requires level",
