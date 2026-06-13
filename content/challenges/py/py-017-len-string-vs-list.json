@@ -1,0 +1,82 @@
+{
+  "id": "py-017-len-string-vs-list",
+  "sector": "py",
+  "difficulty": "easy",
+  "title": "17_count_the_words.ipynb",
+  "language": "python",
+  "icon": "list-ordered",
+  "conceptTags": ["len", "strings", "lists", "split"],
+  "descriptionMd": "## Mission: Count the Words\n\nYour script reads a tagline and is supposed to print the number of **words** in it — for `\"All the world is a stage\"` you expect `6`. Instead it prints `24`.\n\nThat's a clue: `24` is the number of **characters** in the string (letters and spaces). `len()` of a string counts characters; `len()` of a list counts items. To count words you need a list of words first. Fix it.",
+  "initialCode": "tagline = \"All the world is a stage\"\nprint(f\"tagline repr: {tagline!r}\")\nword_count = len(tagline)\nprint(f\"That line has {word_count} words.\")",
+  "buggyLineStart": 3,
+  "buggyLineEnd": 3,
+  "traceback": "tagline repr: 'All the world is a stage'\nThat line has 24 words.",
+  "correctOutput": "tagline repr: 'All the world is a stage'\nThat line has 6 words.",
+  "options": [
+    {
+      "key": "a",
+      "label": "Split the line into a list of words, then count the list",
+      "patchCode": "tagline = \"All the world is a stage\"\nprint(f\"tagline repr: {tagline!r}\")\nword_count = len(tagline.split())\nprint(f\"That line has {word_count} words.\")",
+      "isCorrect": true,
+      "resultLog": "tagline repr: 'All the world is a stage'\nThat line has 6 words.",
+      "rationale": "`tagline.split()` turns the text into a **list of words** (splitting on whitespace by default): `['All', 'the', 'world', 'is', 'a', 'stage']`. `len()` of that list is `6` — the number of items, which is the number of words. `len()` on a string counts characters; on a list it counts elements. Pick the right container for what you want to count."
+    },
+    {
+      "key": "b",
+      "label": "Subtract the number of spaces from the character count",
+      "patchCode": "tagline = \"All the world is a stage\"\nprint(f\"tagline repr: {tagline!r}\")\nword_count = len(tagline) - tagline.count(\" \")\nprint(f\"That line has {word_count} words.\")",
+      "isCorrect": false,
+      "resultLog": "tagline repr: 'All the world is a stage'\nThat line has 19 words.",
+      "rationale": "Now it counts characters minus spaces — `24 - 5 = 19` — which is the number of **letters**, not words. Coincidentally correct only when every word is one letter long. Use `split()` for words; it's exactly the tool for the job."
+    },
+    {
+      "key": "c",
+      "label": "Loop and count manually with a `for` loop over the characters",
+      "patchCode": "tagline = \"All the world is a stage\"\nprint(f\"tagline repr: {tagline!r}\")\nword_count = 0\nfor ch in tagline:\n    word_count += 1\nprint(f\"That line has {word_count} words.\")",
+      "isCorrect": false,
+      "resultLog": "tagline repr: 'All the world is a stage'\nThat line has 24 words.",
+      "rationale": "Looping over `tagline` walks **each character**, so this just counts characters the long way — same `24` as before. `for ch in tagline` iterates letters; `for w in tagline.split()` would iterate words. Looping isn't wrong; it's looping over the wrong thing."
+    }
+  ],
+  "hints": [
+    "Print `len(tagline)` and `tagline.split()` separately and look at both. The first is `24`; the second is a list. What's the length of the list?",
+    "Use `tagline.split()` to turn the sentence into a list of words, then `len(...)` on that list."
+  ],
+  "explanationMd": "### Why the bug occurs\n`len()` returns the length of whatever you hand it — but \"length\" depends on the type. For a `str` it's the number of **characters** (letters and spaces); for a `list` it's the number of **elements**. The script asked for `len(tagline)`, which is the character count (`24`), not the word count.\n\n### Why the fix is correct\n`tagline.split()` splits the string on whitespace and returns a list — `['All', 'the', 'world', 'is', 'a', 'stage']`. `len(...)` of that list is `6`, the number of words. The general lesson: before calling `len()`, ask yourself *of what container, and what does an element of that container represent?*",
+  "recruiterReview": "Nice — you recognised `24` was the character count and reached for `split()` to get a list of words. That's exactly the pattern you'll use over and over in data cleaning (turning a CSV field into a list, a path into segments, a sentence into tokens). One nuance for later: `split()` with no arguments collapses runs of whitespace, but `split(\",\")` on a CSV doesn't — keep that in mind when you start parsing real files. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## What `len()` Counts\n\n`len()` is one of the first Python functions you'll use, but it means slightly different things depending on what you give it. Getting comfortable with this saves a lot of head-scratching later.\n\n### Strings: character count\n```python\nlen(\"hello\")        # 5\nlen(\"All the world\") # 12  (spaces count too)\nlen(\"\")             # 0\n```\n`len(s)` walks the string and counts each character — letters, digits, spaces, punctuation, all the same.\n\n### Lists: element count\n```python\nlen([\"a\", \"b\", \"c\"])      # 3\nlen([1, 2, 3, 4, 5, 6])   # 6\nlen([])                   # 0\n```\nFor a list, an \"item\" is whatever sits between the commas. The list `[\"All\", \"the\", \"world\"]` has 3 items, no matter how long each word is.\n\n### Turning text into a list of words: `split()`\n```python\n\"All the world is a stage\".split()\n# ['All', 'the', 'world', 'is', 'a', 'stage']\n```\nCalled with no arguments, `split()` breaks on whitespace and ignores runs of multiple spaces. You can split on something else:\n```python\n\"red,green,blue\".split(\",\")\n# ['red', 'green', 'blue']\n```\n\n### Putting it together\nThe correct word-count pattern is **convert first, then measure**:\n```python\nwords = tagline.split()\ncount = len(words)\n```\nor in one line:\n```python\ncount = len(tagline.split())\n```\n\n### Other things `len()` works on\n- **Tuples** and **dicts**: number of items (or keys).\n- **Sets**: number of unique elements.\n- **Bytes**: number of bytes.\n\nIf in doubt, run `len(thing)` in a REPL and look. The general rule is: `len()` returns the number of *outer* items.\n\n### Common beginner mistakes\n- Calling `len()` on a string when you wanted words — counts characters.\n- Forgetting that `split()` with no arguments handles any whitespace, but `split(\" \")` treats every space literally, so a double space yields an empty string in the list.\n- Counting blank entries: `len(\"a,,b\".split(\",\"))` is `3` because there's an empty string between the commas.\n\n### You just learned…\n`len()` measures whatever container you hand it: characters for strings, items for lists. To count words, **split into a list of words first**, then call `len()`. \"Convert, then measure\" is a useful shape for many problems.",
+    "videos": [
+      {
+        "title": "Python len() on strings vs lists",
+        "searchQuery": "python len string vs list beginner tutorial"
+      },
+      {
+        "title": "Counting words with split() in Python",
+        "searchQuery": "python split count words sentence beginner"
+      }
+    ]
+  },
+  "estMinutes": 4,
+  "version": 1,
+  "conceptCard": "This mission is about what **`len()` counts**.\n\n- On a **string**, `len()` returns the number of characters (`\"abc\"` → `3`).\n- On a **list**, `len()` returns the number of items (`[\"a\",\"b\",\"c\"]` → `3`).\n- To count words, **turn the sentence into a list of words first** with `.split()`.\n\nThe code calls `len()` on a string and counts characters instead of words. `len(tagline.split())` is the fix.",
+  "lineNotes": [
+    {
+      "line": 1,
+      "noteMd": "A sentence stored as a string — 24 characters long, made of 6 words."
+    },
+    {
+      "line": 2,
+      "noteMd": "Prints the raw string for debugging. `!r` uses `repr(...)` so you see the quotes — handy for spotting hidden whitespace."
+    },
+    {
+      "line": 3,
+      "noteMd": "`len(tagline)` counts **characters**, not words — that's the bug. Use `len(tagline.split())` to count words."
+    },
+    {
+      "line": 4,
+      "noteMd": "Prints the count. With the fix, this says `6`."
+    }
+  ],
+  "takeaway": "len() on a string counts characters; on a list it counts items. Split first if you want words."
+}

@@ -1,0 +1,82 @@
+{
+  "id": "py-019-mutable-default-arg",
+  "sector": "py",
+  "difficulty": "medium",
+  "title": "19_basket_default.ipynb",
+  "language": "python",
+  "icon": "shield-alert",
+  "conceptTags": ["functions", "default-arguments", "mutability"],
+  "descriptionMd": "## Mission: Two Fresh Baskets\n\nYou wrote `add_item(name, basket=[])` so callers without an existing basket get an empty one. The first call adds `apple` to a brand-new basket; the second call should add `pear` to a *different* brand-new basket. Instead the second basket already contains `apple` — and every subsequent call adds to that same hidden list.\n\nThis is one of Python's classic gotchas. Default-argument values are evaluated **once**, when the function is defined — not each time it's called. The empty list you wrote is *the same list* every time. Fix the default so each call starts with a fresh, empty basket.",
+  "initialCode": "def add_item(name, basket=[]):\n    basket.append(name)\n    return basket\n\nfirst = add_item(\"apple\")\nsecond = add_item(\"pear\")\n\nprint(f\"first  = {first}\")\nprint(f\"second = {second}\")",
+  "buggyLineStart": 1,
+  "buggyLineEnd": 1,
+  "traceback": "first  = ['apple', 'pear']\nsecond = ['apple', 'pear']\n# expected: first = ['apple'], second = ['pear']",
+  "correctOutput": "first  = ['apple']\nsecond = ['pear']",
+  "options": [
+    {
+      "key": "a",
+      "label": "Default to `None`, then create a new list inside the body",
+      "patchCode": "def add_item(name, basket=None):\n    if basket is None:\n        basket = []\n    basket.append(name)\n    return basket\n\nfirst = add_item(\"apple\")\nsecond = add_item(\"pear\")\n\nprint(f\"first  = {first}\")\nprint(f\"second = {second}\")",
+      "isCorrect": true,
+      "resultLog": "first  = ['apple']\nsecond = ['pear']",
+      "rationale": "`None` is **immutable** — it's safe to share as a default sentinel. Inside the body we check `if basket is None` and assign a **fresh** `[]` every call, so two callers never share state. This is the canonical Python idiom; treat it as the always-right shape for any mutable default (list, dict, set)."
+    },
+    {
+      "key": "b",
+      "label": "Re-bind `basket` to a copy each call: `basket = basket[:]`",
+      "patchCode": "def add_item(name, basket=[]):\n    basket = basket[:]\n    basket.append(name)\n    return basket\n\nfirst = add_item(\"apple\")\nsecond = add_item(\"pear\")\n\nprint(f\"first  = {first}\")\nprint(f\"second = {second}\")",
+      "isCorrect": false,
+      "resultLog": "first  = ['apple']\nsecond = ['pear']",
+      "rationale": "This *does* produce the right output for these two calls, but the bug is still there: the **default object** still grows every time someone calls without `basket`. If a caller later passes their own list expecting it to be modified in place, they'd get a copy back and be confused. Always fix the shared default, not the symptom."
+    },
+    {
+      "key": "c",
+      "label": "Clear the basket at the start: `basket.clear()`",
+      "patchCode": "def add_item(name, basket=[]):\n    basket.clear()\n    basket.append(name)\n    return basket\n\nfirst = add_item(\"apple\")\nsecond = add_item(\"pear\")\n\nprint(f\"first  = {first}\")\nprint(f\"second = {second}\")",
+      "isCorrect": false,
+      "resultLog": "first  = ['pear']\nsecond = ['pear']",
+      "rationale": "Worse: now any caller who **passes their own basket** would have it wiped out — that's a destructive surprise nobody asked for. Both prints also show `['pear']` because both names reference the same single shared list, which the second call cleared. The bug isn't \"too full\" — it's \"shared at all.\""
+    }
+  ],
+  "hints": [
+    "Add `print(id(basket))` at the top of `add_item`. Both calls print the same id — they're literally the same object.",
+    "Never put a mutable value (list, dict, set) as a default. Use `None` and build the real one inside the body."
+  ],
+  "explanationMd": "### Why the bug occurs\nIn Python, **default argument values are evaluated once**, when the `def` line runs (the first time the module loads the function). They're stored on the function object and reused for every call that omits the argument. So `basket=[]` becomes a single, persistent list living on the function — not a fresh one per call.\n\nWhen the first call appends `apple`, it grows that shared list. When the second call omits `basket`, it gets the same now-non-empty list and appends `pear` to it. From the caller's view, baskets leak across calls.\n\n### Why the fix is correct\nUsing `None` as the default sentinel is safe because `None` is immutable — there's nothing to share. Inside the body, the explicit `basket = []` creates a brand-new list every call. The pattern is so common you should write it on autopilot for any mutable default. Linters like `pylint` and `ruff` flag mutable defaults specifically because of this trap.",
+  "recruiterReview": "Strong — you didn't just patch the output; you fixed the actual shared-state problem with the canonical `default=None` + `if x is None:` pattern. That's the senior move. The bug you avoided here is the same shape as bugs you'll meet later with mutable class attributes, cached singletons, and module-level state — once you internalise \"defaults are shared,\" all three become obvious. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## Mutable Default Arguments — Python's Classic Trap\n\nThis is one of the highest-ROI things you can learn early. It will save you hours of debugging.\n\n### The setup\nWhen you write:\n```python\ndef f(items=[]):\n    items.append(1)\n    return items\n```\nyou probably expect each call to start with an empty list. It doesn't. Watch:\n```python\nf()   # [1]\nf()   # [1, 1]\nf()   # [1, 1, 1]\n```\nEvery call grows the *same* list.\n\n### Why this happens\nThe `[]` in the function signature is evaluated **once**, when Python first reads the `def`. It's then attached to the function as the default value. Every call that omits `items` gets a reference to that *one* list, not a freshly built copy.\n\nYou can see it directly:\n```python\nprint(f.__defaults__)\n# ([1, 1, 1],)\n```\nThe shared list lives on the function object.\n\n### Why it doesn't happen with `int`/`str`\n```python\ndef g(x=0):\n    x += 1\n    return x\n```\nIntegers and strings are immutable — you can't change `0` in place; `x += 1` creates a *new* integer. So nothing about the default itself ever changes.\n\nThe trap only bites with mutable values: `list`, `dict`, `set`, `bytearray`, custom objects with mutable state.\n\n### The canonical fix\nUse `None` as the default and create the real container inside the body:\n```python\ndef f(items=None):\n    if items is None:\n        items = []\n    items.append(1)\n    return items\n```\nNow each call without `items` gets a fresh, empty list.\n\n### Same shape for dicts and sets\n```python\ndef build(config=None):\n    if config is None:\n        config = {}\n    ...\n\ndef seen(tags=None):\n    if tags is None:\n        tags = set()\n    ...\n```\n\n### When you *want* shared state\nSometimes you actually do want a cache that persists across calls. Make it explicit (and named), not a default-argument accident:\n```python\n_RESULTS_CACHE = {}\ndef expensive(x):\n    if x not in _RESULTS_CACHE:\n        _RESULTS_CACHE[x] = ...\n    return _RESULTS_CACHE[x]\n```\nA module-level dict labelled clearly. Nobody will be surprised by it.\n\n### Common beginner mistakes\n- Writing `def f(items=[])` and being shocked by the bug.\n- \"Fixing\" it inside the body with `items = list(items)` (works in some cases, hides the real issue).\n- Using `clear()` to wipe the default — destroys any list a caller passed in.\n\n### You just learned…\nDefault arguments are evaluated **once** and shared across every call. For mutable defaults, write `arg=None` and build the real container inside the body. This is the textbook Python idiom; once it's in your fingers you'll never trip over it again.",
+    "videos": [
+      {
+        "title": "Mutable default arguments in Python — the famous gotcha",
+        "searchQuery": "python mutable default argument gotcha tutorial"
+      },
+      {
+        "title": "Why default=[] is dangerous",
+        "searchQuery": "python function default empty list bug shared state"
+      }
+    ]
+  },
+  "estMinutes": 7,
+  "version": 1,
+  "conceptCard": "This mission is about **mutable default arguments**.\n\n- Default values are evaluated **once** when `def` runs — not on every call.\n- A mutable default (`[]`, `{}`, `set()`) is **shared** across calls.\n- The canonical idiom is `arg=None`, then `if arg is None: arg = []` inside the body.\n\nThe code uses `basket=[]` so every call without a basket gets the same growing list. Switch to `basket=None`.",
+  "lineNotes": [
+    {
+      "line": 1,
+      "noteMd": "`basket=[]` looks innocent but is the **bug**: the `[]` is created once and shared by every call that omits `basket`."
+    },
+    {
+      "line": 2,
+      "noteMd": "Appends `name` to whatever list `basket` currently points at — which is the **shared** one on the buggy version."
+    },
+    {
+      "line": 5,
+      "noteMd": "First call: gets the shared list, appends `apple` to it."
+    },
+    {
+      "line": 6,
+      "noteMd": "Second call: gets the **same** shared list (already holding `apple`), appends `pear`. Both names now point at the same `['apple', 'pear']`."
+    }
+  ],
+  "takeaway": "Never use a mutable value as a default — write arg=None and build the real one inside."
+}

@@ -1,0 +1,90 @@
+{
+  "id": "py-018-range-off-by-one",
+  "sector": "py",
+  "difficulty": "easy",
+  "title": "18_sum_to_n.ipynb",
+  "language": "python",
+  "icon": "sigma",
+  "conceptTags": ["range", "off-by-one", "loops"],
+  "descriptionMd": "## Mission: Sum 1 to N\n\nYou wrote a function to add up the whole numbers from 1 to `n`. For `n = 10` you expect `1 + 2 + … + 10 = 55`. Your function returns `45`.\n\nThat's exactly `10` short of the right answer — which is suspicious, because `10` is `n`. The likely culprit is **how `range()` works**: its right edge is **exclusive**, not inclusive. You're summing 1 through 9. Fix the call so 10 is included.",
+  "initialCode": "def sum_to(n):\n    total = 0\n    for i in range(1, n):\n        total += i\n    return total\n\nresult = sum_to(10)\nprint(f\"sum_to(10) = {result}\")\nprint(f\"expected 55 (1+2+...+10), got {result}\")",
+  "buggyLineStart": 3,
+  "buggyLineEnd": 3,
+  "traceback": "sum_to(10) = 45\nexpected 55 (1+2+...+10), got 45",
+  "correctOutput": "sum_to(10) = 55\nexpected 55 (1+2+...+10), got 55",
+  "options": [
+    {
+      "key": "a",
+      "label": "Add 1 to the upper bound: `range(1, n + 1)`",
+      "patchCode": "def sum_to(n):\n    total = 0\n    for i in range(1, n + 1):\n        total += i\n    return total\n\nresult = sum_to(10)\nprint(f\"sum_to(10) = {result}\")\nprint(f\"expected 55 (1+2+...+10), got {result}\")",
+      "isCorrect": true,
+      "resultLog": "sum_to(10) = 55\nexpected 55 (1+2+...+10), got 55",
+      "rationale": "`range(start, stop)` walks `start, start+1, …, stop - 1`. So `range(1, n)` stops *before* `n` — for `n = 10` you get `1..9`, missing `10`. `range(1, n + 1)` shifts the stop one up so the loop ends on `n` itself. This is the idiomatic Python fix for the inclusive 1..n pattern."
+    },
+    {
+      "key": "b",
+      "label": "Use `range(1, n)` and `+ n` at the end",
+      "patchCode": "def sum_to(n):\n    total = 0\n    for i in range(1, n):\n        total += i\n    return total + n\n\nresult = sum_to(10)\nprint(f\"sum_to(10) = {result}\")\nprint(f\"expected 55 (1+2+...+10), got {result}\")",
+      "isCorrect": false,
+      "resultLog": "sum_to(10) = 55\nexpected 55 (1+2+...+10), got 55",
+      "rationale": "Numerically this lands on the right answer, but it papers over the actual bug — adding `n` outside the loop hides the fact that `range(1, n)` was wrong. If a teammate later calls `sum_to(0)` you'd return `0 + 0 = 0` (fine), but for any future change ('sum the squares, sum every other number, …') this fix breaks. Fix the loop, not the result."
+    },
+    {
+      "key": "c",
+      "label": "Start from 0: `range(0, n)`",
+      "patchCode": "def sum_to(n):\n    total = 0\n    for i in range(0, n):\n        total += i\n    return total\n\nresult = sum_to(10)\nprint(f\"sum_to(10) = {result}\")\nprint(f\"expected 55 (1+2+...+10), got {result}\")",
+      "isCorrect": false,
+      "resultLog": "sum_to(10) = 45\nexpected 55 (1+2+...+10), got 45",
+      "rationale": "This walks `0, 1, 2, …, 9` — same 10 numbers but starting at zero. `0` adds nothing, so the sum is still `45`. The off-by-one is at the *upper* end (stop is exclusive), not the lower; widening the lower bound doesn't recover the missing `10`."
+    }
+  ],
+  "hints": [
+    "Add `print(list(range(1, 10)))` and look at the last item. Is `10` in there?",
+    "`range(a, b)` stops just **before** `b`. For an inclusive upper bound, use `b + 1`: `range(1, n + 1)`."
+  ],
+  "explanationMd": "### Why the bug occurs\n`range(start, stop)` produces `start, start+1, …, stop - 1` — the **stop is exclusive**. So `range(1, 10)` is `1, 2, 3, 4, 5, 6, 7, 8, 9`. Summing those gives `45`. The missing `10` accounts exactly for the `10` shortfall vs the expected `55`.\n\nWhy is the stop exclusive? Because it makes a lot of common patterns line up cleanly — `range(len(items))` walks every valid index of a list (`0` through `len-1`), without you needing to think about \"minus one.\" The tradeoff is that, for the inclusive 1..n case, you write `n + 1`.\n\n### Why the fix is correct\n`range(1, n + 1)` shifts the stop up by one so the loop ends on `n`. For `n = 10` it's `1..10`, summing to `55`. This is the standard Python idiom; once it's in your fingers you stop tripping over it.",
+  "recruiterReview": "Good — you recognised an exact off-by-one from a number that matched `n`. Two things I appreciated: you didn't compensate by adding `n` at the end (which would hide the real bug), and you fixed the range itself. That's the difference between a quick patch and a correct one. Off-by-one errors are one of the most common bugs in software — getting comfortable with `range()`'s exclusive stop now will save you debugging hours later. Approved. ✅",
+  "tutorial": {
+    "bodyMd": "## `range()` and the Exclusive Stop\n\n`range()` produces a sequence of integers for a `for` loop. Its shape often surprises beginners — once you know it cold, off-by-one bugs nearly disappear.\n\n### The three forms\n```python\nrange(stop)            # 0, 1, …, stop - 1\nrange(start, stop)     # start, start + 1, …, stop - 1\nrange(start, stop, step)  # like above, but stepping by step (can be negative)\n```\nIn every form, **`stop` is exclusive** — the loop ends one *before* `stop`.\n\n### Worked examples\n```python\nfor i in range(5):\n    print(i)   # 0, 1, 2, 3, 4\n```\n```python\nfor i in range(1, 5):\n    print(i)   # 1, 2, 3, 4    (no 5)\n```\n```python\nfor i in range(0, 10, 2):\n    print(i)   # 0, 2, 4, 6, 8\n```\n\n### The inclusive 1..n pattern\nThis is the case from the mission. To sum or print `1, 2, …, n` inclusive, write `range(1, n + 1)`:\n```python\nfor i in range(1, n + 1):\n    total += i\n```\nThis is so common you'll write it dozens of times in your first few weeks.\n\n### Why is `stop` exclusive?\nFor list indexing: a list of 5 items has valid indexes `0..4`, and `range(len(items))` is exactly those numbers — no `- 1` arithmetic needed. The choice is consistent with how Python slices work too: `xs[a:b]` includes `a` and excludes `b`.\n\n### Common beginner mistakes\n- Writing `range(1, 10)` when you wanted `1..10` (the bug in this mission).\n- Writing `range(0, len(items) - 1)` to walk a list — actually skips the last item.\n- Using `range(1, n)` for a count `n` of iterations — that's only `n - 1` loops.\n\n### A useful trick: `enumerate()`\nWhen you need both the index and the value, prefer `enumerate(items)` over `range(len(items))`:\n```python\nfor i, item in enumerate(items):\n    print(i, item)\n```\nFewer chances to get the bounds wrong.\n\n### You just learned…\n`range(start, stop)` stops one **before** `stop`. For inclusive `1..n` you write `range(1, n + 1)`. Whenever a number is off by exactly the size of the loop, your first suspect is the range bounds.",
+    "videos": [
+      {
+        "title": "Python range() explained for beginners",
+        "searchQuery": "python range function exclusive stop beginner tutorial"
+      },
+      {
+        "title": "Off-by-one errors and how to avoid them",
+        "searchQuery": "python off by one range loop error beginner"
+      }
+    ]
+  },
+  "estMinutes": 5,
+  "version": 1,
+  "conceptCard": "This mission is about **`range()`'s exclusive stop**.\n\n- `range(a, b)` produces `a, a+1, …, b-1` — the stop is **not** included.\n- For inclusive `1..n`, write `range(1, n + 1)`.\n- If a result is short by exactly `n` (or 1), suspect a range bound first.\n\nThe code uses `range(1, n)` so the loop ends at `n-1`, missing the final term. Add `+ 1` to the upper bound.",
+  "lineNotes": [
+    {
+      "line": 1,
+      "noteMd": "Function definition — `n` is the inclusive upper bound the caller passes in."
+    },
+    {
+      "line": 3,
+      "noteMd": "`range(1, n)` walks `1..n-1` — **misses `n`**. That's the bug. `range(1, n + 1)` includes `n`."
+    },
+    {
+      "line": 4,
+      "noteMd": "Standard accumulator pattern: add each `i` into `total`."
+    },
+    {
+      "line": 7,
+      "noteMd": "Calls the function and stores the result."
+    },
+    {
+      "line": 8,
+      "noteMd": "Prints the result. With the fix this prints `55`."
+    },
+    {
+      "line": 9,
+      "noteMd": "Self-check line — handy when debugging numeric off-by-ones."
+    }
+  ],
+  "takeaway": "range(a, b) is exclusive at b — for inclusive 1..n write range(1, n + 1)."
+}
