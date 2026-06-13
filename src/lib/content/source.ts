@@ -43,6 +43,7 @@ interface ChallengeRow {
   figure_caption?: string | null;
   track?: string | null;
   glossary?: Array<{ term: string; definitionMd: string }> | null;
+  sub_sector?: string | null;
   challenge_options: Array<{
     option_key: string;
     label: string;
@@ -121,6 +122,7 @@ export function mapChallengeRow(row: ChallengeRow): Challenge {
     track:
       row.track === "debugging" || row.track === "reasoning" ? row.track : undefined,
     glossary: row.glossary ?? undefined,
+    subSector: row.sub_sector ?? undefined,
   });
 }
 
@@ -148,7 +150,7 @@ export async function getChallenges(): Promise<Challenge[]> {
 }
 
 const META_SELECT =
-  "id, sector_id, difficulty, title, language, icon, concept_tags, est_minutes, unlock_level_override, track";
+  "id, sector_id, difficulty, title, language, icon, concept_tags, est_minutes, unlock_level_override, track, sub_sector";
 
 interface MetaRow {
   id: string;
@@ -161,6 +163,7 @@ interface MetaRow {
   est_minutes: number;
   unlock_level_override: number | null;
   track: string | null;
+  sub_sector: string | null;
 }
 
 /** List views ship metadata only (Section 11); bodies come via getChallenge. */
@@ -186,6 +189,7 @@ export async function getChallengeMetas(): Promise<ChallengeMeta[]> {
         ? 1
         : (row.unlock_level_override ?? UNLOCK_LEVELS[row.difficulty] ?? 1),
       track: row.track === "reasoning" ? ("reasoning" as const) : ("debugging" as const),
+      subSector: row.sub_sector ?? undefined,
     }))
     .sort(
       (a, b) =>

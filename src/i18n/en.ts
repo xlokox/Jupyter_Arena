@@ -194,6 +194,8 @@ export const en = {
     trackFilterAria: "Mission track",
     glossaryAria: "Glossary for this mission",
     glossaryHeading: "Glossary",
+    subSectorFilterAria: "Sub-sector filter",
+    subSectorAll: "All",
   },
   landing: {
     navAria: "Main navigation",

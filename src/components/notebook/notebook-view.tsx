@@ -13,6 +13,7 @@ import { ControlCell } from "./control-cell";
 import { SolvePanel } from "./solve-panel";
 import { FigurePanel } from "./figure-panel";
 import { GlossaryDisclosure } from "./glossary-disclosure";
+import { formatSubSector } from "@/lib/content/sub-sectors";
 import { useWorkspaceStore, getAttempt, type OptionKey } from "@/store/workspace";
 import { useAuthStore } from "@/store/auth";
 import { submitAttemptServer } from "@/lib/game/server-progress";
@@ -227,6 +228,14 @@ function LoadedNotebook({
         </span>
       )}
       <span className="text-xs text-muted">{en.sectors[challenge.sector]}</span>
+      {challenge.subSector && (
+        <span
+          data-sub-sector-header={challenge.subSector}
+          className="text-xs text-muted"
+        >
+          · {formatSubSector(challenge.subSector)}
+        </span>
+      )}
     </header>
   );
 

@@ -49,6 +49,7 @@ export async function seedContent(admin: SupabaseClient): Promise<{
         figure_caption: challenge.figureCaption ?? null,
         track: challenge.track ?? null,
         glossary: challenge.glossary ?? null,
+        sub_sector: challenge.subSector ?? null,
         is_published: true,
       },
       { onConflict: "id" },

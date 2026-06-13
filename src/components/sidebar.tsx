@@ -12,8 +12,10 @@ import {
   useWorkspaceStore,
   type DifficultyFilter,
   type SidebarTab,
+  type SubSectorFilter,
   type TrackFilter,
 } from "@/store/workspace";
+import { SUB_SECTOR_MAP, formatSubSector } from "@/lib/content/sub-sectors";
 import { levelForXp } from "@/lib/game/xp";
 import { useFocusTrap } from "@/lib/use-focus-trap";
 import { en } from "@/i18n/en";
@@ -79,6 +81,8 @@ function SidebarContent({ challenges }: { challenges: ChallengeMeta[] }) {
   const setDifficultyFilter = useWorkspaceStore((s) => s.setDifficultyFilter);
   const trackFilter = useWorkspaceStore((s) => s.trackFilter);
   const setTrackFilter = useWorkspaceStore((s) => s.setTrackFilter);
+  const subSectorFilter = useWorkspaceStore((s) => s.subSectorFilter);
+  const setSubSectorFilter = useWorkspaceStore((s) => s.setSubSectorFilter);
   const searchQuery = useWorkspaceStore((s) => s.searchQuery);
   const setSearchQuery = useWorkspaceStore((s) => s.setSearchQuery);
   const activeChallengeId = useWorkspaceStore((s) => s.activeChallengeId);
@@ -94,8 +98,34 @@ function SidebarContent({ challenges }: { challenges: ChallengeMeta[] }) {
     sector: sectorFilter,
     difficulty: difficultyFilter,
     track: trackFilter,
+    subSector: subSectorFilter,
     query: searchQuery,
   });
+
+  // Sub-sector chip row shows only when the active sector has ≥ 2 registered
+  // sub-sectors AND the visible challenge set (before sub-sector filter) has
+  // ≥ 2 distinct sub-sector tags. Otherwise the row would be a single dead
+  // chip alongside "All".
+  const subSectorScope = challenges.filter(
+    (c) =>
+      (sectorFilter === "all" || c.sector === sectorFilter) &&
+      (difficultyFilter === "all" || c.difficulty === difficultyFilter) &&
+      (trackFilter === "all" || (c.track ?? "debugging") === trackFilter),
+  );
+  const subSectorsInScope = Array.from(
+    new Set(subSectorScope.map((c) => c.subSector).filter((s): s is string => Boolean(s))),
+  );
+  const activeSectorSubSectors =
+    sectorFilter !== "all"
+      ? (SUB_SECTOR_MAP[sectorFilter] as readonly string[])
+      : [];
+  // Order matches SUB_SECTOR_MAP for the active sector; intersection with scope.
+  const subSectorChips =
+    sectorFilter !== "all"
+      ? activeSectorSubSectors.filter((s) => subSectorsInScope.includes(s))
+      : [];
+  const showSubSectorFilter =
+    sectorFilter !== "all" && activeSectorSubSectors.length >= 2 && subSectorChips.length >= 2;
 
   // Show the track chip row only when the *currently selected scope* contains
   // both tracks. If the user filters to a sector with only debugging missions,
@@ -172,6 +202,35 @@ function SidebarContent({ challenges }: { challenges: ChallengeMeta[] }) {
             );
           })}
         </div>
+        {showSubSectorFilter && (
+          <div
+            role="group"
+            aria-label={en.workspace.subSectorFilterAria}
+            className="mt-2 flex flex-wrap gap-1.5"
+            data-sub-sector-filter
+          >
+            {(["all", ...subSectorChips] as const).map((id) => {
+              const isActive = subSectorFilter === id;
+              const label = id === "all" ? en.workspace.subSectorAll : formatSubSector(id);
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  aria-pressed={isActive}
+                  onClick={() => setSubSectorFilter(id as SubSectorFilter)}
+                  data-sub-sector-chip={id}
+                  className={`rounded-full border px-2 py-1 font-mono text-[10px] uppercase tracking-wide transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent ${
+                    isActive
+                      ? "border-accent bg-accent/10 text-accent"
+                      : "border-border text-muted hover:text-text"
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        )}
         {showTrackFilter && (
           <div
             role="group"
@@ -292,6 +351,15 @@ function SidebarContent({ challenges }: { challenges: ChallengeMeta[] }) {
                           >
                             <Brain className="size-2.5" aria-hidden />
                             {en.workspace.reasoningBadge}
+                          </span>
+                        )}
+                        {sidebarTab === "missions" && challenge.subSector && (
+                          <span
+                            data-sub-sector-badge={challenge.subSector}
+                            title={formatSubSector(challenge.subSector)}
+                            className="rounded border border-border px-1 py-0.5 font-mono text-[9px] uppercase tracking-wide text-muted"
+                          >
+                            {formatSubSector(challenge.subSector)}
                           </span>
                         )}
                         <DifficultyBadge difficulty={challenge.difficulty} />

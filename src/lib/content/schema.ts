@@ -102,6 +102,10 @@ export const ChallengeSchema = z.object({
     .array(z.object({ term: z.string().min(1).max(60), definitionMd: z.string().min(8) }))
     .max(8)
     .optional(),
+  // Sub-sector tag organising missions by real-world job (e.g. "data-flow"
+  // inside Full Stack). Optional; valid values are kept in the map at
+  // src/lib/content/sub-sectors.ts and verified by checkSubSector below.
+  subSector: z.string().min(1).max(40).optional(),
 });
 
 export type Sector = z.infer<typeof SectorSchema>;
@@ -123,6 +127,8 @@ export interface ChallengeMeta {
   unlockLevel: number;
   /** Mission track — never undefined on the meta (default 'debugging' applied in toMeta). */
   track: Track;
+  /** Sub-sector tag — optional; undefined when no tag is set on the challenge. */
+  subSector?: string;
 }
 
 export const toMeta = (
@@ -143,6 +149,7 @@ export const toMeta = (
     : (c.unlockLevelOverride ?? UNLOCK_LEVELS[c.difficulty] ?? 1),
   // null/undefined on the row means the default fix-the-bug track.
   track: c.track ?? "debugging",
+  subSector: c.subSector,
 });
 export type ChallengeOption = z.infer<typeof ChallengeOptionSchema>;
 export type Challenge = z.infer<typeof ChallengeSchema>;

@@ -1,4 +1,5 @@
 import { ChallengeSchema, SectorsFileSchema, type Challenge } from "./schema";
+import { isValidSubSector, SUB_SECTOR_MAP } from "./sub-sectors";
 
 /**
  * Content QA checks — MASTER_BRIEF.md Section 6 pipeline: Zod parse,
@@ -83,6 +84,20 @@ export function checkBeginnerLearnFirst(challenge: Challenge): string[] {
   return errors;
 }
 
+/**
+ * When `subSector` is set on a challenge, it must be one of the registered
+ * values for that sector in SUB_SECTOR_MAP. Catches typos at content:validate
+ * time so a misspelled tag never reaches the DB.
+ */
+export function checkSubSector(challenge: Challenge): string[] {
+  if (challenge.subSector === undefined) return [];
+  if (isValidSubSector(challenge.sector, challenge.subSector)) return [];
+  const allowed = SUB_SECTOR_MAP[challenge.sector].join(", ");
+  return [
+    `subSector "${challenge.subSector}" is not in the registered list for sector "${challenge.sector}" — allowed: ${allowed}`,
+  ];
+}
+
 export function checkFileConsistency(
   challenge: Challenge,
   sectorDir: string,
@@ -123,6 +138,7 @@ export function validateChallengeFile(input: ChallengeFileInput): ChallengeFileR
     ...checkLineRange(challenge),
     ...checkFileConsistency(challenge, input.sectorDir, input.fileName),
     ...checkBeginnerLearnFirst(challenge),
+    ...checkSubSector(challenge),
   );
   return { errors, challenge };
 }
