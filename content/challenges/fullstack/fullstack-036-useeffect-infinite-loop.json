@@ -1,0 +1,63 @@
+{
+  "id": "fullstack-036-useeffect-infinite-loop",
+  "sector": "fullstack",
+  "difficulty": "easy",
+  "title": "36_useeffect_infinite_loop.jsx",
+  "language": "jsx",
+  "icon": "repeat",
+  "conceptTags": ["react", "useEffect", "dependencies", "infinite-loop"],
+  "subSector": "async-and-network",
+  "descriptionMd": "## Mission: The Comments Fetch Never Stops\n\nA blog post page fetches comments when it loads. The Network tab shows `/api/comments` being called continuously — hundreds of requests per second. The browser tab becomes unresponsive.\n\nThe developer added `comments` to the `useEffect` dependency array because the linter warned about it. Now every time comments load, the effect re-runs and fetches again — infinite loop.\n\nFix the effect so it fetches comments exactly once when the component mounts.",
+  "initialCode": "import { useState, useEffect } from \"react\";\n\nexport default function CommentList({ postId }) {\n  const [comments, setComments] = useState([]);\n\n  useEffect(() => {\n    fetch(`/api/posts/${postId}/comments`)\n      .then(r => r.json())\n      .then(data => setComments(data));\n  }, [comments]);   // ← bug: 'comments' in deps triggers re-fetch after every set\n\n  return (\n    <ul>{comments.map(c => <li key={c.id}>{c.text}</li>)}</ul>\n  );\n}",
+  "buggyLineStart": 11,
+  "buggyLineEnd": 11,
+  "traceback": "Network tab (before tab crashes):\n  GET /api/posts/1/comments  200  12ms\n  GET /api/posts/1/comments  200  11ms\n  GET /api/posts/1/comments  200  13ms\n  ... (hundreds of requests)\n\nLoop:\n  1. Effect runs → fetch → setComments(data)\n  2. `comments` state changes\n  3. Dep `comments` changed → effect re-runs\n  4. fetch → setComments(data)\n  5. goto 2",
+  "correctOutput": "Network tab:\n  GET /api/posts/1/comments  200  12ms  (one request, once)\n\nComments appear in the UI. No further requests.",
+  "options": [
+    {
+      "key": "a",
+      "label": "Remove `comments` from the dependency array — use `[postId]` only",
+      "patchCode": "useEffect(() => {\n  fetch(`/api/posts/${postId}/comments`)\n    .then(r => r.json())\n    .then(data => setComments(data));\n}, [postId]);   // re-fetch only when postId changes",
+      "isCorrect": true,
+      "resultLog": "Network tab:\n  GET /api/posts/1/comments  200  12ms  (once on mount)\n\nIf postId changes (user navigates to another post):\n  GET /api/posts/2/comments  200  14ms  (re-fetches correctly)\n\nNo loop. Comments render once.",
+      "rationale": "The effect needs to re-run when the `postId` changes (navigating to a different post). It does NOT need to re-run when `comments` changes — that would be circular: fetch sets comments, comments triggers fetch, fetch sets comments, forever. Remove `comments` from deps and add `postId` — the value that should actually trigger a re-fetch."
+    },
+    {
+      "key": "b",
+      "label": "Use an empty dependency array `[]` to run once only",
+      "patchCode": "useEffect(() => {\n  fetch(`/api/posts/${postId}/comments`)\n    .then(r => r.json())\n    .then(data => setComments(data));\n}, []);   // run once on mount",
+      "isCorrect": false,
+      "resultLog": "Network tab:\n  GET /api/posts/1/comments  200  12ms  (once on mount)\n\nBut: if `postId` changes (user navigates to post 2),\nthe effect does NOT re-run — still shows post 1's comments.\n\n`[]` is correct if postId never changes, wrong if it can.",
+      "rationale": "Empty deps `[]` stops the infinite loop and fetches once. However, if `postId` can change (e.g. the user navigates to a different post without unmounting), the effect won't re-run and old comments stay visible. `[postId]` is more correct — it re-fetches when the post changes but not when comments change."
+    },
+    {
+      "key": "c",
+      "label": "Wrap the setter in `useCallback` to stabilize the reference",
+      "patchCode": "const stableSet = useCallback(setComments, []);\n\nuseEffect(() => {\n  fetch(`/api/posts/${postId}/comments`)\n    .then(r => r.json())\n    .then(stableSet);\n}, [postId, stableSet]);",
+      "isCorrect": false,
+      "resultLog": "Network tab:\n  GET /api/posts/1/comments  200  12ms  (once)\n\nCorrect output — loop stopped.\nBut `setComments` is already stable (React guarantees setState\nfunctions never change reference). Wrapping in useCallback adds\ncomplexity with no benefit.",
+      "rationale": "`setComments` returned by `useState` is already a stable reference — React guarantees it never changes between renders. Wrapping it in `useCallback` with `[]` deps is redundant. Simply using `[postId]` as the deps (without `comments`) is the correct and minimal fix."
+    }
+  ],
+  "hints": [
+    "Trace the loop: effect runs → fetch → setComments → `comments` changes → `comments` is in deps → effect runs again → repeat. The problem is that `comments` should not be a dependency because the effect is the one that sets it.",
+    "Remove `comments` from the dependency array. The effect should re-run when the `postId` changes (different post = different comments). It should NOT re-run when `comments` changes — that is what causes the loop."
+  ],
+  "explanationMd": "### When an effect causes the thing it depends on\nInfinite `useEffect` loops always follow this pattern:\n```\neffect runs → sets state A → A is in deps → effect runs → sets A → ...\n```\n\nThe rule: **an effect's deps should be the values that determine WHEN to re-fetch**, not the values it produces.\n\n### The correct deps for this fetch\n```js\nuseEffect(() => {\n  fetch(`/api/posts/${postId}/comments`)\n    .then(r => r.json())\n    .then(data => setComments(data));\n}, [postId]);   // re-run when postId changes\n```\n\n`postId` changes → different post → fetch new comments. Correct.\n`comments` changes → we just loaded them → fetch again. Wrong.\n\n### The linter's `exhaustive-deps` rule\nThe `react-hooks/exhaustive-deps` ESLint rule warns when you use a value inside `useEffect` without listing it in deps. It is helpful but requires judgement:\n\n- `postId` is used inside the effect → add it ✓\n- `comments` is SET by the effect → **don't** add it — it creates a loop\n- `setComments` is already stable (React guarantees this) → don't need to add it\n\n### Recognising infinite loops\nSigns of a useEffect loop: Network tab showing the same request hundreds of times, browser tab becoming unresponsive, `setInterval` of 0ms in memory.",
+  "recruiterReview": "Correct. The useEffect infinite loop is one of the first async bugs developers encounter in React. The empty-deps `[]` distractor is a partial fix — it stops the loop but breaks navigation between posts. The `useCallback` distractor adds unnecessary complexity for a problem that doesn't require it. Understanding that deps should encode 'what triggers re-running', not 'what the effect produces', is the key insight. ✅",
+  "tutorial": {
+    "bodyMd": "## React useEffect Dependency Arrays and Infinite Loops\n\n### What the dependency array means\nThe `useEffect` dependency array controls **when the effect re-runs**. After the initial render, React checks the deps on each re-render: if any dep changed, the effect runs again.\n\n```jsx\nuseEffect(() => {\n  // runs once after mount\n}, []);  // no deps — only runs on mount\n\nuseEffect(() => {\n  // runs after every render\n});   // no array — runs always (rarely what you want)\n\nuseEffect(() => {\n  // runs when x or y changes\n}, [x, y]);\n```\n\n### The infinite loop pattern\nThe most common `useEffect` bug is when an effect sets state that is also in its deps:\n\n```jsx\nconst [data, setData] = useState([]);\n\nuseEffect(() => {\n  fetch('/api/data')\n    .then(r => r.json())\n    .then(result => setData(result));  // sets `data`\n}, [data]);  // re-runs when `data` changes\n```\n\nTrace:\n1. Effect runs → fetches → `setData(result)` → `data` changes\n2. `data` is in deps and changed → effect runs again\n3. goto 1 — infinite loop\n\n### Identifying which values belong in deps\nThe correct question is: **what external value determines whether this effect is still valid?**\n\n```jsx\nuseEffect(() => {\n  fetch(`/api/posts/${postId}/comments`)\n    .then(r => r.json())\n    .then(setComments);\n  // postId: YES — different post = different comments needed\n  // comments: NO — we are PRODUCING comments, not consuming them\n  // setComments: NO — setState functions are always stable\n}, [postId]);  // only postId\n```\n\n### The exhaustive-deps linter rule\n`eslint-plugin-react-hooks` provides the `exhaustive-deps` rule, which warns when you use a value inside `useEffect` without listing it in deps. This rule is correct and helpful — but requires understanding of which values are produced BY the effect vs consumed BY it.\n\nCommon cases where you should NOT add to deps despite the warning:\n- **State setters** (`setFoo`, `setBar`): React guarantees they are stable references\n- **Values the effect sets**: adding them causes loops\n- **Values that are intentionally captured once** (use `useRef` to escape the rule in those cases)\n\n### Stable references: when you don't need to add to deps\n```jsx\n// These are ALWAYS stable — no need to add to deps:\nconst [count, setCount] = useState(0);\nconst [data, setData] = useState([]);\n// setCount and setData are stable\n\n// dispatch from useReducer is also stable:\nconst [state, dispatch] = useReducer(reducer, init);\n// dispatch is stable\n\n// useCallback with [] is stable:\nconst stableFn = useCallback(() => {}, []);\n// stableFn is stable — but useCallback isn't needed for setState\n```\n\n### Cleanup: cancelling effects when deps change\nIf the same effect can be running for a stale `postId` while a new `postId` is loading, use a cleanup:\n\n```jsx\nuseEffect(() => {\n  let cancelled = false;\n\n  fetch(`/api/posts/${postId}/comments`)\n    .then(r => r.json())\n    .then(data => {\n      if (!cancelled) setComments(data);  // guard against stale responses\n    });\n\n  return () => { cancelled = true; };  // cleanup when postId changes\n}, [postId]);\n```\n\n### Recognizing the infinite loop\nSigns:\n- Network tab: same endpoint called hundreds of times per second\n- Browser tab becoming unresponsive\n- Console logs from inside the effect firing endlessly\n- Memory usage climbing continuously\n\n### You just learned\n`useEffect` deps control when the effect re-runs. If an effect sets state and that state is also in the deps, you get an infinite loop. The fix: include only the values that determine whether the effect should run again — not the values the effect produces.",
+    "videos": [
+      {
+        "title": "React useEffect infinite loop how to fix",
+        "searchQuery": "react useEffect infinite loop dependency array fix tutorial"
+      },
+      {
+        "title": "React useEffect dependency array explained",
+        "searchQuery": "react useEffect dependency array explained tutorial beginners"
+      }
+    ]
+  },
+  "estMinutes": 5,
+  "version": 1
+}

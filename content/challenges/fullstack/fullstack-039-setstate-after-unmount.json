@@ -1,0 +1,63 @@
+{
+  "id": "fullstack-039-setstate-after-unmount",
+  "sector": "fullstack",
+  "difficulty": "medium",
+  "title": "39_setstate_after_unmount.jsx",
+  "language": "jsx",
+  "icon": "network",
+  "conceptTags": ["react", "useEffect", "AbortController", "cleanup"],
+  "subSector": "async-and-network",
+  "descriptionMd": "## Mission: The Profile Card Logs a Warning After Navigating Away\n\nA profile card fetches user data when it mounts. When the user navigates away quickly — before the fetch completes — the console shows:\n\n> Warning: Can't perform a React state update on a component that is not mounted.\n\nThe fetch completes after the component unmounted, then `setProfile(data)` runs on a dead component.\n\nFix the effect to cancel the fetch when the component unmounts.",
+  "initialCode": "import { useState, useEffect } from \"react\";\n\nexport default function ProfileCard({ userId }) {\n  const [profile, setProfile] = useState(null);\n\n  useEffect(() => {\n    fetch(`/api/users/${userId}`)\n      .then(r => r.json())\n      .then(data => setProfile(data));   // ← no cleanup: runs even after unmount\n    // ← no return: no cleanup function\n  }, [userId]);\n\n  if (!profile) return <p>Loading...</p>;\n  return <h2>{profile.name}</h2>;\n}",
+  "buggyLineStart": 8,
+  "buggyLineEnd": 9,
+  "traceback": "1. ProfileCard mounts for userId=1\n2. fetch('/api/users/1') starts (takes 500ms)\n3. User navigates away — ProfileCard unmounts\n4. 500ms later: fetch resolves\n5. setProfile(data) runs on unmounted component\n\nConsole warning:\n  Warning: Can't perform a React state update on a component\n  that is not mounted. (In older React: 'unmounted component')",
+  "correctOutput": "1. ProfileCard mounts for userId=1\n2. fetch starts with AbortController signal\n3. User navigates away — ProfileCard unmounts\n4. Cleanup runs → controller.abort()\n5. fetch rejects with AbortError — caught and ignored\n\nNo warning. No state update after unmount.",
+  "options": [
+    {
+      "key": "a",
+      "label": "Add an `AbortController` and abort the fetch in the cleanup function",
+      "patchCode": "useEffect(() => {\n  const controller = new AbortController();\n  fetch(`/api/users/${userId}`, { signal: controller.signal })\n    .then(r => r.json())\n    .then(data => setProfile(data))\n    .catch(err => {\n      if (err.name !== 'AbortError') throw err;\n    });\n  return () => controller.abort();\n}, [userId]);",
+      "isCorrect": true,
+      "resultLog": "ProfileCard mounts → fetch starts\nUser navigates away → unmount → cleanup runs → controller.abort()\nfetch rejects with AbortError → catch ignores it\nsetProfile never called — no warning",
+      "rationale": "`AbortController` cancels the fetch request at the network level when `controller.abort()` is called in the cleanup. The fetch rejects with `AbortError`, which the `.catch()` handler ignores. `setProfile` is never called on the unmounted component, eliminating the warning and any potential stale-state issues."
+    },
+    {
+      "key": "b",
+      "label": "Use a boolean `mounted` flag to guard the setState call",
+      "patchCode": "useEffect(() => {\n  let mounted = true;\n  fetch(`/api/users/${userId}`)\n    .then(r => r.json())\n    .then(data => {\n      if (mounted) setProfile(data);\n    });\n  return () => { mounted = false; };\n}, [userId]);",
+      "isCorrect": false,
+      "resultLog": "ProfileCard mounts → fetch starts\nUser navigates away → cleanup: mounted = false\nfetch still runs to completion server-side\nResponse arrives → guard: mounted is false → setProfile skipped\n\nNo warning — correct.\nBut: the network request completes unnecessarily (server does the work,\nbandwidth is consumed). AbortController is more efficient.",
+      "rationale": "The boolean guard correctly prevents `setProfile` from running after unmount, eliminating the warning. The request still completes at the server — bandwidth and server compute are wasted. `AbortController` is preferable because it cancels the request before the server sends the response, saving resources."
+    },
+    {
+      "key": "c",
+      "label": "Wrap `setProfile` in a try/catch to suppress the warning",
+      "patchCode": "useEffect(() => {\n  fetch(`/api/users/${userId}`)\n    .then(r => r.json())\n    .then(data => {\n      try { setProfile(data); } catch {}\n    });\n}, [userId]);",
+      "isCorrect": false,
+      "resultLog": "ProfileCard mounts → fetch starts\nUser navigates away → unmount\nfetch completes → setProfile called on unmounted component\nReact logs the warning — try/catch does NOT suppress React warnings.\n\nReact's warning is logged via console.error, not thrown as an exception.\ntry/catch cannot catch it.",
+      "rationale": "React's 'setState on unmounted component' warning is logged through `console.error`, not thrown as a JavaScript exception. `try/catch` only catches thrown exceptions — it cannot intercept console warnings. The underlying problem (calling `setProfile` after unmount) is still there."
+    }
+  ],
+  "hints": [
+    "The `useEffect` cleanup function runs when a component unmounts (or when deps change before the next effect). Return a function from `useEffect` — that is the cleanup. `return () => { /* cancel something */ }`.",
+    "Create an `AbortController` at the top of the effect body. Pass `{ signal: controller.signal }` as the second argument to `fetch`. In the cleanup function, call `controller.abort()`. Catch `AbortError` in `.catch()` and ignore it — it means the request was intentionally cancelled."
+  ],
+  "explanationMd": "### The React warning explained\nReact 18 still warns (in development) when `setState` is called on an unmounted component. The real problem is not the warning — it is that calling `setState` on a dead component can cause memory leaks (the component's state is kept alive by the closure) and unpredictable behaviour.\n\n### The cleanup function pattern\n`useEffect` accepts a return value — a cleanup function:\n```js\nuseEffect(() => {\n  // setup: runs after render\n  return () => {\n    // cleanup: runs before next effect OR on unmount\n  };\n}, [deps]);\n```\n\nThe cleanup runs:\n1. When the component unmounts\n2. Before the effect runs again (when deps change)\n\n### AbortController for fetch cleanup\n```js\nuseEffect(() => {\n  const controller = new AbortController();\n\n  fetch(url, { signal: controller.signal })\n    .then(r => r.json())\n    .then(setData)\n    .catch(err => {\n      if (err.name !== 'AbortError') throw err;\n    });\n\n  return () => controller.abort();  // cancel on unmount or dep change\n}, [url]);\n```\n\n### When cleanup runs on dep change\nIf `userId` changes (navigating to a different user's profile), the cleanup for the old effect aborts the old fetch, then the new effect starts a fresh fetch. This also prevents race conditions between user navigations.",
+  "recruiterReview": "Correct. setState-after-unmount is ubiquitous in production React apps — any component that fetches data and can be unmounted (route changes, tab switches, modal closes) has this bug. The boolean-flag distractor is a working pattern worth knowing but wastes server resources. The try/catch distractor reveals a fundamental misunderstanding: React warnings are console.error calls, not exceptions. AbortController is the preferred modern fix. ✅",
+  "tutorial": {
+    "bodyMd": "## React useEffect Cleanup and setState After Unmount\n\n### The lifecycle of a useEffect\nEvery `useEffect` can optionally return a **cleanup function**. React calls this function at two moments:\n\n1. **Before the component unmounts** — final cleanup\n2. **Before the next run of the same effect** — clean up the previous setup\n\n```jsx\nuseEffect(() => {\n  console.log('effect ran');\n\n  return () => {\n    console.log('cleanup ran');\n  };\n}, [dependency]);\n```\n\nIf you subscribe to something in the effect (a WebSocket, an interval, an event listener, a fetch), you should unsubscribe in the cleanup.\n\n### Why setState after unmount is a problem\nWhen a component unmounts, React removes it from the DOM and its state is garbage-collected — but closures inside `useEffect` still hold references to the state setters. If an async operation (like a `fetch`) completes after unmount and calls `setState`, two things can happen:\n\n1. React logs a warning in development: *'Can't perform a React state update on a component that is not mounted'*\n2. The closure keeps the component's state alive in memory (memory leak) until the async operation finishes\n\n### Cancelling a fetch with AbortController\n`AbortController` is the standard Web API for cancelling fetch requests:\n\n```jsx\nuseEffect(() => {\n  const controller = new AbortController();\n\n  fetch('/api/profile', { signal: controller.signal })\n    .then(r => r.json())\n    .then(data => setProfile(data))\n    .catch(err => {\n      // AbortError is expected when we cancel — ignore it\n      if (err.name !== 'AbortError') throw err;\n    });\n\n  // Cleanup: called on unmount or before next effect run\n  return () => controller.abort();\n}, [userId]);\n```\n\nWhen `abort()` is called:\n- The browser cancels the network request (if still in flight)\n- The `fetch` promise rejects with an `AbortError`\n- The `.catch` handler checks for `AbortError` and silently returns\n- `setProfile` is never called\n\n### Alternative: boolean mounted flag\nFor cases where AbortController isn't available or the async operation isn't a fetch:\n\n```jsx\nuseEffect(() => {\n  let alive = true;\n\n  someAsyncOperation().then(result => {\n    if (alive) setData(result);  // guard against stale callback\n  });\n\n  return () => { alive = false; };\n}, []);\n```\n\nThis is simpler but less efficient — the async operation completes but the result is discarded.\n\n### The pattern for any subscription\nThe cleanup principle applies to any subscription:\n\n```jsx\n// Event listener:\nuseEffect(() => {\n  const handler = (e) => setKey(e.key);\n  window.addEventListener('keydown', handler);\n  return () => window.removeEventListener('keydown', handler);\n}, []);\n\n// Interval:\nuseEffect(() => {\n  const id = setInterval(() => setTick(t => t + 1), 1000);\n  return () => clearInterval(id);\n}, []);\n\n// WebSocket:\nuseEffect(() => {\n  const ws = new WebSocket(url);\n  ws.onmessage = (e) => setMessages(m => [...m, e.data]);\n  return () => ws.close();\n}, [url]);\n```\n\n### When does cleanup matter most?\n- Components that live inside routes (can unmount on navigation)\n- Modal contents (modal closes before fetch completes)\n- List items that can be removed while loading data\n- Any component with async operations\n\n### You just learned\nThe `useEffect` cleanup function runs when a component unmounts and before the next effect run. Return a function from `useEffect` to cancel in-flight work. For `fetch`, use `AbortController` with `{ signal: controller.signal }` and call `controller.abort()` in the cleanup — this cancels the network request and prevents `setState` from being called on unmounted components.",
+    "videos": [
+      {
+        "title": "React useEffect cleanup function explained",
+        "searchQuery": "react useEffect cleanup function unmount explained tutorial"
+      },
+      {
+        "title": "React AbortController fetch cancel unmount tutorial",
+        "searchQuery": "react AbortController fetch cancel setState unmounted component tutorial"
+      }
+    ]
+  },
+  "estMinutes": 6,
+  "version": 1
+}

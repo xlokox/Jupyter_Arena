@@ -1,0 +1,63 @@
+{
+  "id": "fullstack-038-promise-all-fail-fast",
+  "sector": "fullstack",
+  "difficulty": "medium",
+  "title": "38_promise_all_fail_fast.jsx",
+  "language": "jsx",
+  "icon": "layers",
+  "conceptTags": ["javascript", "Promise.all", "Promise.allSettled", "async-await"],
+  "subSector": "async-and-network",
+  "descriptionMd": "## Mission: One 404 Wipes Out the Entire Dashboard\n\nA dashboard loads three sections in parallel: user profile, recent posts, and friend suggestions. The friend suggestions endpoint returns `404` for new users who have no friends yet. Because the code uses `Promise.all`, the one 404 rejects the entire group — and the dashboard shows nothing instead of rendering the two sections that succeeded.\n\nFix the fetch so successful sections always render, even when one endpoint fails.",
+  "initialCode": "async function loadDashboard(userId) {\n  const [profile, posts, friends] = await Promise.all([\n    fetch(`/api/users/${userId}`).then(r => r.json()),\n    fetch(`/api/users/${userId}/posts`).then(r => r.json()),\n    fetch(`/api/users/${userId}/friends`).then(r => r.json()),  // 404 for new users\n  ]);\n  // ← if friends fails, profile and posts data are also lost\n  return { profile, posts, friends };\n}",
+  "buggyLineStart": 2,
+  "buggyLineEnd": 6,
+  "traceback": "userId = 99 (new user, no friends):\n  GET /api/users/99         200  profile loaded\n  GET /api/users/99/posts   200  posts loaded\n  GET /api/users/99/friends 404  no friends yet\n\nPromise.all rejects as soon as any promise rejects.\nThe profile and posts data are discarded.\nloadDashboard throws: 'Not Found'\nDashboard shows error screen — no content at all.",
+  "correctOutput": "userId = 99 (new user, no friends):\n  GET /api/users/99         200  profile loaded\n  GET /api/users/99/posts   200  posts loaded\n  GET /api/users/99/friends 404  rejected (handled)\n\nDashboard renders:\n  Profile: { name: 'Alice' }\n  Posts: [{ id: 1, title: 'First post' }]\n  Friends: null  (gracefully absent)",
+  "options": [
+    {
+      "key": "a",
+      "label": "Use `Promise.allSettled` and extract successful values",
+      "patchCode": "async function loadDashboard(userId) {\n  const [profileResult, postsResult, friendsResult] = await Promise.allSettled([\n    fetch(`/api/users/${userId}`).then(r => r.json()),\n    fetch(`/api/users/${userId}/posts`).then(r => r.json()),\n    fetch(`/api/users/${userId}/friends`).then(r => r.json()),\n  ]);\n\n  return {\n    profile: profileResult.status === 'fulfilled' ? profileResult.value : null,\n    posts:   postsResult.status   === 'fulfilled' ? postsResult.value   : [],\n    friends: friendsResult.status === 'fulfilled' ? friendsResult.value : null,\n  };\n}",
+      "isCorrect": true,
+      "resultLog": "userId = 99:\n  profileResult:  { status: 'fulfilled', value: { name: 'Alice' } }\n  postsResult:    { status: 'fulfilled', value: [{...}] }\n  friendsResult:  { status: 'rejected', reason: Error: 404 }\n\nReturn:\n  { profile: { name: 'Alice' }, posts: [{...}], friends: null }\n\nDashboard renders profile and posts. Friends section shows nothing.",
+      "rationale": "`Promise.allSettled` never rejects — it always resolves with an array of result objects, each with a `status` of `'fulfilled'` or `'rejected'`. This lets you handle partial failures: render what succeeded and show empty/fallback states for what failed. Compare to `Promise.all` which rejects immediately on the first failure and discards all other results."
+    },
+    {
+      "key": "b",
+      "label": "Wrap each fetch in its own try/catch to return null on failure",
+      "patchCode": "async function loadDashboard(userId) {\n  async function safeFetch(url) {\n    try {\n      const r = await fetch(url);\n      return await r.json();\n    } catch {\n      return null;\n    }\n  }\n\n  const [profile, posts, friends] = await Promise.all([\n    safeFetch(`/api/users/${userId}`),\n    safeFetch(`/api/users/${userId}/posts`),\n    safeFetch(`/api/users/${userId}/friends`),\n  ]);\n\n  return { profile, posts, friends };\n}",
+      "isCorrect": false,
+      "resultLog": "userId = 99:\n  profile = { name: 'Alice' }  (200)\n  posts   = [{...}]            (200)\n  friends = null               (404 caught, returns null)\n\nCorrect output — dashboard renders profile and posts.\n\nBut: the bare `catch` in `safeFetch` also silences real errors\n(network failure, 500 server crash). Consider checking `r.ok`\ninside safeFetch to distinguish 404 from genuine failures.",
+      "rationale": "Wrapping each fetch in `try/catch` and returning `null` on failure works. However, it silently swallows all errors — including real server errors (500, network failure) that the caller might want to handle differently. `Promise.allSettled` is more transparent: each result carries `status` and `reason`, so the caller can inspect what failed and why."
+    },
+    {
+      "key": "c",
+      "label": "Fetch sequentially with `await` so a failure stops early",
+      "patchCode": "async function loadDashboard(userId) {\n  const profile = await fetch(`/api/users/${userId}`).then(r => r.json());\n  const posts   = await fetch(`/api/users/${userId}/posts`).then(r => r.json());\n  const friends = await fetch(`/api/users/${userId}/friends`).then(r => r.json());\n  return { profile, posts, friends };\n}",
+      "isCorrect": false,
+      "resultLog": "userId = 99:\n  profile fetched  (300ms)\n  posts fetched    (400ms after profile)\n  friends → 404   (throws)\n\nStill throws on friends — profile and posts are loaded but not returned.\n\nAlso: sequential fetches take 300+400+300 = 1000ms instead of\nmax(300, 400, 300) = 400ms in parallel. Slower AND still broken.",
+      "rationale": "Sequential `await` does not fix the error propagation problem — if `friends` throws, the function still throws and `profile`/`posts` data is lost. It also eliminates the performance benefit of parallelism: 3 sequential requests take 3× as long as 3 parallel ones. This is worse on both dimensions."
+    }
+  ],
+  "hints": [
+    "`Promise.all` rejects as soon as any single promise rejects — even if the others succeeded. For a dashboard where partial data is acceptable, look up `Promise.allSettled` — it waits for all promises and never rejects.",
+    "`Promise.allSettled` returns an array of result objects. Each has `status: 'fulfilled'` or `status: 'rejected'`. Check `result.status === 'fulfilled'` to read `result.value`, or provide a fallback when `status === 'rejected'`."
+  ],
+  "explanationMd": "### `Promise.all` vs `Promise.allSettled`\n| | `Promise.all` | `Promise.allSettled` |\n|---|---|---|\n| Resolves when | All resolve | All settle (either outcome) |\n| Rejects when | First rejection | Never rejects |\n| Value on reject | The rejection reason | Always resolves with results array |\n\n### `Promise.all` — fast fail\n```js\nconst [a, b, c] = await Promise.all([p1, p2, p3]);\n// If p2 rejects, a and c are discarded — total failure\n```\n\nGood when you need ALL results or nothing is useful (e.g. a transaction: if any step fails, abort everything).\n\n### `Promise.allSettled` — partial success\n```js\nconst results = await Promise.allSettled([p1, p2, p3]);\n// results is always an array:\n// [{ status: 'fulfilled', value: ... }, { status: 'rejected', reason: ... }, ...]\n```\n\nGood when partial results are useful (a dashboard where individual sections can fail independently).\n\n### Reading allSettled results\n```js\nconst [aRes, bRes] = await Promise.allSettled([fetchA(), fetchB()]);\nconst a = aRes.status === 'fulfilled' ? aRes.value : defaultA;\nconst b = bRes.status === 'fulfilled' ? bRes.value : defaultB;\n```",
+  "recruiterReview": "Correct. `Promise.all` fail-fast is a real production bug — a low-priority endpoint (friend suggestions, ads, recommendations) fails and wipes out the entire page because it shares a `Promise.all` with critical data. The sequential-await distractor is slower AND still broken — the double-downgrade catches developers who reach for sequential as a 'safe' fallback. The try/catch-wrapper distractor works but silences error information. `Promise.allSettled` is the canonical tool. ✅",
+  "tutorial": {
+    "bodyMd": "## Promise.all vs Promise.allSettled: Handling Partial Failures\n\n### Running promises in parallel\nJavaScript is single-threaded but asynchronous — you can start multiple async operations and wait for them concurrently. `Promise.all` is the primary tool for this:\n\n```js\n// Sequential — slow (total = sum of all durations):\nconst a = await fetchA();  // 300ms\nconst b = await fetchB();  // 400ms\nconst c = await fetchC();  // 250ms\n// Total: 950ms\n\n// Parallel — fast (total = slowest):\nconst [a, b, c] = await Promise.all([fetchA(), fetchB(), fetchC()]);\n// Total: 400ms\n```\n\n### The `Promise.all` fail-fast behaviour\n`Promise.all` returns a promise that:\n- **Resolves** with an array of values when ALL input promises resolve\n- **Rejects** immediately with the reason of the FIRST promise that rejects\n\n```js\nawait Promise.all([resolves(1), rejects('oops'), resolves(3)]);\n// → throws 'oops'\n// The values 1 and 3 are silently discarded\n```\n\nThis is the right behaviour for operations that must all succeed or the result is useless — like a database transaction. But for a dashboard with independent sections, one failure should not blank the entire page.\n\n### `Promise.allSettled`: always resolves\n`Promise.allSettled` returns a promise that ALWAYS resolves — never rejects. It waits for all promises to settle (either resolve or reject) and returns an array of result descriptors:\n\n```js\nconst results = await Promise.allSettled([\n  fetch('/api/profile').then(r => r.json()),\n  fetch('/api/posts').then(r => r.json()),\n  fetch('/api/friends').then(r => r.json()),\n]);\n\n// results is always:\n[\n  { status: 'fulfilled', value: { name: 'Alice' } },\n  { status: 'fulfilled', value: [{ id: 1, ... }] },\n  { status: 'rejected',  reason: Error('404 Not Found') },\n]\n```\n\nEach element is either `{ status: 'fulfilled', value: X }` or `{ status: 'rejected', reason: Error }`.\n\n### Extracting results\n```js\nconst [profileRes, postsRes] = await Promise.allSettled([p1, p2]);\n\nconst profile = profileRes.status === 'fulfilled'\n  ? profileRes.value\n  : null;  // fallback for failure\n\nconst posts = postsRes.status === 'fulfilled'\n  ? postsRes.value\n  : [];    // fallback for failure\n```\n\n### Helper for cleaner code\n```js\nfunction extract(result, fallback) {\n  return result.status === 'fulfilled' ? result.value : fallback;\n}\n\nconst [pR, qR] = await Promise.allSettled([fetchP(), fetchQ()]);\nconst p = extract(pR, null);\nconst q = extract(qR, []);\n```\n\n### When to use which\n| Use case | Tool |\n|---|---|\n| All must succeed (transaction, critical data) | `Promise.all` |\n| Partial success is acceptable (dashboard, widget) | `Promise.allSettled` |\n| Race — first to resolve wins | `Promise.race` |\n| Race — first to resolve without rejection | `Promise.any` |\n\n### Promise combinators summary\n```js\n// Resolves when ALL resolve, rejects on first rejection:\nawait Promise.all([p1, p2, p3]);\n\n// Always resolves, waits for all to settle:\nawait Promise.allSettled([p1, p2, p3]);\n\n// Resolves with first resolved value, rejects if all reject:\nawait Promise.any([p1, p2, p3]);\n\n// Resolves or rejects with the first settlement (any outcome):\nawait Promise.race([p1, p2, p3]);\n```\n\n### You just learned\n`Promise.all` rejects on the first failure and discards all other results. `Promise.allSettled` always resolves with an array of `{status, value/reason}` objects — perfect for independent operations like dashboard sections where partial success is better than total failure.",
+    "videos": [
+      {
+        "title": "Promise.all vs Promise.allSettled JavaScript explained",
+        "searchQuery": "javascript Promise.all vs Promise.allSettled explained tutorial"
+      },
+      {
+        "title": "JavaScript async await parallel requests tutorial",
+        "searchQuery": "javascript async await parallel requests Promise.all tutorial"
+      }
+    ]
+  },
+  "estMinutes": 6,
+  "version": 1
+}
