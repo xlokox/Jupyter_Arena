@@ -1,0 +1,88 @@
+{
+  "id": "py-043-dict-key-error",
+  "sector": "py",
+  "difficulty": "easy",
+  "title": "43_dict_key_error.py",
+  "language": "python",
+  "icon": "key-round",
+  "conceptTags": ["dict", "KeyError", "get", "default-value"],
+  "conceptCard": "Accessing a dict with `dict[key]` raises `KeyError` if the key is absent. `dict.get(key, default)` returns the default value instead of crashing.",
+  "descriptionMd": "## Mission: The Config Lookup Crashes on Missing Keys\n\nA server reads optional configuration from a dictionary. `timeout` is optional — many deployments don't set it — but `config[\"timeout\"]` raises `KeyError` when the key is absent, crashing the startup.\n\nFix the lookup to return `30` as a default when `timeout` is not configured.",
+  "initialCode": "config = {\n    \"host\": \"localhost\",\n    \"port\": 5432,\n    \"max_connections\": 100\n}\n\ntimeout = config[\"timeout\"]   # ← bug: KeyError if key is absent\nprint(f\"Connecting (timeout={timeout}s)...\")",
+  "buggyLineStart": 7,
+  "buggyLineEnd": 7,
+  "lineNotes": [
+    {
+      "line": 7,
+      "noteMd": "`config[\"timeout\"]` raises `KeyError` because `\"timeout\"` is not in `config`. Use `.get()` to provide a fallback."
+    }
+  ],
+  "traceback": "Traceback (most recent call last):\n  File \"server.py\", line 7, in <module>\n    timeout = config[\"timeout\"]\nKeyError: 'timeout'",
+  "correctOutput": "Connecting (timeout=30s)...\n\n# config.get('timeout', 30) returns 30 when 'timeout' is absent from config",
+  "options": [
+    {
+      "key": "a",
+      "label": "Use `config.get('timeout', 30)` to return 30 when the key is missing",
+      "patchCode": "timeout = config.get(\"timeout\", 30)",
+      "isCorrect": true,
+      "resultLog": "Connecting (timeout=30s)...\n\n# dict.get(key, default) never raises KeyError.\n# Returns the stored value if key exists, or 30 if it doesn't.",
+      "rationale": "`dict.get(key, default)` is the safe, idiomatic way to access an optional dictionary key. If the key exists it returns its value; if not, it returns the default. No exception, no try/except block needed."
+    },
+    {
+      "key": "b",
+      "label": "Catch the KeyError with try/except and set timeout to 30",
+      "patchCode": "try:\n    timeout = config[\"timeout\"]\nexcept KeyError:\n    timeout = 30",
+      "isCorrect": false,
+      "resultLog": "Connecting (timeout=30s)...\n\nCorrect output — but using try/except for a predictable missing key\nis verbose. `config.get('timeout', 30)` expresses the same intent in one line.",
+      "rationale": "try/except works, but it is the wrong tool for an expected case. A missing optional config key is not an exceptional event — it is the normal case when the key isn't set. `dict.get()` exists precisely for this pattern and is more concise and readable."
+    },
+    {
+      "key": "c",
+      "label": "Check `'timeout' in config` before accessing",
+      "patchCode": "if \"timeout\" in config:\n    timeout = config[\"timeout\"]\nelse:\n    timeout = 30",
+      "isCorrect": false,
+      "resultLog": "Connecting (timeout=30s)...\n\nCorrect output — four lines where one would do.\nAlso: in multi-threaded code another thread could delete 'timeout'\nbetween the `in` check and the `[]` access.\n`config.get('timeout', 30)` is safer and shorter.",
+      "rationale": "Checking `'key' in dict` before accessing is the 'Look Before You Leap' (LBYL) pattern. It works but is verbose and has a subtle threading risk: the key could be deleted between the `in` check and the `[]` access. `dict.get()` is the more concise and Pythonic approach for optional keys."
+    }
+  ],
+  "hints": [
+    "`config[\"timeout\"]` raises `KeyError` when the key doesn't exist. Python dictionaries have a method that returns a default value instead — look up `dict.get()`.",
+    "`dict.get(key, default)` returns the value at `key` if it exists, or `default` otherwise. Try `config.get('timeout', 30)` — it returns 30 when 'timeout' is absent."
+  ],
+  "takeaway": "Use `dict.get(key, default)` to safely access optional dictionary keys. It returns the default when the key is absent without raising `KeyError`.",
+  "glossary": [
+    {
+      "term": "KeyError",
+      "definitionMd": "Raised when you access a dictionary key that doesn't exist using `dict[key]` syntax. Use `dict.get(key, default)` to return a fallback instead of raising."
+    },
+    {
+      "term": "dict.get()",
+      "definitionMd": "`dict.get(key)` returns the value for `key`, or `None` if absent. `dict.get(key, default)` returns `default` instead of `None`. Never raises `KeyError`."
+    },
+    {
+      "term": "optional key",
+      "definitionMd": "A dictionary key that may or may not be present. Use `dict.get(key, default)` to read optional keys without crashing on the ones that are absent."
+    },
+    {
+      "term": "LBYL vs EAFP",
+      "definitionMd": "Two Python styles. **LBYL** (Look Before You Leap) checks first (`if 'k' in d`). **EAFP** (Easier to Ask Forgiveness than Permission) tries and catches (`try: d['k'] except KeyError`). For optional keys, `dict.get()` is more concise than either."
+    }
+  ],
+  "explanationMd": "### `[]` vs `.get()` for dictionary access\n```python\nconfig = {\"host\": \"localhost\"}\n\nconfig[\"host\"]                # 'localhost'\nconfig[\"timeout\"]             # KeyError — key is absent\n\nconfig.get(\"host\")            # 'localhost'\nconfig.get(\"timeout\")         # None — no crash\nconfig.get(\"timeout\", 30)     # 30   — custom default\n```\n\n### When to use each\n- `dict[key]` — key **must** exist (missing = programmer error)\n- `dict.get(key, default)` — key is optional, need a fallback\n\n### Common patterns\n```python\n# Counter (increment or initialise to 0):\ncounts[word] = counts.get(word, 0) + 1\n\n# Nested optional read:\nname = user.get('profile', {}).get('name', 'unknown')\n```",
+  "tutorial": {
+    "bodyMd": "## Python Dictionaries and KeyError\n\n### What a dictionary is\nA Python dictionary (`dict`) maps **keys** to **values**. Keys can be strings, integers, tuples, or any hashable type. Values can be anything.\n\n```python\nuser = {\n    \"name\": \"Alice\",\n    \"age\": 30,\n    \"city\": \"Berlin\"\n}\n\nprint(user[\"name\"])   # Alice\nprint(user[\"age\"])    # 30\n```\n\n### KeyError: the missing-key exception\nAccessing a key that doesn't exist raises `KeyError`:\n\n```python\nprint(user[\"email\"])   # KeyError: 'email'\n```\n\nThis is intentional in Python — unlike some languages that return `null` or `undefined` for missing keys, Python raises an error so you know immediately that something is wrong.\n\n### Safe access with `.get()`\n`dict.get(key)` returns `None` for missing keys instead of raising:\n\n```python\nprint(user.get(\"email\"))          # None   — no error\nprint(user.get(\"email\", \"\"))      # \"\"     — custom default\nprint(user.get(\"name\", \"guest\"))  # Alice  — key exists; default ignored\n```\n\nThe second argument to `.get()` is the **default value**.\n\n### When to use `[]` vs `.get()`\nChoose based on whether the missing key is expected:\n\n```python\n# Required key — use [] so you get an error if it's missing:\nhost = config[\"host\"]       # must be there\n\n# Optional key — use .get() with a sensible fallback:\ntimeout = config.get(\"timeout\", 30)\nlog_level = config.get(\"log_level\", \"INFO\")\n```\n\nIf a key *must* be there and isn't, `dict[key]` gives you a helpful `KeyError` immediately. If a key is optional, `.get()` avoids the error with a clean fallback.\n\n### `setdefault()`: read-or-insert\n`dict.setdefault(key, default)` reads a key AND adds it to the dict with the default if missing:\n\n```python\nconfig = {\"host\": \"localhost\"}\nconfig.setdefault(\"timeout\", 30)  # adds \"timeout\": 30\nprint(config)   # {\"host\": \"localhost\", \"timeout\": 30}\n\n# vs .get(), which does NOT modify the dict:\nconfig2 = {\"host\": \"localhost\"}\nconfig2.get(\"timeout\", 30)  # returns 30, dict unchanged\n```\n\n### Counter pattern: `.get()` + increment\nA classic use of `.get()` is counting occurrences:\n\n```python\ncounts = {}\nwords = [\"the\", \"cat\", \"the\", \"dog\", \"the\"]\n\nfor word in words:\n    counts[word] = counts.get(word, 0) + 1\n\nprint(counts)  # {'the': 3, 'cat': 1, 'dog': 1}\n```\n\n### Checking key existence\n```python\n# Check if key exists:\n\"timeout\" in config        # True or False\n\"timeout\" not in config    # True or False\n\n# Get all keys:\nconfig.keys()     # dict_keys([...])\n\n# Get all values:\nconfig.values()   # dict_values([...])\n\n# Get key-value pairs:\nconfig.items()    # dict_items([...])\n```\n\n### Safe nested key access\nFor nested dicts, chain `.get()` calls:\n\n```python\nresponse = {\"data\": {\"user\": {\"name\": \"Alice\"}}}\n\n# Safe — handles missing intermediate keys:\nname = response.get(\"data\", {}).get(\"user\", {}).get(\"name\", \"unknown\")\n\n# Unsafe — raises KeyError if any key is missing:\nname = response[\"data\"][\"user\"][\"name\"]\n```\n\n### You just learned\n`dict[key]` raises `KeyError` when the key is absent. `dict.get(key, default)` returns `default` instead. Use `[]` for required keys (so you get an error when something is wrong) and `.get(key, default)` for optional keys with a fallback.",
+    "videos": [
+      {
+        "title": "Python dictionary get method default value tutorial",
+        "searchQuery": "python dictionary get method default value KeyError tutorial beginners"
+      },
+      {
+        "title": "Python dictionaries complete beginner tutorial",
+        "searchQuery": "python dictionaries complete guide beginners tutorial"
+      }
+    ]
+  },
+  "recruiterReview": "Correct. `dict.get()` vs `dict[]` is the first dictionary idiom every Python developer needs. The try/except distractor is technically correct but shows overly defensive coding for a routine case. The LBYL `'key' in dict` distractor is correct but verbose and has the subtle TOCTOU threading caveat, making `.get()` the clearly superior choice. ✅",
+  "estMinutes": 4,
+  "version": 1
+}

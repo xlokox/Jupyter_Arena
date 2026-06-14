@@ -1,0 +1,84 @@
+{
+  "id": "py-045-mutable-default-arg",
+  "sector": "py",
+  "difficulty": "medium",
+  "title": "45_mutable_default_arg.py",
+  "language": "python",
+  "icon": "variable",
+  "conceptTags": ["functions", "default-arguments", "mutation", "None"],
+  "conceptCard": "Default argument values are evaluated **once** when the function is defined, not each call. A mutable default like `[]` or `{}` is shared across every call that omits that argument.",
+  "descriptionMd": "## Mission: The Tag List Accumulates Across Calls\n\nA function builds a list of tags for a blog post. Each call without an explicit `tags` argument should start fresh. Instead, the list grows across calls — the previous call's tags bleed into the next.\n\nFix the function so every call without an explicit `tags` argument starts with a new empty list.",
+  "initialCode": "def add_tag(tag, tags=[]):   # ← bug: mutable default argument\n    tags.append(tag)\n    return tags\n\nprint(add_tag(\"python\"))   # expected: ['python']\nprint(add_tag(\"flask\"))    # expected: ['flask'], got: ['python', 'flask']",
+  "buggyLineStart": 1,
+  "buggyLineEnd": 1,
+  "lineNotes": [
+    {
+      "line": 1,
+      "noteMd": "`[]` is evaluated **once** when Python compiles the `def` statement. Every call that omits `tags` receives a reference to this same list — not a fresh one."
+    }
+  ],
+  "traceback": "# No exception — silent wrong output:\nadd_tag('python')   # → ['python']   (looks fine on first call)\nadd_tag('flask')    # → ['python', 'flask']  ← wrong!\nadd_tag('django')   # → ['python', 'flask', 'django']  ← wrong!\n\n# Verify: inspect the default directly\nprint(add_tag.__defaults__)  # (['python', 'flask', 'django'],) — accumulated!",
+  "correctOutput": "['python']\n['flask']\n\n# Each call without explicit tags gets its own new empty list",
+  "options": [
+    {
+      "key": "a",
+      "label": "Use `None` as the default and create a new list inside the function",
+      "patchCode": "def add_tag(tag, tags=None):\n    if tags is None:\n        tags = []\n    tags.append(tag)\n    return tags",
+      "isCorrect": true,
+      "resultLog": "['python']\n['flask']\n\n# None is immutable — safe as a default.\n# `if tags is None: tags = []` creates a fresh list each time\n# no argument is passed.",
+      "rationale": "`None` is immutable, so it cannot accumulate state across calls. `if tags is None: tags = []` creates a brand-new list for each call that omits `tags`. This is the standard, idiomatic Python fix for the mutable default argument problem."
+    },
+    {
+      "key": "b",
+      "label": "Use a tuple default `tags=()` and convert to a list inside",
+      "patchCode": "def add_tag(tag, tags=()):\n    tags = list(tags) + [tag]\n    return tags",
+      "isCorrect": false,
+      "resultLog": "['python']\n['flask']\n\nCorrect output — tuples are immutable, so () is safe as a default.\nBut `list(tags) + [tag]` creates a new list on every call regardless,\nchanging the function contract: callers can no longer pass a list\nand have it extended in place. The `None` sentinel is more flexible.",
+      "rationale": "Tuples are immutable so `()` is a safe default. Converting to list + concatenating works. However it changes the function's behaviour — it always creates a new list rather than optionally accepting a mutable list from the caller. The `None` sentinel is the conventional Python fix and preserves the function's ability to accept an existing list."
+    },
+    {
+      "key": "c",
+      "label": "Clear the list at the start of each call: `tags.clear()`",
+      "patchCode": "def add_tag(tag, tags=[]):\n    tags.clear()\n    tags.append(tag)\n    return tags",
+      "isCorrect": false,
+      "resultLog": "['python']\n['flask']\n\nAppears to work for sequential calls.\nBut if a caller passes their own list expecting it to be extended:\n\n  my_tags = ['existing']\n  add_tag('python', my_tags)   # → ['python'] — 'existing' was wiped!\n\nThe mutable default is still there; this just hides the symptom.",
+      "rationale": "Clearing at the start produces correct output for sequential calls, but silently destroys data when a caller passes their own list. `add_tag('python', my_tags)` wipes `my_tags` before appending — the caller's existing data is lost. The root cause (mutable default) is unaddressed. Use `None` as the sentinel and create a new list only when no `tags` was provided."
+    }
+  ],
+  "hints": [
+    "Python evaluates default argument values **once**, when the `def` statement runs — not on each call. So `def f(x=[]):` creates one list forever. Verify this: call `add_tag('a')` three times and check `add_tag.__defaults__` after each.",
+    "The fix: use `None` as the default (it is immutable and safe) and create a new `[]` inside the function body. `def add_tag(tag, tags=None): if tags is None: tags = []`."
+  ],
+  "takeaway": "Never use a mutable value (`[]`, `{}`, `set()`) as a default argument — it is shared across all calls. Use `None` as the sentinel and create a new mutable object inside the function.",
+  "glossary": [
+    {
+      "term": "mutable default argument",
+      "definitionMd": "A Python gotcha: using a mutable type (`list`, `dict`, `set`) as a default argument value. The default is created once at function definition and shared across all calls that omit the argument."
+    },
+    {
+      "term": "sentinel value",
+      "definitionMd": "A special placeholder value (commonly `None`) used to mean 'the caller did not provide this argument'. Allows the function body to detect omission and create a fresh object."
+    },
+    {
+      "term": "is vs ==",
+      "definitionMd": "`is` checks **identity** — whether two names refer to the same object in memory. `==` checks **equality** — whether two objects have the same value. Always use `is None` / `is not None` to test for `None`."
+    }
+  ],
+  "explanationMd": "### Why mutable defaults accumulate\nPython evaluates default values at **function definition time**:\n\n```python\ndef f(items=[]):\n    items.append(1)\n    return items\n\nf()   # [1]\nf()   # [1, 1]  — same list object!\nf()   # [1, 1, 1]\n\nprint(f.__defaults__)  # ([1, 1, 1],) — proof it's the same list\n```\n\nThe `[]` in `def f(items=[]):` is a single list stored in `f.__defaults__` forever.\n\n### The canonical fix\n```python\ndef f(items=None):\n    if items is None:\n        items = []   # new list on every call\n    items.append(1)\n    return items\n\nf()   # [1]\nf()   # [1]  — fresh list every time\n```\n\n### Applies to all mutable defaults\n```python\n# All dangerous:\ndef log(event, history={}): ...\ndef init(values=set()): ...\n\n# All safe:\ndef log(event, history=None):\n    if history is None: history = {}\ndef init(values=None):\n    if values is None: values = set()\n```\n\n### Intentional shared default (caching)\nRarely, the shared behaviour is intentional:\n```python\ndef compute(n, _cache={}):\n    if n not in _cache:\n        _cache[n] = n * n  # cache the result\n    return _cache[n]\n```\nHere `_cache` is shared on purpose — one cache for all calls. The leading underscore signals it is an implementation detail, not a caller parameter.",
+  "tutorial": {
+    "bodyMd": "## Python Mutable Default Arguments\n\n### When are default values created?\nIn Python, the values of default arguments are evaluated exactly **once**, when the `def` statement is executed — not each time the function is called. For immutable defaults (numbers, strings, tuples, `None`) this makes no observable difference. For mutable defaults (lists, dicts, sets), it means every call shares the same object.\n\n```python\ndef append_to(element, to=[]):\n    to.append(element)\n    return to\n\nappend_to(1)   # [1]\nappend_to(2)   # [1, 2]  — same list!\nappend_to(3)   # [1, 2, 3]\n\nprint(append_to.__defaults__)   # ([1, 2, 3],)  — accumulated state\n```\n\n### Why this surprises developers\nMost languages evaluate default arguments at call time, so `def f(x=[])` would mean 'use a fresh empty list if x is omitted'. Python's once-at-definition behaviour is one of the most common interview gotchas and surprises even experienced developers new to Python.\n\n### The canonical fix: None sentinel\nUse `None` — an immutable singleton — as the default, and create a new mutable object in the function body:\n\n```python\ndef append_to(element, to=None):\n    if to is None:\n        to = []    # new list per call\n    to.append(element)\n    return to\n\nappend_to(1)   # [1]\nappend_to(2)   # [2]  — fresh list every time\n```\n\nWhy `is None` and not `== None`? `is` checks object identity (guaranteed unique for `None`); `==` calls `__eq__` which can be overridden. Always `is None`.\n\n### The pattern applies to all mutable types\n```python\n# Functions with mutable defaults — ALL dangerous:\ndef fn1(data={}): ...\ndef fn2(items=[]): ...\ndef fn3(tags=set()): ...\n\n# Fixed with None sentinel:\ndef fn1(data=None):\n    if data is None: data = {}\n\ndef fn2(items=None):\n    if items is None: items = []\n\ndef fn3(tags=None):\n    if tags is None: tags = set()\n```\n\n### Safe defaults (immutable types)\nImmutable defaults are always safe — they cannot accumulate state:\n\n```python\ndef greet(name, greeting=\"Hello\"):   # safe — string is immutable\n    return f\"{greeting}, {name}!\"\n\ndef repeat(value, times=3):           # safe — int is immutable\n    return [value] * times\n```\n\n### Intentional shared state (advanced)\nOccasionally, the shared-default behaviour is used deliberately to implement a simple cache:\n\n```python\ndef fibonacci(n, _cache={0: 0, 1: 1}):\n    if n not in _cache:\n        _cache[n] = fibonacci(n - 1) + fibonacci(n - 2)\n    return _cache[n]\n```\n\nHere `_cache` is shared on purpose — every call benefits from previous computations. The leading underscore signals it is an internal implementation detail, not a parameter callers should provide. This is an expert pattern; document it clearly.\n\n### Detecting the bug\nYou can inspect a function's defaults at runtime:\n\n```python\ndef add_tag(tag, tags=[]):\n    tags.append(tag)\n    return tags\n\nadd_tag('python')\nadd_tag('flask')\n\nprint(add_tag.__defaults__)  # (['python', 'flask'],) — the leaking list\n```\n\n### You just learned\nMutable default arguments (`[]`, `{}`, `set()`) are shared across all calls — they accumulate state across the program's lifetime. The fix: use `None` as the default and create a fresh mutable object inside the function body with `if arg is None: arg = []`. This is one of Python's most common interview questions.",
+    "videos": [
+      {
+        "title": "Python mutable default argument gotcha explained",
+        "searchQuery": "python mutable default argument list gotcha explained tutorial"
+      },
+      {
+        "title": "Python function default arguments None sentinel",
+        "searchQuery": "python function default arguments None sentinel tutorial beginners"
+      }
+    ]
+  },
+  "recruiterReview": "Correct. The mutable default argument is one of Python's most famous gotchas and a standard interview question. The tuple-default distractor is safe but changes the function contract subtly. The clear()-at-start distractor destroys caller data — a real-world data loss bug that passes unit tests if they never test passing an existing list. The `None` sentinel is the only correct fix. ✅",
+  "estMinutes": 6,
+  "version": 1
+}

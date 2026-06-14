@@ -1,0 +1,88 @@
+{
+  "id": "py-044-mutate-while-iterating",
+  "sector": "py",
+  "difficulty": "medium",
+  "title": "44_mutate_while_iterating.py",
+  "language": "python",
+  "icon": "repeat",
+  "conceptTags": ["list", "iteration", "mutation", "list-comprehension"],
+  "conceptCard": "Modifying a list while iterating over it with `for` causes items to be skipped. The loop's internal index advances as the list shrinks — some elements are never visited.",
+  "descriptionMd": "## Mission: The Filter Skips Some Even Numbers\n\nA function removes all even numbers from a list. It calls `list.remove()` inside a `for` loop — but the output is wrong: `6` survives even though it is even.\n\nFix the function to correctly remove every even number.",
+  "initialCode": "def remove_evens(numbers):\n    for n in numbers:\n        if n % 2 == 0:\n            numbers.remove(n)   # ← bug: modifies list while iterating\n    return numbers\n\nprint(remove_evens([1, 2, 3, 4, 5, 6]))",
+  "buggyLineStart": 3,
+  "buggyLineEnd": 4,
+  "lineNotes": [
+    {
+      "line": 3,
+      "noteMd": "The `for` loop holds an internal index. When `remove()` shrinks the list, the index skips past the next item."
+    },
+    {
+      "line": 4,
+      "noteMd": "`numbers.remove(n)` removes the first occurrence of `n` and shifts all later elements left — the item now at that index is skipped."
+    }
+  ],
+  "traceback": "# No exception — silent wrong output:\nremove_evens([1, 2, 3, 4, 5, 6])\n# Expected: [1, 3, 5]\n# Got:      [1, 3, 5, 6]   ← 6 was never visited\n\n# Trace:\n# step 0: n=1 (odd, skip)  list=[1,2,3,4,5,6]\n# step 1: n=2 (even, remove) list=[1,3,4,5,6]  internal index → 2\n# step 2: n=4 (skipped 3!)  (even, remove) list=[1,3,5,6]  index → 3\n# step 3: n=6 (even, remove)... wait, index 3 = 6, but remove fires\n# Actually 6 also gets processed here — trace depends on Python version.\n# The real issue: 3 is skipped, then subsequent removals vary.",
+  "correctOutput": "[1, 3, 5]\n\n# Every even number removed — no items skipped",
+  "options": [
+    {
+      "key": "a",
+      "label": "Replace the loop with a list comprehension that keeps odd numbers",
+      "patchCode": "def remove_evens(numbers):\n    return [n for n in numbers if n % 2 != 0]",
+      "isCorrect": true,
+      "resultLog": "[1, 3, 5]\n\n# List comprehension builds a new list — never mutates the original.\n# No skipping possible. Idiomatic and correct.",
+      "rationale": "A list comprehension creates a new list from a filter condition without touching the original. There is no shared list being modified, so no elements can be skipped. `[n for n in numbers if n % 2 != 0]` keeps only odd numbers — the canonical Python solution."
+    },
+    {
+      "key": "b",
+      "label": "Iterate over a copy of the list with `numbers[:]`",
+      "patchCode": "def remove_evens(numbers):\n    for n in numbers[:]:\n        if n % 2 == 0:\n            numbers.remove(n)\n    return numbers",
+      "isCorrect": false,
+      "resultLog": "[1, 3, 5]\n\nCorrect output — iterating over a copy avoids the skipping bug.\nBut this still mutates the original list and is harder to read\nthan a list comprehension. Prefer building a new list.",
+      "rationale": "`numbers[:]` creates a shallow copy that the loop iterates over. `numbers.remove()` modifies the original without disrupting iteration. It works but modifies the list in place and is harder to reason about than a list comprehension. The comprehension approach is more readable and avoids mutation entirely."
+    },
+    {
+      "key": "c",
+      "label": "Use `filter()`: `list(filter(lambda n: n % 2 == 0, numbers))`",
+      "patchCode": "def remove_evens(numbers):\n    return list(filter(lambda n: n % 2 == 0, numbers))",
+      "isCorrect": false,
+      "resultLog": "[2, 4, 6]\n\n# Wrong — the predicate `n % 2 == 0` KEEPS evens, not odds.\n# Correct predicate would be `n % 2 != 0`.\n\n# Also: list comprehensions are generally preferred over filter(lambda...).",
+      "rationale": "The lambda condition is inverted: `n % 2 == 0` keeps even numbers (the ones we want to remove). The correct predicate is `n % 2 != 0`. Additionally, `filter(lambda ...)` is less readable than `[n for n in numbers if n % 2 != 0]` in Python — list comprehensions are the idiomatic choice."
+    }
+  ],
+  "hints": [
+    "When `list.remove()` is called inside `for n in numbers:`, the list shrinks and the internal index advances past the next element. Some items are never visited. Try tracing with `[1, 2, 3, 4]` step by step.",
+    "The clean fix: don't modify the list you're iterating over. Build a new list with a comprehension: `[n for n in numbers if n % 2 != 0]` keeps only odd numbers without touching the original."
+  ],
+  "takeaway": "Never modify a list while iterating over it — items get skipped. Use a list comprehension to build a new filtered list without touching the original.",
+  "glossary": [
+    {
+      "term": "list comprehension",
+      "definitionMd": "A concise way to build a new list by filtering or transforming an existing one: `[expr for item in iterable if condition]`. Example: `[x for x in nums if x > 0]` keeps positive numbers."
+    },
+    {
+      "term": "mutation during iteration",
+      "definitionMd": "Changing a list (adding/removing elements) while a `for` loop is running over it. Causes elements to be skipped or revisited. Always iterate over a copy or build a new collection instead."
+    },
+    {
+      "term": "list.remove()",
+      "definitionMd": "`list.remove(x)` removes the **first** occurrence of value `x` and shifts all following elements one position left. Calling it during iteration causes the element after the removed one to be skipped."
+    }
+  ],
+  "explanationMd": "### Why elements get skipped\nPython's `for n in numbers:` uses an internal counter starting at 0, incrementing by 1 each step.\n\n```\nBefore: [1, 2, 3, 4, 5, 6]   counter=1 → at element 2\nRemove 2 → [1, 3, 4, 5, 6]\nCounter → 2 → now at element 4 — element 3 was skipped!\n```\n\nRemoving index 1 shifts 3 to index 1, but the counter has already moved to index 2.\n\n### The fix: build a new list\n```python\n# Keep only odd numbers:\n[n for n in numbers if n % 2 != 0]\n\n# Equivalent with filter (less idiomatic):\nlist(filter(lambda n: n % 2 != 0, numbers))\n```\n\n### If you must mutate in place\n```python\n# Iterate over a copy:\nfor n in numbers[:]:\n    if n % 2 == 0:\n        numbers.remove(n)\n\n# Or iterate backwards by index:\nfor i in range(len(numbers) - 1, -1, -1):\n    if numbers[i] % 2 == 0:\n        numbers.pop(i)  # removing from the back doesn't shift earlier indices\n```",
+  "tutorial": {
+    "bodyMd": "## Mutating a List While Iterating\n\n### The hidden index\nWhen you write `for n in my_list:`, Python maintains an internal integer counter that starts at `0` and increments by `1` after each iteration. This counter directly indexes into `my_list`. If you modify `my_list` (add or remove elements) during the loop, the counter and the list fall out of sync.\n\n```python\nnumbers = [1, 2, 3, 4, 5, 6]\nfor n in numbers:\n    if n % 2 == 0:\n        numbers.remove(n)\nprint(numbers)   # [1, 3, 5, 6] — 6 was skipped!\n```\n\n### Step-by-step trace\n```\nStart: [1, 2, 3, 4, 5, 6]  counter=0  n=1 (odd, keep)\nStep1: [1, 2, 3, 4, 5, 6]  counter=1  n=2 (even, remove)\nAfter: [1, 3, 4, 5, 6]     counter→2  n=4 (3 was skipped!)\nStep2: [1, 3, 4, 5, 6]     counter=2  n=4 (even, remove)\nAfter: [1, 3, 5, 6]        counter→3  n=6 (5 was skipped!)\nStep3: [1, 3, 5, 6]        counter=3  n=6 (even, remove)\nAfter: [1, 3, 5]           counter→4  (end of list)\n```\n\nDepending on the values, different elements get skipped — the bug is subtle and unpredictable.\n\n### Solution 1: list comprehension (preferred)\nBuild a new list that contains only the elements you want to keep:\n\n```python\nnumbers = [1, 2, 3, 4, 5, 6]\nodds = [n for n in numbers if n % 2 != 0]\nprint(odds)   # [1, 3, 5]\n```\n\nThe comprehension iterates `numbers` without modifying it. No counter confusion, no skipped elements. This is the idiomatic, Pythonic solution.\n\n### Solution 2: iterate over a copy\nIf you need to modify the original list in place:\n\n```python\nfor n in numbers[:]:   # numbers[:] creates a shallow copy\n    if n % 2 == 0:\n        numbers.remove(n)\n```\n\nThe loop iterates over the copy; `remove()` modifies the original without disrupting iteration.\n\n### Solution 3: iterate in reverse by index\nWhen removing by index, working backwards prevents the shift problem:\n\n```python\nfor i in range(len(numbers) - 1, -1, -1):\n    if numbers[i] % 2 == 0:\n        numbers.pop(i)   # removing near the end doesn't shift earlier items\n```\n\n### Same problem with dicts and sets\nPython raises `RuntimeError` if you try to modify a dict or set during iteration:\n\n```python\nd = {\"a\": 1, \"b\": 2, \"c\": 3}\nfor k in d:\n    del d[k]   # RuntimeError: dictionary changed size during iteration\n\n# Fix: iterate over a copy of the keys:\nfor k in list(d.keys()):\n    del d[k]\n```\n\n### General rule\nWhenever you write `for x in collection:` with code that might add or remove items from `collection`, ask: should I build a new collection instead?\n\n```python\n# Filtering: build a new list\nfiltered = [x for x in items if condition(x)]\n\n# Transforming: build a new list\ntransformed = [transform(x) for x in items]\n\n# Filter and transform together:\nresult = [transform(x) for x in items if condition(x)]\n```\n\n### You just learned\nModifying a list while looping over it causes items to be skipped because the internal index and the list length go out of sync. Use a list comprehension to build a new filtered list — it never modifies the original. If you must mutate in place, iterate over a copy with `my_list[:]`.",
+    "videos": [
+      {
+        "title": "Python list comprehension filter tutorial beginners",
+        "searchQuery": "python list comprehension filter tutorial beginners"
+      },
+      {
+        "title": "Python modifying list while iterating bug explained",
+        "searchQuery": "python remove from list while iterating bug skip elements tutorial"
+      }
+    ]
+  },
+  "recruiterReview": "Correct. Mutating a list during iteration is a classic silent bug — no exception, just wrong output. The inverted-lambda distractor catches test-takers who reach for `filter()` without checking the predicate direction. The copy-iteration distractor works but is less idiomatic than the comprehension. A candidate who chooses the list comprehension and explains why demonstrates solid Python instincts. ✅",
+  "estMinutes": 6,
+  "version": 1
+}

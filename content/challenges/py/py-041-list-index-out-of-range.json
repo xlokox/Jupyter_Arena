@@ -1,0 +1,88 @@
+{
+  "id": "py-041-list-index-out-of-range",
+  "sector": "py",
+  "difficulty": "easy",
+  "title": "41_list_index_out_of_range.py",
+  "language": "python",
+  "icon": "list-ordered",
+  "conceptTags": ["list", "indexing", "IndexError", "negative-index"],
+  "conceptCard": "Python lists are zero-indexed. A list with 5 items has valid indices 0 through 4. `len(items)` returns 5 — but index 5 does not exist. It is one past the end.",
+  "descriptionMd": "## Mission: Reading the Last Item Crashes Every Time\n\nA checkout summary prints the most recently added item. The developer uses `cart[len(cart)]` — but this always raises `IndexError: list index out of range`.\n\nFix the expression to reliably return the last element of any non-empty list.",
+  "initialCode": "cart = [\"apple\", \"bread\", \"milk\", \"eggs\", \"butter\"]\n\ndef get_last_item(items):\n    return items[len(items)]   # ← bug: off-by-one\n\nprint(get_last_item(cart))",
+  "buggyLineStart": 4,
+  "buggyLineEnd": 4,
+  "lineNotes": [
+    {
+      "line": 4,
+      "noteMd": "`len(items)` returns 5 for a 5-item list. Valid indices are 0–4. Index 5 does not exist — hence `IndexError`."
+    }
+  ],
+  "traceback": "Traceback (most recent call last):\n  File \"cart.py\", line 6, in <module>\n    print(get_last_item(cart))\n  File \"cart.py\", line 4, in get_last_item\n    return items[len(items)]\nIndexError: list index out of range",
+  "correctOutput": "butter\n\n# items[-1] always returns the last element of any non-empty list",
+  "options": [
+    {
+      "key": "a",
+      "label": "Use negative index `items[-1]` to access the last element",
+      "patchCode": "def get_last_item(items):\n    return items[-1]",
+      "isCorrect": true,
+      "resultLog": "butter\n\n# items[-1] → items[len(items)-1] → items[4] → 'butter'\n# Correct for any list of any length ≥ 1.",
+      "rationale": "Python supports negative indexing: `-1` is the last element, `-2` the second-to-last. `items[-1]` is equivalent to `items[len(items) - 1]` but is idiomatic and works for any non-empty list of any length."
+    },
+    {
+      "key": "b",
+      "label": "Use `items[len(items) - 1]` to correct the off-by-one",
+      "patchCode": "def get_last_item(items):\n    return items[len(items) - 1]",
+      "isCorrect": false,
+      "resultLog": "butter\n\nCorrect output — but `items[-1]` is the idiomatic Python way.\n`len(items) - 1` is verbose and recalculates the length unnecessarily.",
+      "rationale": "`len(items) - 1` gives the correct last index and works. But it is not idiomatic Python — experienced developers expect `items[-1]`. The negative-index form is shorter, more readable, and expresses intent directly: 'give me the last item'."
+    },
+    {
+      "key": "c",
+      "label": "Wrap in try/except IndexError and return `items[-1]` in the handler",
+      "patchCode": "def get_last_item(items):\n    try:\n        return items[len(items)]\n    except IndexError:\n        return items[-1]",
+      "isCorrect": false,
+      "resultLog": "butter\n\nThe except branch fires and returns the right value.\nBut the original off-by-one is still there — the handler just hides it.\n\nException handlers are for *unexpected* failures, not known-wrong index math.",
+      "rationale": "Using `try/except` to paper over a logic error is an anti-pattern. The off-by-one on line 3 is still wrong; the handler merely catches the inevitable crash. Exceptions should handle *unexpected* failures. Fix the index expression directly with `items[-1]`."
+    }
+  ],
+  "hints": [
+    "A list with `n` items has indices `0` through `n-1`. What does `len(items)` give you for a 5-item list — is that index valid?",
+    "Python supports negative indices. `items[-1]` always returns the last element of a list, regardless of length. Replace `items[len(items)]` with `items[-1]`."
+  ],
+  "takeaway": "`items[-1]` is the idiomatic Python way to get the last element of a list. `items[len(items)]` is always one past the end and always raises `IndexError`.",
+  "glossary": [
+    {
+      "term": "zero-indexed",
+      "definitionMd": "A sequence where the first element is at index `0`. A list with `n` elements has valid indices `0` through `n-1`. Index `n` does not exist."
+    },
+    {
+      "term": "negative index",
+      "definitionMd": "Python allows negative indices to count from the end: `seq[-1]` is the last element, `seq[-2]` is second-to-last. Equivalent to `seq[len(seq) - 1]` but shorter and more readable."
+    },
+    {
+      "term": "IndexError",
+      "definitionMd": "Raised when you access a sequence at an index that doesn't exist — either too large (`>= len(seq)`) or too small (`< -len(seq)`)."
+    },
+    {
+      "term": "off-by-one error",
+      "definitionMd": "A bug where an index or loop count is one too high or low. Using `len(items)` instead of `len(items) - 1` for the last index is the classic Python off-by-one."
+    }
+  ],
+  "explanationMd": "### Why `items[len(items)]` always fails\nFor a 5-element list, `len(items)` is `5`. Valid indices are `0, 1, 2, 3, 4`. Index `5` is one past the last element — it does not exist.\n\n### The fix: negative indexing\n```python\nitems = [\"apple\", \"bread\", \"milk\", \"eggs\", \"butter\"]\nitems[-1]   # → 'butter' (last)\nitems[-2]   # → 'eggs'   (second to last)\n```\n\n`items[-1]` is equivalent to `items[len(items) - 1]` but is the Python idiom.\n\n### Index map\n```\nPosition:   0       1       2      3      4\nNeg index: -5      -4      -3     -2     -1\nValue:    apple   bread   milk   eggs  butter\n```\n\n### Slices are always safe\nSlices clip silently instead of raising:\n```python\nitems[3:]   # ['eggs', 'butter']\nitems[99:]  # []  — no IndexError\nitems[-2:]  # ['eggs', 'butter']\n```",
+  "tutorial": {
+    "bodyMd": "## Python List Indexing and IndexError\n\n### Lists are zero-indexed\nEvery Python list, string, and tuple uses **zero-based indexing**: the first element is at index `0`, not `1`.\n\n```python\nfruits = [\"apple\", \"banana\", \"cherry\"]\n#  index:     0          1          2\nprint(fruits[0])  # apple\nprint(fruits[1])  # banana\nprint(fruits[2])  # cherry\nprint(fruits[3])  # IndexError — only 0, 1, 2 are valid\n```\n\nA list with `n` items has valid indices `0` through `n - 1`. `n` itself is always out of range.\n\n### Negative indexing: counting from the end\nPython's most useful list feature: **negative indices** count backwards from the last element.\n\n```python\nfruits = [\"apple\", \"banana\", \"cherry\"]\nprint(fruits[-1])  # cherry  ← last\nprint(fruits[-2])  # banana  ← second to last\nprint(fruits[-3])  # apple   ← same as fruits[0]\n```\n\nNegative index `−k` is equivalent to `len(seq) − k`. So `-1` gives the last element, `-2` the second-to-last.\n\n### The IndexError: list index out of range\n`IndexError` means you tried to access an index that doesn't exist:\n\n```python\nitems = [1, 2, 3]\nitems[3]    # IndexError — valid indices are 0, 1, 2\nitems[-4]   # IndexError — smallest valid negative index is -3\n```\n\nThe most common cause is using `len(items)` instead of `len(items) - 1`.\n\n### The off-by-one pattern\n```python\n# Wrong — always IndexError:\nitems[len(items)]\n\n# Correct but verbose:\nitems[len(items) - 1]\n\n# Correct and idiomatic:\nitems[-1]\n```\n\n### Index map for a 5-element list\n```\nForward index:   0       1       2       3       4\nNegative index: -5      -4      -3      -2      -1\nValue:         apple   bread   milk    eggs   butter\n```\n\n### Slicing: safe even with out-of-range values\nSlices never raise `IndexError` — Python clips silently:\n\n```python\nletters = [\"a\", \"b\", \"c\", \"d\", \"e\"]\nletters[1:4]    # [\"b\", \"c\", \"d\"]  — end index not included\nletters[:3]     # [\"a\", \"b\", \"c\"]  — first 3\nletters[-2:]    # [\"d\", \"e\"]       — last 2\nletters[99:]    # []               — no IndexError, returns empty list\n```\n\n### Safe access when the list might be empty\n```python\ndef last_item(items):\n    if not items:\n        return None\n    return items[-1]\n\n# Or use slicing (never raises IndexError):\ndef last_item(items):\n    tail = items[-1:]\n    return tail[0] if tail else None\n```\n\n### Common mistake: indexing in a loop\n```python\nfor i in range(len(items) + 1):   # bug: one too many\n    print(items[i])               # IndexError on last iteration\n\n# Fix:\nfor i in range(len(items)):       # correct\n    print(items[i])\n\n# Or just iterate directly:\nfor item in items:                # most Pythonic\n    print(item)\n```\n\n### You just learned\nPython lists are zero-indexed — the first item is index `0`, the last is index `len(items) - 1`. `items[len(items)]` is always an `IndexError`. Use `items[-1]` to access the last element — it is idiomatic, shorter, and works for any list.",
+    "videos": [
+      {
+        "title": "Python list indexing negative index tutorial for beginners",
+        "searchQuery": "python list index negative indexing tutorial beginners"
+      },
+      {
+        "title": "Python IndexError list index out of range fix",
+        "searchQuery": "python IndexError list index out of range how to fix tutorial"
+      }
+    ]
+  },
+  "recruiterReview": "Correct. The off-by-one using `len(items)` is the single most common `IndexError` seen in code review. The 'fix the math' distractor works but misses the idiomatic Python solution. The try/except distractor shows the classic mistake of papering over a logic bug with exception handling. Knowing `items[-1]` is the Pythonic last-element access is entry-level Python fluency. ✅",
+  "estMinutes": 4,
+  "version": 1
+}

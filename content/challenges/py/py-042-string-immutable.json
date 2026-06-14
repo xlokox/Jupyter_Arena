@@ -1,0 +1,84 @@
+{
+  "id": "py-042-string-immutable",
+  "sector": "py",
+  "difficulty": "easy",
+  "title": "42_string_immutable.py",
+  "language": "python",
+  "icon": "braces",
+  "conceptTags": ["string", "immutability", "TypeError", "string-methods"],
+  "conceptCard": "Strings in Python cannot be changed after creation — they are immutable. Every string method that 'modifies' a string actually returns a new string.",
+  "descriptionMd": "## Mission: Capitalizing the First Letter Crashes\n\nA form normalizes user names so the first letter is always uppercase. The developer tries `name[0] = name[0].upper()` — but Python raises `TypeError: 'str' object does not support item assignment`.\n\nFix the function to return a correctly capitalized name without modifying the string in place.",
+  "initialCode": "def normalize_name(name):\n    name[0] = name[0].upper()   # ← bug: strings are immutable\n    return name\n\nprint(normalize_name(\"alice\"))",
+  "buggyLineStart": 2,
+  "buggyLineEnd": 2,
+  "lineNotes": [
+    {
+      "line": 2,
+      "noteMd": "Strings do not support index assignment. This always raises `TypeError` — you cannot change a character in place."
+    }
+  ],
+  "traceback": "Traceback (most recent call last):\n  File \"names.py\", line 5, in <module>\n    print(normalize_name('alice'))\n  File \"names.py\", line 2, in normalize_name\n    name[0] = name[0].upper()\nTypeError: 'str' object does not support item assignment",
+  "correctOutput": "Alice\n\n# str.capitalize() returns a new string — first char upper, rest lower",
+  "options": [
+    {
+      "key": "a",
+      "label": "Use `name.capitalize()` to return a new capitalized string",
+      "patchCode": "def normalize_name(name):\n    return name.capitalize()",
+      "isCorrect": true,
+      "resultLog": "Alice\n\n# str.capitalize() returns a NEW string.\n# First character is uppercased; the rest are lowercased.\n# No index assignment needed.",
+      "rationale": "`str.capitalize()` is the built-in that returns a new string with the first character uppercased and the rest lowercased. Because strings are immutable, it can't change the string in place — it creates a new one. This is the idiomatic Python solution."
+    },
+    {
+      "key": "b",
+      "label": "Concatenate `name[0].upper() + name[1:]` to build a new string",
+      "patchCode": "def normalize_name(name):\n    if not name:\n        return name\n    return name[0].upper() + name[1:]",
+      "isCorrect": false,
+      "resultLog": "Alice\n\nCorrect output — but this is not idiomatic.\nDifference: `name[0].upper() + name[1:]` does NOT lowercase the rest.\n'aLICE' → 'ALICE' with this approach; 'Alice' with `capitalize()`.\n\nFor a name normalizer, `capitalize()` is more correct and shorter.",
+      "rationale": "Concatenating `name[0].upper() + name[1:]` demonstrates understanding of string immutability (build a new string). But it doesn't lowercase the remaining characters: `'aLICE'` → `'ALICE'`, not `'Alice'`. For a name normalizer, `str.capitalize()` is safer and more idiomatic."
+    },
+    {
+      "key": "c",
+      "label": "Convert to a list, mutate the first element, then rejoin with `''.join()`",
+      "patchCode": "def normalize_name(name):\n    chars = list(name)\n    chars[0] = chars[0].upper()\n    return ''.join(chars)",
+      "isCorrect": false,
+      "resultLog": "Alice\n\nCorrect output — lists are mutable, so `chars[0] = ...` works.\nBut converting to a list and back just to capitalize one character\nis unnecessarily complex. `name.capitalize()` does this in one call.",
+      "rationale": "Lists are mutable, so index assignment works after `list(name)`. The logic is correct but roundabout — Python's built-in `str.capitalize()` already solves this in a single method call. Use built-in string methods before reaching for list conversion."
+    }
+  ],
+  "hints": [
+    "Try `'hello'.upper()` in the Python REPL. Notice it returns a new string — it doesn't change the original. All string methods work this way. You cannot assign to a character index like `name[0] = ...`.",
+    "Python has a built-in method for exactly this: `str.capitalize()`. It returns a new string with the first character uppercased and the rest lowercased. Replace the buggy line with `return name.capitalize()`."
+  ],
+  "takeaway": "Python strings are immutable — you cannot assign to a character by index. All string methods return new strings. Use `str.capitalize()` to capitalize the first letter.",
+  "glossary": [
+    {
+      "term": "immutable",
+      "definitionMd": "A value that cannot be changed after it is created. Python strings, integers, floats, and tuples are immutable. Lists, dicts, and sets are mutable (changeable in place)."
+    },
+    {
+      "term": "str.capitalize()",
+      "definitionMd": "Returns a **new** string with the first character uppercased and all remaining characters lowercased. `'hELLO'.capitalize()` → `'Hello'`."
+    },
+    {
+      "term": "TypeError",
+      "definitionMd": "Raised when an operation is used on an object of an incompatible type. Assigning to a string index (`s[0] = 'x'`) raises `TypeError` because strings do not support item assignment."
+    }
+  ],
+  "explanationMd": "### Strings cannot be changed\nIn Python, strings are immutable — their characters cannot be reassigned:\n```python\ns = \"hello\"\ns[0] = 'H'   # TypeError: 'str' object does not support item assignment\n\nitems = [1, 2, 3]\nitems[0] = 99   # OK — lists ARE mutable\n```\n\n### String methods return new strings\nEvery method that 'modifies' a string returns a new string:\n```python\nname = \"alice\"\nname.upper()         # returns 'ALICE' — name is unchanged\nname = name.upper()  # reassign to capture the result\n```\n\n### Case methods\n```python\n'alice smith'.capitalize()  # 'Alice smith'  — first char only\n'alice smith'.title()       # 'Alice Smith'  — each word\n'alice'.upper()             # 'ALICE'\n'ALICE'.lower()             # 'alice'\n```",
+  "tutorial": {
+    "bodyMd": "## Python String Immutability\n\n### What immutability means\nWhen Python says strings are **immutable**, it means you cannot change any part of a string after it is created. You cannot modify a character, insert one in the middle, or remove one — you can only create a new string.\n\nThis is the opposite of lists, which are **mutable**:\n```python\n# Lists are mutable — you can change individual elements:\nnumbers = [1, 2, 3]\nnumbers[0] = 99\nprint(numbers)   # [99, 2, 3]\n\n# Strings are immutable — you cannot:\nword = \"cat\"\nword[0] = 'b'   # TypeError: 'str' object does not support item assignment\n```\n\n### String methods always return new strings\nEvery string method that 'modifies' a string actually returns a **new string** and leaves the original unchanged:\n\n```python\ngreeting = \"hello\"\ncaps = greeting.upper()   # 'HELLO' — greeting is still 'hello'\n\nprint(greeting)   # hello  (unchanged)\nprint(caps)       # HELLO  (new string)\n```\n\nThis means you must assign the result if you want to use it:\n```python\nname = \"alice\"\nname.capitalize()    # result is discarded — does nothing visible\nprint(name)          # still 'alice'\n\nname = name.capitalize()  # assign the result back\nprint(name)               # Alice\n```\n\n### The built-in case methods\nPython includes several methods for transforming string case:\n\n```python\n'alice'.capitalize()       # 'Alice'  — first char upper, rest lower\n'alice smith'.title()      # 'Alice Smith'  — each word capitalized\n'alice'.upper()            # 'ALICE'\n'ALICE'.lower()            # 'alice'\n'Hello World'.swapcase()   # 'hELLO wORLD'\n```\n\nNote the difference between `capitalize()` and `title()`:\n- `capitalize()` — only the very first character of the whole string\n- `title()` — first character of each whitespace-separated word\n\n### Building new strings by concatenation\nWhen no built-in method covers your need, build a new string:\n\n```python\n# Insert at a position:\ns = \"abcdef\"\nnew_s = s[:3] + \"_\" + s[3:]   # 'abc_def'\n\n# Replace first character:\nname = \"alice\"\ncap = name[0].upper() + name[1:]   # 'Alice'\n# Caveat: does not lowercase the rest — 'aLICE' → 'ALICE' not 'Alice'\n```\n\nFor name capitalization, `str.capitalize()` is more correct because it also lowercases the remaining characters.\n\n### Why are strings immutable?\nImmutability gives Python strings two key properties:\n\n1. **Hashable**: strings can be used as dictionary keys and set members. Mutable objects (like lists) cannot because their value could change after being stored.\n   ```python\n   d = {}; d[\"hello\"] = 1    # fine — strings are hashable\n   d[[1, 2]] = 1             # TypeError — lists are not hashable\n   ```\n2. **Thread-safe**: multiple threads can read the same string without synchronization because it cannot change.\n\n### String checking methods\nStrings have convenient methods to test their contents:\n\n```python\n\"Alice\".isupper()    # False — not all uppercase\n\"ALICE\".isupper()   # True\n\"alice\".islower()   # True\n\"Alice\".istitle()   # True — looks like title case\n\"abc123\".isalnum()  # True — all alphanumeric\n\"123\".isdigit()     # True\n\"   \".isspace()     # True\n```\n\n### You just learned\nPython strings are immutable — you cannot change a character by assigning to its index. Every string method returns a new string; assign the result to use it. Use `str.capitalize()` to capitalize the first letter, `str.title()` for title case, and `str.upper()` / `str.lower()` for full-string conversion.",
+    "videos": [
+      {
+        "title": "Python string immutability explained for beginners",
+        "searchQuery": "python string immutable explained mutable vs immutable tutorial"
+      },
+      {
+        "title": "Python string methods capitalize title upper lower tutorial",
+        "searchQuery": "python string methods capitalize upper lower tutorial beginners"
+      }
+    ]
+  },
+  "recruiterReview": "Correct. String immutability is fundamental Python and this is a genuine beginner mistake — index assignment works on lists so newcomers try it on strings. The `capitalize()` option is correctly preferred over the concatenation approach because it also lowercases the remainder. The list-roundtrip distractor demonstrates understanding of mutability but overengineers a solved problem. ✅",
+  "estMinutes": 4,
+  "version": 1
+}
