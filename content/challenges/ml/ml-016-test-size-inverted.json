@@ -1,0 +1,62 @@
+{
+  "id": "ml-016-test-size-inverted",
+  "sector": "ml",
+  "difficulty": "easy",
+  "title": "16_test_size_inverted.py",
+  "language": "python",
+  "icon": "split",
+  "conceptTags": ["train-test-split", "test-size", "data-split", "sklearn"],
+  "descriptionMd": "## Mission: The Model Trains on Only 20% of the Data\n\nA classification pipeline calls `train_test_split` with `test_size=0.8`. The developer intended to hold out 20% for testing — but the parameter means **test fraction**, not train fraction. Training runs on only 20% of the data, validation accuracy is poor, and it's unclear why.\n\nFix the split so 80% of data goes to training and 20% to testing.",
+  "initialCode": "from sklearn.model_selection import train_test_split\nfrom sklearn.ensemble import RandomForestClassifier\nfrom sklearn.metrics import accuracy_score\n\nX, y = load_data()  # 10 000 samples\n\nX_train, X_test, y_train, y_test = train_test_split(\n    X, y, test_size=0.8, random_state=42   # ← bug: test gets 80%, train gets 20%\n)\n\nmodel = RandomForestClassifier(random_state=42)\nmodel.fit(X_train, y_train)   # trains on only 2 000 samples\nprint(accuracy_score(y_test, model.predict(X_test)))",
+  "buggyLineStart": 7,
+  "buggyLineEnd": 8,
+  "traceback": "No exception — silent wrong behaviour:\n  X_train.shape  → (2000, n_features)   ← only 20% of data\n  X_test.shape   → (8000, n_features)   ← 80% of data\n\nModel trains on 2 000 samples instead of 8 000.\nAccuracy appears lower than expected — but it looks like a bad model,\nnot a bad split. The real bug is invisible without checking shapes.",
+  "correctOutput": "X_train.shape → (8000, n_features)\nX_test.shape  → (2000, n_features)\n\nModel trains on 8 000 samples. Accuracy improves to expected levels.",
+  "options": [
+    {
+      "key": "a",
+      "label": "Change `test_size=0.8` to `test_size=0.2` to hold out 20% for testing",
+      "patchCode": "X_train, X_test, y_train, y_test = train_test_split(\n    X, y, test_size=0.2, random_state=42\n)",
+      "isCorrect": true,
+      "resultLog": "X_train.shape → (8000, n_features)  ← 80% for training\nX_test.shape  → (2000, n_features)  ← 20% for testing\n\nModel trains on full training set. Accuracy matches expectations.",
+      "rationale": "`test_size` specifies the **test** fraction. `test_size=0.8` gives 80% to the test set and 20% to training — the opposite of the standard 80/20 split. Changing to `test_size=0.2` gives 80% to training. Alternatively, `train_size=0.8` is an equivalent, explicit form."
+    },
+    {
+      "key": "b",
+      "label": "Use `train_size=0.8` instead of `test_size`",
+      "patchCode": "X_train, X_test, y_train, y_test = train_test_split(\n    X, y, train_size=0.8, random_state=42\n)",
+      "isCorrect": false,
+      "resultLog": "X_train.shape → (8000, n_features)  ← 80% for training\nX_test.shape  → (2000, n_features)  ← 20% for testing\n\nCorrect output — `train_size=0.8` is equivalent to `test_size=0.2`.\nBoth parameters are valid. `test_size` is more commonly used in practice.",
+      "rationale": "`train_size=0.8` is equivalent to `test_size=0.2` and produces the correct 80/20 split. Both parameters are valid in sklearn. The convention is to specify `test_size` (the smaller held-out fraction), so `test_size=0.2` is more idiomatic — but this option also works."
+    },
+    {
+      "key": "c",
+      "label": "Increase training by removing the test set: `test_size=0.0`",
+      "patchCode": "X_train, X_test, y_train, y_test = train_test_split(\n    X, y, test_size=0.0, random_state=42\n)",
+      "isCorrect": false,
+      "resultLog": "ValueError: With n_samples=10000, test_size=0.0 and train_size=None,\nthe resulting test set will be empty. Adjust any of the aforementioned\nparameters.\n\nYou cannot have a test set with zero samples.",
+      "rationale": "`test_size=0.0` raises a `ValueError` — sklearn requires at least one sample in both train and test sets. Evaluating a model without a test set is also bad practice: you have no way to measure generalisation. A standard 20% holdout (`test_size=0.2`) is the correct approach."
+    }
+  ],
+  "hints": [
+    "`test_size` specifies the fraction that goes to the **test** set — not the training set. Print `X_train.shape` and `X_test.shape` after the split to verify the actual sizes.",
+    "For an 80/20 train/test split, use `test_size=0.2`. Equivalently, `train_size=0.8` produces the same result. The convention is to specify the smaller held-out fraction."
+  ],
+  "explanationMd": "### `train_test_split` parameter semantics\n`test_size` and `train_size` are complementary — they specify the fraction or absolute count going to each partition:\n\n```python\ntrain_test_split(X, y, test_size=0.2)  # 20% test, 80% train\ntrain_test_split(X, y, train_size=0.8) # 80% train, 20% test — equivalent\ntrain_test_split(X, y, test_size=200)  # absolute: 200 test samples\n```\n\nOnly one is needed. If both are specified they must sum to ≤ 1.\n\n### The silent failure pattern\nThe wrong `test_size=0.8` does not raise an error — it silently trains on 20% of data. The only symptom is unexpectedly poor performance, which is easily misdiagnosed as a model or hyperparameter problem.\n\n**Always print shapes after splitting:**\n```python\nprint(X_train.shape, X_test.shape)  # verify sizes immediately\n```\n\n### Recommended split sizes\n- **80/20** — default for most tabular tasks\n- **70/30** — when data is limited or test diversity matters\n- **60/20/20** — train/validation/test when tuning hyperparameters\n- **90/10** — large datasets (millions of rows) where 10% is still thousands\n\n### Stratified split for classification\nFor classification, add `stratify=y` to preserve the class distribution in both splits:\n```python\ntrain_test_split(X, y, test_size=0.2, stratify=y, random_state=42)\n```\nWithout stratification, a small positive class (5%) might end up with 0% positives in the test set by chance.",
+  "recruiterReview": "Correct. Inverted `test_size` is a genuine beginner mistake — the parameter name is 'test_size' but people read it as 'size for training'. Silent wrong output (no error, just poor model performance) makes it hard to debug without printing shapes. The `train_size=0.8` distractor is technically correct but less idiomatic. The `test_size=0.0` distractor shows what happens when the developer overcorrects. Always verify split shapes. ✅",
+  "tutorial": {
+    "bodyMd": "## train_test_split: Getting the Split Right\n\n### Why we split data\nMachine learning models must be evaluated on data they have never seen during training. Without a held-out test set, you might train a model that memorises the training data and reports 99% accuracy — but fails completely on new data. The test set simulates real-world deployment.\n\nThe standard workflow:\n```\nAll data  →  train_test_split  →  training set (fit the model)\n                                 test set (evaluate once at the end)\n```\n\n### `train_test_split` parameters\n```python\nfrom sklearn.model_selection import train_test_split\n\nX_train, X_test, y_train, y_test = train_test_split(\n    X,             # features\n    y,             # labels\n    test_size=0.2, # 20% goes to test, 80% to train\n    random_state=42  # reproducibility\n)\n```\n\n**`test_size`**: fraction (0–1) or count going to the **test** set.\n**`train_size`**: fraction (0–1) or count going to the **train** set.\n**Only one is needed** — they are complementary.\n\n```python\ntrain_test_split(X, y, test_size=0.2)   # 80% train, 20% test\ntrain_test_split(X, y, train_size=0.8)  # same result\ntrain_test_split(X, y, test_size=2000)  # 2000 samples to test\n```\n\n### Verifying your split\nAlways print shapes immediately after splitting:\n\n```python\nX_train, X_test, y_train, y_test = train_test_split(\n    X, y, test_size=0.2, random_state=42\n)\nprint(f'Train: {X_train.shape}, Test: {X_test.shape}')\n# Train: (8000, 20), Test: (2000, 20)  ← looks right\n```\n\n### Stratified splitting for classification\nFor classification, the class distribution should be preserved in both splits. Without stratification, random chance might give the test set very few positive examples:\n\n```python\n# Without stratify (risky for imbalanced data):\nX_train, X_test, y_train, y_test = train_test_split(\n    X, y, test_size=0.2, random_state=42\n)\n\n# With stratify (recommended for classification):\nX_train, X_test, y_train, y_test = train_test_split(\n    X, y, test_size=0.2, stratify=y, random_state=42\n)\n```\n\nWith stratification, if 5% of the original data is positive, both train and test will have ~5% positives.\n\n### Three-way split: train / validation / test\nWhen tuning hyperparameters, you need a third partition:\n\n```python\n# Step 1: reserve 20% for final test\nX_temp, X_test, y_temp, y_test = train_test_split(\n    X, y, test_size=0.2, random_state=42\n)\n\n# Step 2: split temp into train (75%) and val (25%)\n# 75% of 80% = 60% of all data for training\nX_train, X_val, y_train, y_val = train_test_split(\n    X_temp, y_temp, test_size=0.25, random_state=42\n)\n```\n\nRule: **touch the test set only once**, after all tuning is done.\n\n### random_state: reproducibility\n`random_state` seeds the random number generator. The same seed always produces the same split:\n\n```python\nsplit1 = train_test_split(X, y, test_size=0.2, random_state=42)\nsplit2 = train_test_split(X, y, test_size=0.2, random_state=42)\n# split1 == split2  — identical\n\nsplit3 = train_test_split(X, y, test_size=0.2)  # no random_state\n# Different every run — hard to reproduce or compare\n```\n\nAlways set `random_state` in experiments you want to reproduce or share.\n\n### You just learned\n`test_size` in `train_test_split` specifies the fraction going to the **test** set. `test_size=0.8` gives 80% to testing and 20% to training — the opposite of the standard split. Use `test_size=0.2` for the standard 80/20 split. Always print `.shape` after splitting to verify the partition sizes.",
+    "videos": [
+      {
+        "title": "sklearn train_test_split tutorial beginners",
+        "searchQuery": "sklearn train_test_split tutorial test_size stratify beginners"
+      },
+      {
+        "title": "Machine learning data splitting train test validation explained",
+        "searchQuery": "machine learning train validation test split explained tutorial"
+      }
+    ]
+  },
+  "estMinutes": 4,
+  "version": 1
+}

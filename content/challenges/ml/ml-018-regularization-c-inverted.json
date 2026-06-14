@@ -1,0 +1,62 @@
+{
+  "id": "ml-018-regularization-c-inverted",
+  "sector": "ml",
+  "difficulty": "medium",
+  "title": "18_regularization_c_inverted.py",
+  "language": "python",
+  "icon": "scale",
+  "conceptTags": ["regularization", "LogisticRegression", "C-parameter", "overfitting"],
+  "descriptionMd": "## Mission: High C Means Less Regularization — Not More\n\nA developer trains `LogisticRegression` to reduce overfitting on a noisy dataset. They set `C=1000`, thinking a large value means strong regularization. But `C` is the **inverse** of regularization strength: `C = 1 / λ`.\n\nA large `C` all but removes regularization — the model is free to overfit. The developer needed `C=0.01` (strong regularization) but got `C=1000` (almost none).\n\nFix the parameter so the model is regularized as intended.",
+  "initialCode": "from sklearn.linear_model import LogisticRegression\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.metrics import accuracy_score\n\nX_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)\n\nmodel = LogisticRegression(\n    C=1000,            # ← bug: developer wants strong regularization, but C=1000 means almost none\n    max_iter=1000,\n    random_state=42\n)\nmodel.fit(X_train, y_train)\nprint(accuracy_score(y_test, model.predict(X_test)))",
+  "buggyLineStart": 8,
+  "buggyLineEnd": 8,
+  "traceback": "No exception — silent wrong behaviour:\n  C=1000 → λ = 1/C = 0.001 → very weak regularization\n\n  Training accuracy:  0.99   (memorises training set)\n  Test accuracy:      0.71   (poor generalisation)\n\nExpected with C=0.01 (strong regularization, λ=100):\n  Training accuracy:  0.84\n  Test accuracy:      0.83   (better generalisation, lower variance)\n\nThe model overfits. No warning is raised — C=1000 is a valid value.",
+  "correctOutput": "model = LogisticRegression(C=0.01, max_iter=1000, random_state=42)\n\nC=0.01 → λ = 1/C = 100 → strong regularization\nCoefficients are penalised heavily → smaller, more generalised weights\n\nTest accuracy improves from 0.71 to ~0.83.",
+  "options": [
+    {
+      "key": "a",
+      "label": "Change `C=1000` to `C=0.01` for strong regularization",
+      "patchCode": "model = LogisticRegression(\n    C=0.01,          # small C = large λ = strong regularization\n    max_iter=1000,\n    random_state=42\n)",
+      "isCorrect": true,
+      "resultLog": "C=0.01 → regularization strength λ = 100\n\nCoefficients shrink toward zero — model generalises better.\nTrain accuracy: 0.84\nTest accuracy:  0.83\n\nOverfitting reduced. Train–test gap narrowed from 0.28 to 0.01.",
+      "rationale": "`C` in sklearn's `LogisticRegression` is the inverse regularization strength: `C = 1/λ`. A small `C` (like 0.01) means large `λ` — strong regularization, coefficients shrink toward zero. A large `C` (like 1000) means almost no regularization — the model fits the training data as tightly as possible, leading to overfitting. To regularize, use a small `C` (0.001–1.0 range)."
+    },
+    {
+      "key": "b",
+      "label": "Switch to `penalty='none'` to remove all regularization",
+      "patchCode": "model = LogisticRegression(\n    penalty='none',\n    max_iter=1000,\n    random_state=42\n)",
+      "isCorrect": false,
+      "resultLog": "penalty='none' removes regularization entirely (equivalent to C → ∞).\n\nTrain accuracy: 0.99  (maximum overfit — no coefficient penalty at all)\nTest accuracy:  0.68  (worse than C=1000)\n\nThis moves in the wrong direction — the model needs MORE regularization,\nnot less.",
+      "rationale": "`penalty='none'` (or `penalty=None` in newer sklearn) removes the regularization term entirely, making the model equivalent to `C=∞`. This is the opposite of what's needed. To reduce overfitting, regularization must be added (small `C`), not removed."
+    },
+    {
+      "key": "c",
+      "label": "Add `solver='saga'` to change the optimisation algorithm",
+      "patchCode": "model = LogisticRegression(\n    C=1000,\n    solver='saga',\n    max_iter=1000,\n    random_state=42\n)",
+      "isCorrect": false,
+      "resultLog": "solver='saga' changes the optimisation algorithm, not the regularization.\n\nC=1000 is unchanged → λ = 0.001 → still almost no regularization.\n\nTrain accuracy: 0.99\nTest accuracy:  0.71  (same overfitting as before)\n\nThe solver determines HOW the loss is minimised (gradient descent variant),\nnot HOW MUCH the coefficients are penalised.",
+      "rationale": "The `solver` parameter controls the optimisation algorithm (e.g., `liblinear`, `lbfgs`, `saga`). Changing the solver does not affect the regularization strength — `C` still controls that. With `C=1000` unchanged, the model still barely regularises and overfits at the same rate. The fix is always to lower `C`, not to change the solver."
+    }
+  ],
+  "hints": [
+    "In `LogisticRegression`, `C` is the **inverse** of regularization strength: `C = 1/λ`. A high `C` means weak regularization — the model is free to fit the training data closely. To regularize more, make `C` smaller.",
+    "Common `C` ranges: 0.001–0.1 (strong regularization, good for high-dimensional or noisy data), 1.0 (sklearn default — moderate), 10–1000 (weak regularization). If you're overfitting, try `C=0.01` or `C=0.001`."
+  ],
+  "explanationMd": "### The `C` parameter in sklearn LogisticRegression\n`C` is the **inverse** of regularization strength. The loss function that `LogisticRegression` minimises is:\n\n```\nloss = -log-likelihood + (1/C) × ||w||²\n```\n\nSo:\n- **Large `C`** (e.g. 1000) → small penalty → coefficients can grow large → overfitting\n- **Small `C`** (e.g. 0.01) → large penalty → coefficients shrink → better generalisation\n\n### Why this is confusing\nIn statistics, regularization strength is usually written as `λ` (lambda). In sklearn, `C = 1/λ`. The two conventions are opposite:\n\n| Intuition | sklearn | Regularization |\n|---|---|---|\n| Strong regularization | small `C` (0.01) | large `λ` |\n| Weak regularization | large `C` (1000) | small `λ` |\n\nThe default is `C=1.0` — moderate regularization.\n\n### Diagnosing overfitting\n```python\nprint('Train:', model.score(X_train, y_train))\nprint('Test: ', model.score(X_test, y_test))\n# Large gap (e.g. 0.99 train vs 0.71 test) → overfitting\n# Try smaller C values: 0.1, 0.01, 0.001\n```\n\n### The same inverse convention applies to SVM\n`sklearn.svm.SVC` and `LinearSVC` also use `C` as the inverse margin-violation penalty. Large `C` = hard margin (overfit), small `C` = soft margin (regularized).",
+  "recruiterReview": "Correct. The `C` parameter in sklearn's LogisticRegression and SVM is one of the most common sources of confusion — the name clashes with the statistical convention where `λ` (not `C`) represents regularization strength, and they are inverses of each other. A developer who writes `C=1000` intending to regularize has built the opposite model. The `penalty='none'` distractor catches the 'remove the term' escape. The `solver` distractor catches developers who conflate optimisation algorithm with regularization. ✅",
+  "tutorial": {
+    "bodyMd": "## Regularization in Logistic Regression: the `C` Parameter\n\n### What regularization does\nRegularization adds a penalty for large coefficients to the loss function. Without it, the model is free to assign arbitrarily large weights to features — fitting the training set exactly, including its noise. The result is a model that performs well in training but poorly on new data (overfitting).\n\nWith regularization, coefficient sizes are penalised. The model trades some training accuracy for smaller weights — weights that generalise better.\n\n### Sklearn's convention: `C = 1/λ`\nIn most statistical textbooks, regularization strength is written as `λ` (lambda). A larger `λ` means stronger regularization. Sklearn's `LogisticRegression` uses `C` instead, defined as the **inverse** of `λ`:\n\n```\nC = 1 / λ\n```\n\nThe minimised objective is:\n```\nloss = -log-likelihood + (1/C) × ||w||²\n```\n\nThis means:\n- `C = 0.001` → `λ = 1000` → very strong regularization (coefficients near zero)\n- `C = 1.0` → `λ = 1` → sklearn default, moderate regularization\n- `C = 1000` → `λ = 0.001` → almost no regularization, model can overfit freely\n\n### Detecting overfitting\n```python\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.metrics import accuracy_score\n\nX_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)\n\nfor C in [0.001, 0.01, 0.1, 1.0, 10, 100]:\n    model = LogisticRegression(C=C, max_iter=1000).fit(X_train, y_train)\n    train_acc = model.score(X_train, y_train)\n    test_acc  = model.score(X_test, y_test)\n    print(f'C={C:6}: train={train_acc:.3f}, test={test_acc:.3f}, gap={train_acc-test_acc:.3f}')\n```\n\nLook for the `C` where the train–test gap is smallest while test accuracy is still high.\n\n### The regularization path\n```\nC=0.001: train=0.78, test=0.77, gap=0.01   ← underfitting (too strong)\nC=0.01:  train=0.84, test=0.83, gap=0.01   ← good fit\nC=0.1:   train=0.87, test=0.85, gap=0.02   ← good fit\nC=1.0:   train=0.93, test=0.87, gap=0.06   ← starting to overfit\nC=10:    train=0.97, test=0.79, gap=0.18   ← overfitting\nC=1000:  train=0.99, test=0.71, gap=0.28   ← severe overfit\n```\n\n### Using GridSearchCV to find the best C\n```python\nfrom sklearn.model_selection import GridSearchCV\n\nparam_grid = {'C': [0.001, 0.01, 0.1, 1, 10, 100]}\ngrid = GridSearchCV(LogisticRegression(max_iter=1000), param_grid, cv=5, scoring='accuracy')\ngrid.fit(X_train, y_train)\nprint('Best C:', grid.best_params_['C'])\nprint('CV score:', grid.best_score_)\n```\n\nCross-validation picks the `C` that generalises best on the training folds — then you evaluate once on the test set.\n\n### The same inverse convention in SVM\n`SVC` and `LinearSVC` also use `C` as the inverse margin-violation penalty:\n- Small `C` → soft margin → allows more violations → more regularized\n- Large `C` → hard margin → tries to classify everything correctly → overfits\n\n### Other regularization options in LogisticRegression\n```python\n# L1 regularization (sparse weights — useful for feature selection):\nLogisticRegression(penalty='l1', C=0.1, solver='saga')\n\n# L2 regularization (default — shrinks all weights):\nLogisticRegression(penalty='l2', C=0.1)  # solver='lbfgs' is default\n\n# ElasticNet (mix of L1 and L2):\nLogisticRegression(penalty='elasticnet', C=0.1, l1_ratio=0.5, solver='saga')\n\n# No regularization:\nLogisticRegression(penalty=None)\n```\n\n### You just learned\n`C` in sklearn's `LogisticRegression` (and SVM) is the **inverse** of regularization strength: `C = 1/λ`. A large `C` weakens regularization — the opposite of intuition. To reduce overfitting, use a small `C` (0.001–0.1). Use `GridSearchCV` to find the optimal `C` on a log scale.",
+    "videos": [
+      {
+        "title": "Logistic regression regularization C parameter sklearn tutorial",
+        "searchQuery": "logistic regression regularization C parameter sklearn overfitting tutorial"
+      },
+      {
+        "title": "Sklearn regularization GridSearchCV C tuning explained",
+        "searchQuery": "sklearn GridSearchCV regularization C parameter tuning explained tutorial"
+      }
+    ]
+  },
+  "estMinutes": 6,
+  "version": 1
+}
