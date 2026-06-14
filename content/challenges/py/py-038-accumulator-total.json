@@ -1,0 +1,73 @@
+{
+  "id": "py-038-accumulator-total",
+  "sector": "py",
+  "difficulty": "easy",
+  "title": "38_cart_total.ipynb",
+  "language": "python",
+  "icon": "shopping-cart",
+  "conceptTags": ["loops", "accumulator", "lists", "variables"],
+  "descriptionMd": "## Mission: The Cart Total Only Shows the Last Item\n\nAn online store loops through a list of prices to calculate the cart total. The loop finishes without errors, but the total printed is always just the price of the last item in the list — not the sum of everything.\n\nThis is the **accumulator bug**: the code replaces the running total on every iteration instead of adding to it. Spot the single-character fix.",
+  "initialCode": "cart = [12.99, 4.50, 7.25, 19.00]\ntotal = 0\n\nfor item in cart:\n    total = item   # ← bug\n\nprint(f\"Cart total: ${total:.2f}\")",
+  "buggyLineStart": 5,
+  "buggyLineEnd": 5,
+  "traceback": "Cart total: $19.00\n\n(Expected: $43.74)\n\nNo crash. After the loop, `total` holds only the LAST item's price ($19.00).\nEvery previous value was silently overwritten on each iteration.",
+  "correctOutput": "Cart total: $43.74\n\n# 12.99 + 4.50 + 7.25 + 19.00 = 43.74",
+  "options": [
+    {
+      "key": "a",
+      "label": "Use `+=` to add to the running total: `total += item`",
+      "patchCode": "cart = [12.99, 4.50, 7.25, 19.00]\ntotal = 0\n\nfor item in cart:\n    total += item\n\nprint(f\"Cart total: ${total:.2f}\")",
+      "isCorrect": true,
+      "resultLog": "Cart total: $43.74\n\nIteration trace:\n  total = 0\n  + 12.99 → total = 12.99\n  + 4.50  → total = 17.49\n  + 7.25  → total = 24.74\n  + 19.00 → total = 43.74\n\nEach price is added to the running total, not replaced.",
+      "rationale": "`total += item` is shorthand for `total = total + item`. It reads the **current** value of `total`, adds `item`, and writes the result back. This is the **accumulator pattern**: start at a neutral value (0 for addition), then update in a loop. The key is that `total` always appears on both sides — the old value plus the new item makes the new total."
+    },
+    {
+      "key": "b",
+      "label": "Use `total = sum(cart)` outside the loop instead",
+      "patchCode": "cart = [12.99, 4.50, 7.25, 19.00]\ntotal = sum(cart)\n\nprint(f\"Cart total: ${total:.2f}\")",
+      "isCorrect": false,
+      "resultLog": "Cart total: $43.74\n\nThis technically prints the correct answer — but it avoids the loop entirely.\nThe mission is to fix the loop accumulator, not replace the pattern.\nIn real code you'd use sum() for simple cases, but the accumulator matters\nwhen you need to apply conditions or transformations inside the loop.",
+      "rationale": "Python's built-in `sum()` is the right tool for summing a list without transformation, but it bypasses the loop entirely. The mission is to understand the **accumulator pattern** — which is essential when the loop does more than just sum (filtering by condition, applying discounts, counting items above a threshold, etc.). Replacing the loop with `sum()` is idiomatic for simple cases but doesn't teach the fix that applies broadly. The correct fix is `total += item` inside the loop."
+    },
+    {
+      "key": "c",
+      "label": "Multiply instead: `total *= item`",
+      "patchCode": "cart = [12.99, 4.50, 7.25, 19.00]\ntotal = 0\n\nfor item in cart:\n    total *= item\n\nprint(f\"Cart total: ${total:.2f}\")",
+      "isCorrect": false,
+      "resultLog": "Cart total: $0.00\n\n`total` starts at 0.\n`0 * 12.99 = 0`\n`0 * 4.50  = 0`\n...\nMultiplying by zero on every iteration: total stays 0 forever.",
+      "rationale": "`*=` is for accumulators that multiply (products), and it needs a starting value of 1, not 0. `0 * anything = 0` — the total stays zero the entire loop. Even if `total` started at 1, multiplying prices together (`12.99 * 4.50 * 7.25 * 19.00`) produces a meaningless number. A shopping cart needs a **sum** (addition), not a product (multiplication). The operator that adds to a running total is `+=`."
+    }
+  ],
+  "hints": [
+    "Run the loop in your head with a small list like `[10, 20]`. After the first iteration, what is `total`? After the second? Why doesn't it show 30?",
+    "The bug is the `=` sign on line 5. To add `item` to the existing total, you need `+=` — shorthand for `total = total + item`."
+  ],
+  "explanationMd": "### The accumulator pattern\nAn **accumulator** is a variable that collects a running result as you loop. It always follows the same shape:\n1. Start the accumulator at a **neutral value** (0 for sums, 1 for products, `[]` for lists, `\"\"` for strings).\n2. Inside the loop, **update** the accumulator by including the current item.\n3. After the loop, the accumulator holds the final result.\n\n```python\ntotal = 0          # start\nfor item in cart:  # loop\n    total += item  # update (total = total + item)\n                   # after: total holds the sum\n```\n\n### The bug: assignment vs addition-assignment\n```python\ntotal = item   # replaces total with the current item (wrong)\ntotal += item  # adds item to whatever total already is (right)\n```\n`=` **overwrites** the left side. `+=` **adds to** the left side and stores the result back. After the loop with `=`, `total` holds only the last value the loop touched — every previous value was silently lost.\n\n### Why `sum()` is different\nPython's `sum()` sums any iterable in one line. It's perfect when you're summing the list without modification:\n```python\ntotal = sum(cart)  # equivalent, idiomatic for simple cases\n```\nBut the accumulator pattern is essential when you need to conditionally include items, apply transformations, or count along with summing:\n```python\ntotal = 0\ncount = 0\nfor item in cart:\n    if item > 5:\n        total += item\n        count += 1\n```\n`sum()` can't express that without a generator expression. Understanding the manual accumulator means you can handle any loop shape.\n\n### Iteration trace — making it visible\nHand-tracing the loop is the fastest way to find accumulator bugs:\n```\ntotal = 0\nitem = 12.99  →  total = 12.99\nitem = 4.50   →  total = 17.49\nitem = 7.25   →  total = 24.74\nitem = 19.00  →  total = 43.74  ← correct final value\n```\nWith the bug (`total = item`):\n```\ntotal = 0\nitem = 12.99  →  total = 12.99  (overwrites 0)\nitem = 4.50   →  total = 4.50   (overwrites 12.99)\nitem = 7.25   →  total = 7.25   (overwrites 4.50)\nitem = 19.00  →  total = 19.00  (overwrites 7.25)  ← only last item\n```",
+  "recruiterReview": "Correct and well-explained. The `sum()` distractor is the most interesting — it gives the right answer but skips the lesson. In an interview I'd ask: 'When would you need the loop version instead of sum()?' The answer is: whenever you're filtering, transforming, or accumulating multiple things simultaneously. The `*=` distractor catches people who recognise they need an update operator but pick the wrong one — and `total = 0` makes it fail immediately since 0 times anything is 0. ✅",
+  "tutorial": {
+    "bodyMd": "## The Accumulator Pattern in Python\n\n### What is an accumulator?\nAn **accumulator** is a variable that builds up a result one piece at a time as a loop runs. You've seen this pattern in real life: a running shopping total that grows as you put items in your cart, a word count that goes up for each word you read, a maximum temperature that updates when a new reading is higher.\n\nIn code:\n```python\naccumulator = start_value       # initialise (before the loop)\nfor item in collection:\n    accumulator = accumulator + item  # or accumulator += item\n# result is in accumulator\n```\n\n### Starting values\nThe starting value must be the **neutral element** for the operation:\n- **Addition (sum)**: start at `0` — adding 0 to anything leaves it unchanged\n- **Multiplication (product)**: start at `1` — multiplying by 1 leaves it unchanged\n- **Building a list**: start at `[]` — extending an empty list\n- **Building a string**: start at `\"\"` — concatenating to an empty string\n\n### = vs +=\nThese two look similar but do completely different things:\n```python\nx = 10\nx = 5   # overwrites: x is now 5\n\ny = 10\ny += 5  # adds: y is now 15  (y = y + 5)\n```\n\nIn a loop:\n```python\ntotal = 0\nfor n in [1, 2, 3]:\n    total = n     # wrong: replaces each time → total = 3 (last only)\n\ntotal = 0\nfor n in [1, 2, 3]:\n    total += n    # correct: accumulates → total = 6 (1+2+3)\n```\n\n### Other accumulator shapes\n```python\n# Count items matching a condition\ncount = 0\nfor price in cart:\n    if price > 10:\n        count += 1\n\n# Build a new list\nexpensive = []\nfor price in cart:\n    if price > 10:\n        expensive.append(price)\n\n# Find the maximum\nbest = None\nfor score in scores:\n    if best is None or score > best:\n        best = score\n```\n\n### When to use sum() instead\nFor simple sums, Python's built-in is shorter:\n```python\ntotal = sum(cart)  # equivalent to the loop above for plain sums\n```\nBut `sum()` can't express conditional accumulation or building a parallel count alongside the sum. The manual loop is the general form — `sum()` is a shortcut for the most common case.\n\n### You just learned\nThe accumulator pattern: start at a neutral value, update with `+=` inside the loop, read the result after. The bug `total = item` (plain `=`) overwrites the running total on every iteration — `total +=` item adds to it.",
+    "videos": [
+      {
+        "title": "Python for loop accumulator pattern tutorial",
+        "searchQuery": "python for loop accumulator pattern sum list beginner"
+      },
+      {
+        "title": "Python += operator and assignment operators explained",
+        "searchQuery": "python plus equals operator augmented assignment beginner tutorial"
+      }
+    ]
+  },
+  "conceptCard": "This mission is about the **accumulator pattern**.\n\n- `total = item` **replaces** the running total each iteration — only the last value survives.\n- `total += item` (shorthand for `total = total + item`) **adds to** the running total.\n- Start the accumulator at a neutral value (`0` for sums) **before** the loop.",
+  "lineNotes": [
+    {"line": 2, "noteMd": "The accumulator starts at `0` — the neutral element for addition. This is correct."},
+    {"line": 5, "noteMd": "**Bug.** `total = item` **replaces** `total` with the current price on every iteration. After the loop, `total` holds only the last item's price. Fix: `total += item`."}
+  ],
+  "takeaway": "Accumulators need `+=` (add-and-update), not `=` (replace). The loop's last value always wins with plain assignment.",
+  "glossary": [
+    {"term": "accumulator", "definitionMd": "A variable used to build up a running result inside a loop. Always has a starting value (neutral element for the operation) and is updated on each iteration with `+=`, `*=`, `.append()`, etc."},
+    {"term": "+=", "definitionMd": "Augmented assignment operator. `x += y` is shorthand for `x = x + y`. There are similar operators for other operations: `-=`, `*=`, `/=`, `//=`, `%=`. All of them read the current value, apply the operation, and write back."},
+    {"term": "neutral element", "definitionMd": "The value that leaves other values unchanged under an operation. For addition: `0` (n + 0 = n). For multiplication: `1` (n × 1 = n). For list concatenation: `[]` (list + [] = list). Always start an accumulator at the neutral element for its operation."}
+  ],
+  "estMinutes": 4,
+  "version": 1
+}

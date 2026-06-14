@@ -1,0 +1,73 @@
+{
+  "id": "py-036-type-conversion-input",
+  "sector": "py",
+  "difficulty": "easy",
+  "title": "36_grade_bonus.ipynb",
+  "language": "python",
+  "icon": "hash",
+  "conceptTags": ["types", "input", "int", "type-conversion"],
+  "descriptionMd": "## Mission: The Bonus Points Don't Add Up\n\nA grade tracker reads a student's score from the keyboard, adds a 5-point bonus, and prints the final result. Every time you run it the program crashes on the addition line before printing anything. The student typed a perfectly valid number — so what's wrong?\n\nThis is one of the most common beginner bugs in Python: forgetting that `input()` always returns a **string**, no matter what the user types.",
+  "initialCode": "name = input(\"Enter your name: \")\nscore = input(\"Enter your score out of 100: \")\nbonus = 5\nfinal_score = score + bonus   # ← bug\nprint(f\"{name} scored {final_score}/100 with the bonus.\")",
+  "buggyLineStart": 4,
+  "buggyLineEnd": 4,
+  "traceback": "Enter your name: Alice\nEnter your score out of 100: 90\nTraceback (most recent call last):\n  File \"grade_bonus.py\", line 4, in <module>\n    final_score = score + bonus\nTypeError: can only concatenate str (not \"int\") to str",
+  "correctOutput": "Enter your name: Alice\nEnter your score out of 100: 90\nAlice scored 95/100 with the bonus.",
+  "options": [
+    {
+      "key": "a",
+      "label": "Convert score to an integer before adding: `int(score) + bonus`",
+      "patchCode": "name = input(\"Enter your name: \")\nscore = input(\"Enter your score out of 100: \")\nbonus = 5\nfinal_score = int(score) + bonus\nprint(f\"{name} scored {final_score}/100 with the bonus.\")",
+      "isCorrect": true,
+      "resultLog": "Enter your name: Alice\nEnter your score out of 100: 90\nAlice scored 95/100 with the bonus.\n\nint(score) converts the string \"90\" to the integer 90.\n90 + 5 = 95 — arithmetic works as expected.",
+      "rationale": "`input()` always returns a string. `int(score)` converts `\"90\"` to the integer `90` so Python can perform arithmetic. This is the standard pattern: read with `input()`, then convert with `int()` or `float()` before doing math. **Always convert at the point of use**, right before the first arithmetic operation — not earlier, or later."
+    },
+    {
+      "key": "b",
+      "label": "Convert bonus to a string instead: `score + str(bonus)`",
+      "patchCode": "name = input(\"Enter your name: \")\nscore = input(\"Enter your score out of 100: \")\nbonus = 5\nfinal_score = score + str(bonus)\nprint(f\"{name} scored {final_score}/100 with the bonus.\")",
+      "isCorrect": false,
+      "resultLog": "Enter your name: Alice\nEnter your score out of 100: 90\nAlice scored 905/100 with the bonus.\n\nstr(5) = \"5\". Then \"90\" + \"5\" = \"905\" — string concatenation, not addition.\nNo crash, but the score is now 905 instead of 95.",
+      "rationale": "Converting `bonus` to a string silences the `TypeError` because you're now adding two strings, which is allowed — but the result is string concatenation, not arithmetic. `\"90\" + \"5\"` is `\"905\"`, not `95`. This is a **wrong-type** fix: instead of converting the string to an integer, you converted the integer to a string. The fix is to move in the opposite direction — turn the string into a number, not the number into a string."
+    },
+    {
+      "key": "c",
+      "label": "Wrap the whole expression: `int(score + bonus)`",
+      "patchCode": "name = input(\"Enter your name: \")\nscore = input(\"Enter your score out of 100: \")\nbonus = 5\nfinal_score = int(score + bonus)\nprint(f\"{name} scored {final_score}/100 with the bonus.\")",
+      "isCorrect": false,
+      "resultLog": "Enter your name: Alice\nEnter your score out of 100: 90\nTraceback (most recent call last):\n  File \"grade_bonus.py\", line 4, in <module>\n    final_score = int(score + bonus)\nTypeError: can only concatenate str (not \"int\") to str\n\nThe same error as before — wrapping in int() doesn't help because score + bonus\nstill tries to add a string and an integer before int() ever runs.",
+      "rationale": "Python evaluates **inside-out**: `score + bonus` executes first. That expression is still `\"90\" + 5`, which still crashes with `TypeError` before `int()` even has a chance to run. The `int()` call wraps the crash, not the string. To fix this, you need to convert `score` to an integer **before** the `+` operator runs — that's `int(score) + bonus`, not `int(score + bonus)`."
+    }
+  ],
+  "hints": [
+    "Check what type `score` has after `input()`. Python doesn't distinguish between `90` (a number the user typed) and `\"hello\"` — they both come back as strings.",
+    "The fix is on line 4. `score` needs to be converted to an integer **before** the `+`. Try `int(score) + bonus`."
+  ],
+  "explanationMd": "### Why `input()` always returns a string\nPython's `input()` reads a line of text from the keyboard. The keyword is **text** — no matter what the user types, the return value is always a `str`. Even `input(\"Enter age: \")` on `\"25\"` returns the string `\"25\"`, not the integer `25`. This is by design: `input()` doesn't know what you intend to do with the value, so it can't guess whether to convert it to `int`, `float`, or leave it as a string.\n\n### The `+` operator behaves differently for strings vs numbers\nPython's `+` is **overloaded**: for integers it adds (`90 + 5 = 95`), for strings it concatenates (`\"90\" + \"5\" = \"905\"`). But it cannot mix the two. `\"90\" + 5` raises a `TypeError` because Python refuses to guess which behaviour you wanted.\n\nCompare this to JavaScript, where `\"90\" + 5` silently produces `\"905\"` (string concatenation wins). Python's explicit error is actually friendlier — it tells you the types are wrong rather than silently giving you a nonsense result.\n\n### The fix: convert at the point of use\nCall `int()` (or `float()`) on the string right before the arithmetic:\n```python\nfinal_score = int(score) + bonus  # correct\n```\nCommon patterns you'll write thousands of times:\n```python\nage = int(input(\"Age: \"))          # read and convert in one line\nprice = float(input(\"Price: \"))    # for decimal numbers\nquantity = int(input(\"Qty: \"))     # for whole numbers\n```\n\n### What happens if the user types something invalid?\n`int(\"hello\")` raises `ValueError`. That's handled with `try`/`except` — covered in a later mission. For now, assume clean input.",
+  "recruiterReview": "Correct diagnosis and fix. The `str(bonus)` distractor is the most telling: it silences the error but produces string concatenation instead of addition — and the output `\"905\"` looks plausible enough that a beginner might not notice until a user reports the wrong score. Catching that kind of 'silent wrong answer' is exactly what code review is for. The `int(score + bonus)` distractor shows understanding of operator precedence — knowing that Python evaluates inside-out before wrapping in a function call. Solid. ✅",
+  "tutorial": {
+    "bodyMd": "## Types in Python: Why `\"90\" + 5` Crashes\n\n### What is a type?\nEvery value in Python has a **type** — a category that tells Python what operations are allowed on it. The main types you'll use:\n- `int` — whole numbers: `0`, `5`, `-12`, `90`\n- `float` — decimal numbers: `3.14`, `0.5`, `-2.7`\n- `str` — text (string): `\"hello\"`, `\"90\"`, `\"3.14\"`\n- `bool` — True or False\n\nYou can check any value's type with `type(value)`:\n```python\nprint(type(42))       # <class 'int'>\nprint(type(\"hello\"))  # <class 'str'>\nprint(type(3.14))     # <class 'float'>\n```\n\n### input() always returns a string\nThis surprises almost every beginner: `input()` returns a `str` regardless of what the user typed. If the user types `90`, Python receives the two-character string `\"90\"`, not the number `90`. There's no automatic conversion.\n\n```python\nvalue = input(\"Enter a number: \")\nprint(type(value))  # <class 'str'> -- always, no exceptions\n```\n\n### How + behaves depends on the types\nPython's `+` operator does different things for different types:\n```python\n90 + 5          # int + int → 95\n\"90\" + \"5\"      # str + str → \"905\"  (concatenation)\n\"90\" + 5        # str + int → TypeError (Python refuses to guess)\n```\nJavaScript and PHP often auto-convert between types in these situations. Python does not — it raises `TypeError` and tells you to be explicit. This is actually helpful: a silent wrong answer (`\"905\"` when you expected `95`) is much harder to debug than a crash with a clear error message.\n\n### How to convert types\nUse the built-in conversion functions:\n```python\nint(\"90\")         # → 90\nfloat(\"3.14\")     # → 3.14\nstr(90)           # → \"90\"\nbool(1)           # → True\n```\n\nFor user input, the pattern is:\n```python\nage = int(input(\"Enter your age: \"))      # whole number\nprice = float(input(\"Enter price: \"))      # decimal\n```\n\n### Common mistakes\n- **Forgetting to convert**: `result = input() + 5` → TypeError\n- **Converting the wrong thing**: `input() + str(5)` → string concat, not math\n- **Converting too late**: `int(input() + 5)` → TypeError before `int()` runs\n- **Using float when int is expected**: `int(float(input()))` works for `\"3.14\"` but loses the decimal for integer inputs — usually just use `int()` for whole numbers\n\n### You just learned\n`input()` always returns a string. Convert it with `int()` or `float()` before doing arithmetic. Python's `+` does not auto-convert between strings and numbers — that's a feature, not a bug.",
+    "videos": [
+      {
+        "title": "Python input() and type conversion for beginners",
+        "searchQuery": "python input function type conversion int float beginner tutorial"
+      },
+      {
+        "title": "Python TypeError explained: strings and integers",
+        "searchQuery": "python TypeError can only concatenate str not int explanation"
+      }
+    ]
+  },
+  "conceptCard": "This mission is about **type conversion for user input**.\n\n- `input()` **always** returns a `str` — even if the user typed a number.\n- `\"90\" + 5` is a `TypeError` — Python's `+` cannot mix `str` and `int`.\n- Convert with `int(score)` or `float(score)` **before** doing arithmetic.",
+  "lineNotes": [
+    {"line": 2, "noteMd": "`input()` returns a `str`. The user types `90` but Python sees the string `\"90\"` — two characters, not a number."},
+    {"line": 4, "noteMd": "**Bug.** `\"90\" + 5` tries to add a string and an integer. Python's `+` doesn't auto-coerce — it raises `TypeError`."}
+  ],
+  "takeaway": "Call `int()` or `float()` on anything from `input()` before doing arithmetic — `int(score) + bonus`.",
+  "glossary": [
+    {"term": "type coercion", "definitionMd": "Automatic conversion between types. Some languages (JavaScript, PHP) coerce silently — `\"5\" + 1` gives `\"51\"` or `6` depending on the language. Python requires **explicit** conversion (`int(\"5\") + 1 = 6`)."},
+    {"term": "int()", "definitionMd": "Built-in function that converts a string or float to a whole number: `int(\"90\") → 90`, `int(3.7) → 3` (truncates, does not round). Raises `ValueError` on non-numeric strings like `int(\"hello\")`."},
+    {"term": "TypeError", "definitionMd": "Raised when an operation is applied to the wrong type — like adding a string and an integer. The error message usually names both types so you know what to convert."}
+  ],
+  "estMinutes": 4,
+  "version": 1
+}

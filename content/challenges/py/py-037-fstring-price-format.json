@@ -1,0 +1,73 @@
+{
+  "id": "py-037-fstring-price-format",
+  "sector": "py",
+  "difficulty": "easy",
+  "title": "37_price_receipt.ipynb",
+  "language": "python",
+  "icon": "receipt",
+  "conceptTags": ["f-strings", "formatting", "float", "rounding"],
+  "descriptionMd": "## Mission: The Receipt Shows Too Many Decimal Places\n\nA coffee shop receipt calculator multiplies price by quantity and prints the total. The math is correct, but the output looks like `$10.879999999999999` instead of `$10.88`. A customer complaint: \"Is that a bug or do I really owe ten dollars and 87 hundredths of a hundredths of a cent?\"\n\nFloating-point arithmetic introduces tiny representation errors in most programming languages. The fix isn't to round the number — it's to **format** it when displaying.",
+  "initialCode": "item = \"Oat Latte\"\nunit_price = 3.60\nquantity = 3\ntotal = unit_price * quantity\nprint(f\"Receipt: {quantity}x {item} = ${total}\")",
+  "buggyLineStart": 5,
+  "buggyLineEnd": 5,
+  "traceback": "Receipt: 3x Oat Latte = $10.799999999999999\n\n(Expected: Receipt: 3x Oat Latte = $10.80)\n\nNo crash — the f-string formats the raw float, showing the full IEEE 754 representation.",
+  "correctOutput": "Receipt: 3x Oat Latte = $10.80",
+  "options": [
+    {
+      "key": "a",
+      "label": "Use `:.2f` inside the f-string: `f\"... = ${total:.2f}\"`",
+      "patchCode": "item = \"Oat Latte\"\nunit_price = 3.60\nquantity = 3\ntotal = unit_price * quantity\nprint(f\"Receipt: {quantity}x {item} = ${total:.2f}\")",
+      "isCorrect": true,
+      "resultLog": "Receipt: 3x Oat Latte = $10.80\n\n:.2f is a format spec: f = fixed-point notation, .2 = two decimal places.\nPython formats 10.799999... as \"10.80\" (rounds at the display level).\nThe number in memory is unchanged; only the displayed string is rounded.",
+      "rationale": "Format specifiers inside f-strings control how a value is displayed without changing the underlying number. `:.2f` means: fixed-point (`f`) with exactly 2 decimal places. For money, you always want `:.2f` — it pads zeros (`10.8` → `\"10.80\"`) and rounds (`10.799...` → `\"10.80\"`). This is the standard display fix for floating-point money amounts in Python."
+    },
+    {
+      "key": "b",
+      "label": "Wrap in `round()`: `f\"... = ${round(total, 2)}\"`",
+      "patchCode": "item = \"Oat Latte\"\nunit_price = 3.60\nquantity = 3\ntotal = unit_price * quantity\nprint(f\"Receipt: {quantity}x {item} = ${round(total, 2)}\")",
+      "isCorrect": false,
+      "resultLog": "Receipt: 3x Oat Latte = $10.8\n\nround(10.799..., 2) returns the float 10.8 (Python's \"closest representable value\").\nf\"${10.8}\" formats as \"10.8\" — missing the trailing zero.\nThe total shows $10.8 instead of $10.80.",
+      "rationale": "`round(total, 2)` returns a float — `10.8`, not the string `\"10.80\"`. When f-string formats a float without a format spec, it drops trailing zeros: `10.80` → `\"10.8\"`. So you fix the excess decimals but lose the trailing zero required for currency display. **`round()` changes the value; `:.2f` controls the display.** For money, you want display control, not value change — and `:.2f` does both: rounds visually AND pads the trailing zero."
+    },
+    {
+      "key": "c",
+      "label": "Convert to int to drop decimals: `f\"... = ${int(total)}\"`",
+      "patchCode": "item = \"Oat Latte\"\nunit_price = 3.60\nquantity = 3\ntotal = unit_price * quantity\nprint(f\"Receipt: {quantity}x {item} = ${int(total)}\")",
+      "isCorrect": false,
+      "resultLog": "Receipt: 3x Oat Latte = $10\n\nint(10.799...) truncates to 10 — drops the cents entirely.\nCustomer owes $10.80 but the receipt says $10. The coffee shop loses 80 cents per transaction.",
+      "rationale": "`int()` truncates toward zero — it doesn't round, it chops off everything after the decimal point. `int(10.799...)` is `10`, not `11` and certainly not `10.80`. Converting a price to `int` throws away the cents. This is a data-loss bug: the underlying math produced `10.799...` but displaying `10` is just wrong. `:.2f` is the right tool for money display."
+    }
+  ],
+  "hints": [
+    "The number itself is correct — the issue is how it's being displayed. Look up 'Python f-string format specifier decimal places'.",
+    "Inside an f-string, you can control formatting with a colon after the variable name: `{value:.2f}` means 'fixed-point, 2 decimal places'."
+  ],
+  "explanationMd": "### Why floats look weird\nComputers store numbers in binary (base-2). Most decimal fractions like `3.60` cannot be represented exactly in binary — the closest representable value is something like `3.5999999999999996`. When you multiply that by 3, the tiny error compounds and you get `10.799999999999999`.\n\nThis is not a Python bug — it's how IEEE 754 floating-point arithmetic works in virtually every programming language. The number is as accurate as the hardware allows; the problem is **displaying** it without the noise.\n\n### Format specifiers in f-strings\nA format specifier follows a colon inside the `{}`: `{variable:format_spec}`.\n\nFor numbers:\n```python\nf\"{3.14159:.2f}\"   # \"3.14\"   — fixed-point, 2 decimal places\nf\"{1000:.0f}\"      # \"1000\"   — no decimal places\nf\"{0.5:.1%}\"       # \"50.0%\"  — as a percentage\nf\"{42:05d}\"        # \"00042\"  — zero-padded integer\n```\n\nFor money, `:.2f` is the standard: the `f` means fixed-point notation, `.2` means 2 digits after the decimal. It rounds at display and pads trailing zeros:\n```python\nf\"${10.8:.2f}\"   # \"$10.80\"  — trailing zero added\nf\"${10.999:.2f}\" # \"$11.00\"  — rounded up\n```\n\n### round() is not the same fix\n`round(10.799..., 2)` returns the Python float `10.8`. Formatting that float without `:.2f` still drops the trailing zero: `f\"${10.8}\"` → `\"$10.8\"`. Use `:.2f` to control display; use `round()` if you need the value in memory to be rounded for further calculations.\n\n### The real solution for serious money handling\nFor applications where floating-point errors matter (billing, accounting), use Python's `decimal.Decimal` type:\n```python\nfrom decimal import Decimal\nunit_price = Decimal(\"3.60\")\ntotal = unit_price * 3    # Decimal(\"10.80\")\nprint(f\"${total:.2f}\")    # \"$10.80\" exactly\n```\n`Decimal` stores numbers in base-10 and avoids most floating-point surprises. For a beginner receipt calculator, `:.2f` is fine; for a real payment system, use `Decimal`.",
+  "recruiterReview": "Correct fix and you named the key distinction: `round()` changes the value, `:.2f` controls the display — and for currency you need the display to both round AND pad trailing zeros, which `:.2f` does in one step. The `int()` distractor is the funniest failure mode — it's definitively wrong (drops cents entirely) but a beginner reaching for 'just get rid of the decimals' might genuinely try it. ✅",
+  "tutorial": {
+    "bodyMd": "## Formatting Numbers in Python f-Strings\n\n### What is a format specifier?\nAn f-string lets you embed any Python expression inside `{}`. You can also add a **format specifier** after a colon to control how the value is displayed:\n```python\nf\"{value}\"         # default formatting\nf\"{value:format}\"  # value displayed according to format spec\n```\n\n### Fixed-point numbers with :.Nf\nFor decimal numbers, `:Nf` means 'display as fixed-point with N decimal places':\n```python\nf\"{3.14159:.2f}\"   # \"3.14\"\nf\"{3.14159:.0f}\"   # \"3\"   (rounds to integer)\nf\"{3.1:.4f}\"       # \"3.1000\"  (pads zeros)\nf\"{10.8:.2f}\"      # \"10.80\"   (trailing zero preserved)\n```\n\nFor money: always use `:.2f`. It handles three things at once:\n1. Rounds the display to 2 decimal places\n2. Adds trailing zeros (`10.8` → `\"10.80\"`)\n3. Shows exactly what the customer expects to see on a receipt\n\n### Why floats look strange\nMost decimal fractions cannot be stored exactly in binary. `3.60` stored as a 64-bit float is actually `3.5999999999999996...`. Multiply by 3 and you get `10.799999999999999`. This is not a Python bug — it happens in every language that uses IEEE 754 floating-point arithmetic (JavaScript, Java, C, Go, Ruby...).\n\n```python\nprint(3.60 * 3)          # 10.799999999999999\nprint(f\"{3.60 * 3:.2f}\") # 10.80 — correct display\n```\n\nThe number in memory is `10.799...`. The string `\"10.80\"` is what you show the user. These are separate concerns.\n\n### Other useful format specifiers\n```python\nf\"{42:05d}\"    # \"00042\"  — zero-padded integer, 5 wide\nf\"{0.25:.0%}\"  # \"25%\"    — percentage (multiplies by 100)\nf\"{1000000:,}\" # \"1,000,000\" — thousands separator\nf\"{42:>10}\"    # \"        42\" — right-aligned in 10 chars\n```\n\n### round() vs :.2f\nThese two look similar but do different things:\n```python\nround(10.799, 2)          # returns 10.8 (a float)\nf\"{10.799:.2f}\"            # returns \"10.80\" (a string with trailing zero)\n```\nUse `round()` when you need the rounded number for further arithmetic. Use `:.2f` when you need a formatted string for display. For money output, `:.2f` is almost always what you want.\n\n### You just learned\nFormat specifiers inside f-strings control how numbers are displayed. `:.2f` is the standard for money: fixed-point, 2 decimal places, trailing zeros included. Floating-point representation noise is a fact of binary arithmetic — format specifiers hide it at display time.",
+    "videos": [
+      {
+        "title": "Python f-string formatting numbers tutorial",
+        "searchQuery": "python f-string format specifier number decimal places tutorial"
+      },
+      {
+        "title": "Python floating point numbers explained for beginners",
+        "searchQuery": "python floating point numbers why 0.1 plus 0.2 is not 0.3 explained"
+      }
+    ]
+  },
+  "conceptCard": "This mission is about **displaying numbers with the right precision**.\n\n- `3.60 * 3` produces `10.799999999999999` due to floating-point arithmetic — this is normal in every language.\n- The fix is a **format specifier** in the f-string: `{total:.2f}` means 'fixed-point, 2 decimal places'.\n- `:.2f` rounds at display AND pads trailing zeros (`10.8` → `\"10.80\"`).",
+  "lineNotes": [
+    {"line": 4, "noteMd": "`3.60 * 3` in floating-point binary is `10.799999999999999...` — a tiny representation error. The math is as accurate as IEEE 754 allows."},
+    {"line": 5, "noteMd": "**Bug.** `f\"..${total}\"` formats the raw float — showing all 16 significant digits. Use `:.2f` after `total` to display exactly 2 decimal places."}
+  ],
+  "takeaway": "Use `:.2f` in f-strings for money: `f\"${price:.2f}\"` always shows exactly two decimal places.",
+  "glossary": [
+    {"term": "format specifier", "definitionMd": "The part after a colon inside `{}` in an f-string that controls how a value is displayed. `:.2f` means fixed-point with 2 decimal places. `:.0%` means percentage with no decimals. Does not change the value in memory — only the displayed string."},
+    {"term": "IEEE 754", "definitionMd": "The international standard for floating-point arithmetic. Almost all computers store decimal fractions in binary using this standard, which means most decimals (like `0.1` or `3.60`) cannot be represented exactly — there's always a tiny rounding error. `:.2f` hides this noise for display."},
+    {"term": "fixed-point notation", "definitionMd": "A number format with a fixed number of digits after the decimal point. `:.2f` produces fixed-point with 2 decimal places: `10.8` → `\"10.80\"`, `3.14159` → `\"3.14\"`. Contrast with scientific notation (`1.23e+4`)."}
+  ],
+  "estMinutes": 4,
+  "version": 1
+}

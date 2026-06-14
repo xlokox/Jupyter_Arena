@@ -1,0 +1,74 @@
+{
+  "id": "py-039-return-vs-print",
+  "sector": "py",
+  "difficulty": "easy",
+  "title": "39_discount_function.ipynb",
+  "language": "python",
+  "icon": "percent",
+  "conceptTags": ["functions", "return", "print", "None"],
+  "descriptionMd": "## Mission: The Discounted Price Is `None`\n\nA ticket booking app calculates a discounted price inside a function and then formats the result for the receipt. Running it prints the discounted price correctly inside the function, but the final receipt line crashes with a `TypeError` — and the variable holding the result is `None`.\n\nThis is the **return vs print** confusion: displaying a value inside a function and **returning** it to the caller are two completely different things.",
+  "initialCode": "def apply_discount(price, percent):\n    discounted = price * (1 - percent / 100)\n    print(f\"Discounted price: ${discounted:.2f}\")\n\nticket_price = 80.00\ndiscount_pct = 25\nfinal_price = apply_discount(ticket_price, discount_pct)\nprint(f\"Your ticket: ${final_price:.2f}\")",
+  "buggyLineStart": 3,
+  "buggyLineEnd": 3,
+  "traceback": "Discounted price: $60.00\nTraceback (most recent call last):\n  File \"tickets.py\", line 8, in <module>\n    print(f\"Your ticket: ${final_price:.2f}\")\nTypeError: unsupported format character 'f' for object of type 'NoneType'",
+  "correctOutput": "Discounted price: $60.00\nYour ticket: $60.00",
+  "options": [
+    {
+      "key": "a",
+      "label": "Replace `print(...)` inside the function with `return discounted`",
+      "patchCode": "def apply_discount(price, percent):\n    discounted = price * (1 - percent / 100)\n    return discounted\n\nticket_price = 80.00\ndiscount_pct = 25\nfinal_price = apply_discount(ticket_price, discount_pct)\nprint(f\"Your ticket: ${final_price:.2f}\")",
+      "isCorrect": true,
+      "resultLog": "Your ticket: $60.00\n\nreturn discounted sends the value $60.00 back to the caller.\nfinal_price = apply_discount(...) captures it.\nf\"{final_price:.2f}\" formats it correctly as \"60.00\".\n\nNote: the 'Discounted price: ...' line no longer appears — print() inside the function was removed.",
+      "rationale": "`return` sends a value back to whoever called the function. Without `return`, the function implicitly returns `None` when it finishes. The calling code `final_price = apply_discount(...)` assigns whatever the function returned — if that's `None`, `final_price` is `None`. Replacing `print()` with `return` makes the value available to the caller, who can then print it, store it, pass it elsewhere, or use it in further calculations."
+    },
+    {
+      "key": "b",
+      "label": "Return the result of print: `return print(f\"Discounted price: ${discounted:.2f}\")`",
+      "patchCode": "def apply_discount(price, percent):\n    discounted = price * (1 - percent / 100)\n    return print(f\"Discounted price: ${discounted:.2f}\")\n\nticket_price = 80.00\ndiscount_pct = 25\nfinal_price = apply_discount(ticket_price, discount_pct)\nprint(f\"Your ticket: ${final_price:.2f}\")",
+      "isCorrect": false,
+      "resultLog": "Discounted price: $60.00\nTraceback (most recent call last):\n  File \"tickets.py\", line 8, in <module>\n    print(f\"Your ticket: ${final_price:.2f}\")\nTypeError: unsupported format character 'f' for object of type 'NoneType'\n\nprint() always returns None. return print(...) returns None.\nSame crash as before — the displayed line just moves inside the function.",
+      "rationale": "`print()` is a function that writes to the screen and **always returns `None`**. Writing `return print(...)` returns the return value of `print()`, which is `None`. The screen output happens (you see \"Discounted price: $60.00\"), but `final_price` is still `None`. You can't 'return through' print — `return` and `print` are separate operations and you need `return discounted`, not `return print(discounted)`."
+    },
+    {
+      "key": "c",
+      "label": "Add `return discounted` after the existing print line (keep both)",
+      "patchCode": "def apply_discount(price, percent):\n    discounted = price * (1 - percent / 100)\n    print(f\"Discounted price: ${discounted:.2f}\")\n    return discounted\n\nticket_price = 80.00\ndiscount_pct = 25\nfinal_price = apply_discount(ticket_price, discount_pct)\nprint(f\"Your ticket: ${final_price:.2f}\")",
+      "isCorrect": false,
+      "resultLog": "Discounted price: $60.00\nYour ticket: $60.00\n\nNo crash — this works. But the mission asks for the minimal fix.\nThe print inside the function is now redundant: the caller prints the final price.\nHaving a function print AND return is usually a design smell — functions should\ngenerally either produce output (print) OR return a value, not both.\n\nThe cleaner fix for this scenario is to remove the print inside the function.",
+      "rationale": "Adding `return discounted` after the `print` line does fix the crash and produces the correct output — so technically it 'works'. But functions that both print and return create confusion: callers can't control when or how the value is displayed. A function that returns a value is reusable (the caller decides what to do with it). A function that only prints is a dead end — the value is shown once and gone. The clean fix is to use `return` instead of `print` inside the function, letting the caller handle display. Keeping both is a design smell the recruiter review would flag."
+    }
+  ],
+  "hints": [
+    "Call `print(apply_discount(80, 25))` and look at what it prints. What does the function actually return? Now compare what `return` and `print` do differently.",
+    "Functions without an explicit `return` statement return `None`. Look at line 3 — `apply_discount` prints but never returns `discounted`. Change `print(...)` to `return discounted`."
+  ],
+  "explanationMd": "### print() vs return — the fundamental difference\n`print()` writes a value to the screen for a human to read. The value then disappears — it can't be stored, passed to another function, or used in arithmetic. `print()` itself always returns `None`.\n\n`return` sends a value back to the caller. The caller can store it in a variable, pass it elsewhere, do more math on it, or print it. Returning is how functions communicate results to the rest of the program.\n\n```python\ndef show_double(x):\n    print(x * 2)    # displays, then gone\n\ndef get_double(x):\n    return x * 2    # sends value back to caller\n\nresult = show_double(5)  # prints 10, result = None\nresult = get_double(5)   # result = 10\nprint(result + 1)        # 11 — usable\n```\n\n### What happens without return\nA function with no `return` statement (or with only `print`) implicitly returns `None` when it reaches the end:\n```python\ndef greet(name):\n    print(f\"Hello, {name}!\")   # prints but no return\n\nresult = greet(\"Ada\")   # prints, then result = None\n```\nThis is fine when the function's only job is displaying — like logging. But when the calling code needs the value, `None` is useless and causes crashes.\n\n### NoneType errors\n`TypeError: unsupported format character 'f' for object of type 'NoneType'` is the crash you get when you try to use `None` where a number is expected. Common ones:\n- `f\"{None:.2f}\"` — formatting None as a float\n- `None + 5` — arithmetic on None\n- `None.lower()` — calling a method on None\nAlways trace back: where was the variable assigned, and does that function actually return something?\n\n### The design question: print or return?\n- If the function's sole job is side effects (logging, saving to a file, sending an email) → `print` or no return is fine.\n- If the calling code needs to do anything with the result → `return` the value, let the caller decide how to use or display it.\n- Doing both in one function is often a design smell — the caller can't suppress the print if they just want the value.",
+  "recruiterReview": "Good diagnosis. The `return print(...)` distractor is the most instructive — it looks like it might work ('I'm returning it, right?') but `print()` always returns `None`, so you're returning `None`. The 'keep both' option c is the most debated: it actually works, but functions that print AND return are hard to reuse (callers can't silence the print). In production code a linter like pylint would flag it. The clean fix is `return discounted` only — let the caller print. ✅",
+  "tutorial": {
+    "bodyMd": "## Functions: return vs print\n\n### What is a function's return value?\nWhen you call a function, Python evaluates it and the call expression gets replaced by whatever the function returned. If a function doesn't return anything explicitly, that replacement value is `None`.\n\n```python\ndef add(a, b):\n    return a + b\n\nresult = add(3, 5)  # result = 8\nprint(result + 2)   # 10\n```\n\nVs with print only:\n```python\ndef show_sum(a, b):\n    print(a + b)  # shows 8, but doesn't return it\n\nresult = show_sum(3, 5)  # result = None\nprint(result + 2)         # TypeError: NoneType + int\n```\n\n### print() always returns None\n`print()` is just a function like any other. It has a side effect (writes to the screen) and a return value: always `None`. This is the Python spec — `print()` is for output, not for returning values.\n\n```python\nx = print(\"hello\")  # prints \"hello\"\nprint(x)             # None\n```\n\nSo `return print(\"hello\")` returns the result of `print(\"hello\")`, which is `None`.\n\n### When to use each\nThink about who needs the value and what they'll do with it:\n\n- **print()**: when you're writing something for a human to see in the terminal, right now, and no other code needs to use that value.\n- **return**: when the calling code needs to store the value, pass it somewhere, do more math on it, or decide how to display it.\n\nA good rule of thumb: **functions that compute should return, functions that format/display should print**. Keep computation and display separate.\n\n```python\n# Clean separation:\ndef apply_discount(price, percent):\n    return price * (1 - percent / 100)   # computes and returns\n\nfinal_price = apply_discount(80, 25)     # caller stores it\nprint(f\"Your ticket: ${final_price:.2f}\")  # caller decides format\n```\n\n### None — Python's 'nothing'\n`None` is a special value that means 'no value'. It's not 0, not `\"\"`, not `False` — it's the explicit absence of a value. Functions return `None` by default. You can also return it explicitly: `return None`. Common places you encounter `None`:\n- A function with no `return` statement\n- `dict.get(key)` when the key doesn't exist\n- List search methods that find nothing\n- Default argument values you haven't filled in\n\n### Debugging NoneType errors\nWhen you see `TypeError: ... 'NoneType'`, the variable holding `None` was assigned from a function call. Trace back:\n1. What line assigned the variable?\n2. What function was called on the right side?\n3. Does that function have a `return` statement? Does it return the right thing?\n\n### You just learned\n`print()` shows values to the screen and returns `None`. `return` sends a value back to the caller. If the calling code needs the value, use `return` — not `print` — inside the function.",
+    "videos": [
+      {
+        "title": "Python return vs print difference explained",
+        "searchQuery": "python return vs print function difference beginner tutorial"
+      },
+      {
+        "title": "Python functions return values tutorial",
+        "searchQuery": "python functions return value None explained beginner"
+      }
+    ]
+  },
+  "conceptCard": "This mission is about **`return` vs `print` in functions**.\n\n- `print()` shows a value on screen and **always returns `None`**.\n- `return` sends the value back to the **caller** — it can be stored, reused, or printed later.\n- A function without `return` also returns `None`. That's why `final_price = apply_discount(...)` becomes `None`.",
+  "lineNotes": [
+    {"line": 3, "noteMd": "**Bug.** `print()` displays the value to the screen and returns `None`. The caller gets `None`, not `$60.00`."},
+    {"line": 7, "noteMd": "`apply_discount(...)` returns `None` (no `return` in the function). `final_price` is `None`."},
+    {"line": 8, "noteMd": "`f\"{None:.2f}\"` crashes — you can't format `None` as a float."}
+  ],
+  "takeaway": "If the calling code needs the value, use `return` inside the function — not `print`. `print()` always returns `None`.",
+  "glossary": [
+    {"term": "return value", "definitionMd": "The value a function sends back to its caller when it exits. In Python, a function with no `return` statement (or `return` with no argument) returns `None`. The caller receives this value where the function call appears: `result = my_func()`."},
+    {"term": "None", "definitionMd": "Python's 'no value' singleton. Not `0`, not `False`, not `\"\"` — a distinct value meaning 'nothing here'. Functions return `None` by default. Trying to do arithmetic on `None` or call methods on it raises `TypeError`."},
+    {"term": "side effect", "definitionMd": "An action a function takes beyond returning a value — writing to the screen (`print`), writing to a file, sending a network request, modifying a global variable. `print()` is a pure side effect: it has no useful return value, only the screen output."}
+  ],
+  "estMinutes": 4,
+  "version": 1
+}
