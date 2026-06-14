@@ -1,0 +1,63 @@
+{
+  "id": "fullstack-028-404-endpoint-vs-resource",
+  "sector": "fullstack",
+  "difficulty": "medium",
+  "title": "28_404_endpoint_vs_resource.jsx",
+  "language": "jsx",
+  "icon": "file-question",
+  "conceptTags": ["http", "404", "error-handling", "status-codes", "debugging"],
+  "subSector": "error-handling",
+  "descriptionMd": "## Mission: The Same 404 — But Two Different Meanings\n\nA profile page fetches `/api/users/99999`. The server returns `404 Not Found`. The component catches this and shows: **\"This endpoint doesn't exist — check the URL.\"** But the actual reason is different: the endpoint `/api/users/:id` is valid and working — user 99999 simply doesn't exist in the database.\n\nA 404 has two very different meanings depending on context:\n1. **Wrong URL** — the endpoint doesn't exist (`/api/usres/1` typo)\n2. **Missing resource** — the URL is correct but the specific resource (user, post, item) isn't in the database\n\nThe server's response body usually tells you which one it is. Distinguish them and show the correct message.",
+  "initialCode": "import { useEffect, useState } from \"react\";\n\nexport default function UserProfile({ userId }) {\n  const [user, setUser] = useState(null);\n  const [error, setError] = useState(null);\n\n  useEffect(() => {\n    fetch(`/api/users/${userId}`, { credentials: \"include\" })\n      .then(async r => {\n        if (r.status === 404) {\n          // ← bug: assumes 404 always means wrong URL\n          setError(\"This endpoint doesn't exist — check the URL.\");\n          return;\n        }\n        if (!r.ok) throw new Error(`HTTP ${r.status}`);\n        setUser(await r.json());\n      })\n      .catch(err => setError(err.message));\n  }, [userId]);\n\n  if (error) return <p className=\"error\">{error}</p>;\n  if (!user) return <p>Loading...</p>;\n  return <h1>{user.name}</h1>;\n}",
+  "buggyLineStart": 11,
+  "buggyLineEnd": 12,
+  "traceback": "Fetch for valid user (userId = 1):\n  GET /api/users/1  200 OK\n  UI: renders user profile correctly\n\nFetch for non-existent user (userId = 99999):\n  GET /api/users/99999  404 Not Found\n  Response body: {\"error\": \"user_not_found\", \"message\": \"No user with id 99999\"}\n  UI: \"This endpoint doesn't exist — check the URL.\"\n  (Wrong: the endpoint is fine, the user just doesn't exist)",
+  "correctOutput": "Fetch for non-existent user (userId = 99999):\n  GET /api/users/99999  404 Not Found\n  Response body: {\"error\":\"user_not_found\"}\n  UI: \"User not found. They may have been deleted or the link is incorrect.\"\n\nFetch for truly bad endpoint:\n  GET /api/usres/1  404 Not Found\n  Response body: {\"error\":\"route_not_found\"}\n  UI: \"This page doesn't exist — the URL may be incorrect.\"",
+  "options": [
+    {
+      "key": "a",
+      "label": "Read the 404 response body to distinguish 'route not found' from 'resource not found'",
+      "patchCode": ".then(async r => {\n  if (r.status === 404) {\n    const body = await r.json().catch(() => ({}));\n    if (body.error === \"user_not_found\") {\n      setError(\"User not found. They may have been deleted or the link is incorrect.\");\n    } else {\n      setError(\"This page doesn't exist — the URL may be incorrect.\");\n    }\n    return;\n  }\n  if (!r.ok) throw new Error(`HTTP ${r.status}`);\n  setUser(await r.json());\n})",
+      "isCorrect": true,
+      "resultLog": "Non-existent user (userId = 99999):\n  404 with body {\"error\":\"user_not_found\"}\n  UI: \"User not found. They may have been deleted or the link is incorrect.\"\n\nBad endpoint URL:\n  404 with body {\"error\":\"route_not_found\"} (or no body)\n  UI: \"This page doesn't exist — the URL may be incorrect.\"",
+      "rationale": "The HTTP status code (404) is the same in both cases, but the **response body** carries the discriminating information. Well-designed APIs include an error code in the body (`\"error\": \"user_not_found\"` vs `\"error\": \"route_not_found\"`) so clients can distinguish cases and show the right message. Reading the body is the correct approach — you check the status code first, then the body for detail. The `.catch(() => ({}))` handles the case where the body isn't JSON (e.g. the server returns a plain 404 page)."
+    },
+    {
+      "key": "b",
+      "label": "Show a generic 'not found' message for all 404s",
+      "patchCode": ".then(async r => {\n  if (r.status === 404) {\n    setError(\"Not found.\");\n    return;\n  }\n  if (!r.ok) throw new Error(`HTTP ${r.status}`);\n  setUser(await r.json());\n})",
+      "isCorrect": false,
+      "resultLog": "Non-existent user: UI: \"Not found.\"\nBad URL: UI: \"Not found.\"\n\nBoth cases show the same message — technically accurate but unhelpful.\n'Not found' doesn't tell the user whether the user was deleted,\nwhether the link is wrong, or whether there's a development bug.\nA junior developer debugging a mistyped URL would get no hint.",
+      "rationale": "A generic 'not found' message is better than a wrong message ('check the URL' when the URL is fine), but it's still unhelpful. Users seeing 'User not found' understand what happened and know the profile is unavailable. Developers debugging a mistyped endpoint need 'URL is wrong' to know to check their routing code. Both groups benefit from a specific message. Reading the response body is the small extra step that provides that specificity."
+    },
+    {
+      "key": "c",
+      "label": "Don't catch 404 specially — let it reach the generic error handler",
+      "patchCode": ".then(async r => {\n  if (!r.ok) throw new Error(`HTTP ${r.status}`);\n  setUser(await r.json());\n})\n.catch(err => setError(err.message))",
+      "isCorrect": false,
+      "resultLog": "Non-existent user:\n  404 → error: 'HTTP 404'\n  UI: 'HTTP 404'\n\nBad URL:\n  404 → error: 'HTTP 404'\n  UI: 'HTTP 404'\n\nThe status code is accurate but meaningless to users.\n'HTTP 404' tells a developer what happened (resource not found) but\ndoesn't tell anyone what to do about it.",
+      "rationale": "Showing raw HTTP status codes is better than nothing — at least the developer can diagnose from the code. But users shouldn't see `HTTP 404`; they should see what went wrong in their context. A deleted user profile deserves 'User not found'; a mistyped URL deserves 'This page doesn't exist'. The generic error handler treats all 4xx and 5xx the same, losing the information that the specific status code and response body provide."
+    }
+  ],
+  "hints": [
+    "A 404 can mean two things: the URL/endpoint is wrong, or the specific resource (user, post, etc.) doesn't exist. Look at the response body — what does the server say in its error message?",
+    "Read `await r.json()` after catching the 404 to get the server's error detail. Check `body.error` — if it's `'user_not_found'`, show a 'user deleted or not found' message; otherwise show 'URL is incorrect'."
+  ],
+  "explanationMd": "### 404: the two meanings\nA 404 response always means 'not found' — but what wasn't found?\n\n**Case 1: The route/endpoint doesn't exist**\nThe URL `/api/usres/1` has a typo — there's no route registered for `/api/usres`. The server has no handler for this URL and returns a 404. The fix is to correct the URL.\n\n**Case 2: The resource doesn't exist**\nThe URL `/api/users/99999` is a valid endpoint — there's a handler for `/api/users/:id`. But user 99999 isn't in the database, so the handler returns 404 with `{\"error\": \"user_not_found\"}`. The fix is to handle the missing state in the UI.\n\n### Reading the response body for detail\nThe HTTP status code gives you the category; the response body gives you the detail:\n```js\nif (r.status === 404) {\n  const body = await r.json().catch(() => ({}));\n  // body.error could be:\n  //   \"user_not_found\" — resource missing\n  //   \"route_not_found\" — URL typo\n  //   undefined — server returned no detail\n}\n```\nWell-designed APIs always include an `error` code (a machine-readable string) and a `message` (human-readable). This lets frontend code branch on specific cases.\n\n### User-facing messages by case\n| Scenario | Status | Error code | User message |\n|---|---|---|---|\n| Endpoint doesn't exist | 404 | `route_not_found` | 'This page doesn't exist' |\n| Resource not found | 404 | `user_not_found` | 'User was not found or deleted' |\n| Generic not found | 404 | (none) | 'Not found' |\n\n### When to redirect vs when to show an error\n- **Resource 404** (user deleted, post removed): show an inline error on the current page — 'User not found'. Don't redirect.\n- **Route 404** (URL typo in code): this is a development bug. Show an error or redirect to a 404 page.\n- In Next.js and similar frameworks, `notFound()` can trigger a full 404 page for server-rendered routes.",
+  "recruiterReview": "Correct — reading the response body to distinguish case is the key skill. The generic 'not found' option is the safe fallback but misses the detail that helps users. Raw HTTP codes in the UI is a common anti-pattern. The `.catch(() => ({}))` on the `r.json()` call is a nice touch — it handles servers that return a non-JSON 404 (an HTML error page) gracefully. ✅",
+  "tutorial": {
+    "bodyMd": "## 404 Not Found: Two Very Different Situations\n\n### HTTP status codes: category vs detail\nAn HTTP status code gives you the category of the response. For debugging and good UX, you also need the detail — which comes from the response body.\n\nThink of it like a package delivery system:\n- The status code is like the delivery result: 'Delivered', 'Not delivered', 'Address not found'\n- The response body is the note explaining why: 'Left at reception', 'Recipient unknown at this address', 'Street does not exist'\n\n### The 404 ambiguity\n`404 Not Found` covers two cases with very different implications:\n\n**Endpoint not found (routing 404):**\n- URL: `/api/usres/1` (typo)\n- Server: no route matches this URL\n- Response: `{\"error\": \"route_not_found\"}` or just an HTML 404 page\n- Cause: developer error in the client code\n- Fix: correct the URL\n\n**Resource not found (data 404):**\n- URL: `/api/users/99999` (correct endpoint, non-existent record)\n- Server: route exists, query returned no rows\n- Response: `{\"error\": \"user_not_found\", \"message\": \"No user with id 99999\"}`\n- Cause: the resource was deleted, or the ID is wrong\n- Fix: handle the missing state in the UI\n\n### How well-designed APIs signal the difference\nGood APIs include a machine-readable `error` code alongside the human-readable `message`:\n```json\n// Route not found:\n{\"error\": \"route_not_found\", \"message\": \"No route matches /api/usres/1\"}\n\n// Resource not found:\n{\"error\": \"user_not_found\", \"message\": \"No user with id 99999\"}\n```\n\nFrontend code can branch on the `error` field:\n```js\nconst body = await r.json().catch(() => ({}));\nif (body.error === \"user_not_found\") {\n  setError(\"This user doesn't exist.\");\n} else {\n  setError(\"Page not found.\");\n}\n```\n\n### When the server doesn't tell you\nLegacy APIs or generic 404 pages may not include a structured body. In that case:\n- If the URL was hard-coded in your code (not user-generated), a 404 is likely a development bug — check the URL\n- If the URL contains a user-supplied ID, a 404 means that record doesn't exist\n- Show a generic 'not found' message and log the status code for developers\n\n### Practical handling patterns\n```js\nif (r.status === 404) {\n  const body = await r.json().catch(() => ({}));\n  switch (body.error) {\n    case \"user_not_found\":\n      setError(\"This user doesn't exist or was deleted.\");\n      break;\n    case \"post_not_found\":\n      setError(\"This post has been removed.\");\n      break;\n    default:\n      setError(\"The requested page was not found.\");\n  }\n  return;\n}\n```\n\n### You just learned\n404 has two meanings: the endpoint URL is wrong (development bug), or the specific resource doesn't exist (data issue). Read the response body to distinguish them. Well-designed APIs include an `error` code in the response body. Show messages that match the actual situation — not a generic 'not found' that covers both.",
+    "videos": [
+      {
+        "title": "HTTP 404 error different meanings explained",
+        "searchQuery": "HTTP 404 not found endpoint vs resource explained tutorial"
+      },
+      {
+        "title": "How to handle 404 errors in React JavaScript",
+        "searchQuery": "react handle 404 not found API response message tutorial"
+      }
+    ]
+  },
+  "estMinutes": 5,
+  "version": 1
+}

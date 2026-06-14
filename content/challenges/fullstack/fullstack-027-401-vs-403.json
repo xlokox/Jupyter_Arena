@@ -1,0 +1,63 @@
+{
+  "id": "fullstack-027-401-vs-403",
+  "sector": "fullstack",
+  "difficulty": "medium",
+  "title": "27_401_vs_403.jsx",
+  "language": "jsx",
+  "icon": "lock",
+  "conceptTags": ["http", "401", "403", "auth", "error-handling"],
+  "subSector": "error-handling",
+  "descriptionMd": "## Mission: The Wrong Error Message for a Permissions Failure\n\nAn admin panel fetches a protected report. When a logged-in non-admin user accesses it, they see: **\"Please sign in to continue.\"** But they're already signed in — the server returned **403 Forbidden**, not 401 Unauthorized.\n\nThe component maps any non-200 to a single 'please sign in' message, conflating two completely different authentication states. The user is confused because they're already logged in.\n\nFix the handler to distinguish between 401 (not authenticated) and 403 (authenticated but not authorised) and show the correct message for each.",
+  "initialCode": "import { useEffect, useState } from \"react\";\n\nexport default function AdminReport() {\n  const [report, setReport] = useState(null);\n  const [error, setError] = useState(null);\n\n  useEffect(() => {\n    fetch(\"/api/admin/revenue-report\", { credentials: \"include\" })\n      .then(async r => {\n        if (!r.ok) {\n          // ← bug: treats 401 and 403 the same\n          setError(\"Please sign in to continue.\");\n          return;\n        }\n        setReport(await r.json());\n      })\n      .catch(err => setError(err.message));\n  }, []);\n\n  if (error) return <p className=\"error\">{error}</p>;\n  if (!report) return <p>Loading...</p>;\n  return <pre>{JSON.stringify(report, null, 2)}</pre>;\n}",
+  "buggyLineStart": 11,
+  "buggyLineEnd": 12,
+  "traceback": "Scenario A — logged-out user:\n  GET /api/admin/revenue-report  401 Unauthorized\n  UI: \"Please sign in to continue.\"  ← correct\n\nScenario B — logged-in user without admin role:\n  GET /api/admin/revenue-report  403 Forbidden\n  UI: \"Please sign in to continue.\"  ← WRONG — user IS signed in\n\nThe user sees 'sign in' but they're already signed in.\nThey try signing in again (or think their session is broken).\nCorrect message: \"You don't have permission to view this report.\"",
+  "correctOutput": "Scenario A — logged-out user:\n  GET /api/admin/revenue-report  401 Unauthorized\n  UI: \"Please sign in to continue.\"\n\nScenario B — logged-in non-admin user:\n  GET /api/admin/revenue-report  403 Forbidden\n  UI: \"You don't have permission to view this report.\"\n\nScenario C — admin user:\n  GET /api/admin/revenue-report  200 OK\n  UI: renders the revenue report JSON",
+  "options": [
+    {
+      "key": "a",
+      "label": "Check `r.status` separately for 401 and 403 and show distinct messages",
+      "patchCode": ".then(async r => {\n  if (r.status === 401) {\n    setError(\"Please sign in to continue.\");\n    return;\n  }\n  if (r.status === 403) {\n    setError(\"You don't have permission to view this report.\");\n    return;\n  }\n  if (!r.ok) {\n    setError(`Unexpected error (${r.status}) — please try again.`);\n    return;\n  }\n  setReport(await r.json());\n})",
+      "isCorrect": true,
+      "resultLog": "Scenario A — logged-out user:\n  GET /api/admin/revenue-report  401\n  UI: \"Please sign in to continue.\"\n\nScenario B — logged-in non-admin:\n  GET /api/admin/revenue-report  403\n  UI: \"You don't have permission to view this report.\"\n\nScenario C — admin:\n  GET /api/admin/revenue-report  200\n  UI: renders report",
+      "rationale": "401 and 403 are different authentication states that require different user actions. **401 Unauthorized**: the user isn't logged in (no session token, expired token). Action: redirect to login. **403 Forbidden**: the user is logged in but doesn't have the role/permission for this resource. Action: show a permission error — NOT a login prompt, because logging in again won't help. Conflating them breaks the user experience: users who are already signed in see a 'sign in' button that does nothing useful."
+    },
+    {
+      "key": "b",
+      "label": "Redirect to `/login` for any non-200 response",
+      "patchCode": ".then(r => {\n  if (!r.ok) {\n    window.location.href = \"/login\";\n    return;\n  }\n  return r.json();\n})\n.then(data => data && setReport(data))",
+      "isCorrect": false,
+      "resultLog": "Scenario A — logged-out user:\n  401 → redirect to /login ← correct\n\nScenario B — logged-in non-admin:\n  403 → redirect to /login ← wrong: user is already logged in\n  Logs in again, comes back, hits /api/admin/revenue-report, gets 403 again,\n  redirect to /login again → infinite redirect loop\n\nScenario C (if 500):\n  500 → redirect to /login ← completely wrong",
+      "rationale": "Redirecting to login on any non-200 is dangerous: a logged-in user who gets a 403 will be redirected to login, log in (already logged in, so they're taken back), hit the 403 again, and get redirected to login again — infinite loop. A 500 error redirecting to login is confusing and unhelpful. Only redirect to login on **401** (unauthenticated). For **403**, show a permission denied message. For **500**, show a server error message."
+    },
+    {
+      "key": "c",
+      "label": "Use `r.ok` but show both codes in the error message: `HTTP ${r.status}`",
+      "patchCode": ".then(async r => {\n  if (!r.ok) {\n    setError(`Error: HTTP ${r.status}. Please sign in if you are not logged in.`);\n    return;\n  }\n  setReport(await r.json());\n})",
+      "isCorrect": false,
+      "resultLog": "Scenario A — logged-out user:\n  401 → UI: \"Error: HTTP 401. Please sign in if you are not logged in.\"\n\nScenario B — logged-in non-admin:\n  403 → UI: \"Error: HTTP 403. Please sign in if you are not logged in.\"\n\nMarginal improvement (the user sees a different number) but:\n- HTTP status codes are technical jargon meaningless to most users\n- The 403 case still suggests signing in might help, which it won't\n- Users shouldn't be told 'HTTP 401' — they should be told what to do",
+      "rationale": "Showing raw HTTP status codes to end users is poor UX — most people don't know what 401 or 403 means. Saying 'Please sign in if you are not logged in' for a 403 (forbidden) case still misleads the user. The goal is: translate the status code into the **user action required**. For 401: sign in. For 403: contact admin or stop trying (signing in won't help). Branching on `r.status` and showing targeted messages is the correct approach."
+    }
+  ],
+  "hints": [
+    "Look up the difference between 401 and 403. One means 'you're not logged in'; the other means 'you're logged in but not allowed'. Which one requires a login prompt?",
+    "Instead of checking `r.ok`, check `r.status === 401` and `r.status === 403` separately and show a different message for each. 401 → 'please sign in'; 403 → 'you don't have permission'."
+  ],
+  "explanationMd": "### 401 Unauthorized vs 403 Forbidden — the critical difference\nDespite the name 'Unauthorized', **401** actually means **unauthenticated**: the server doesn't know who you are (no session, expired token, missing credentials). The right user action is to log in.\n\n**403 Forbidden** means **authenticated but not authorised**: the server knows who you are, but your account doesn't have permission to perform this action. Logging in again won't help — you need a different account, or an admin to grant you the role.\n\n| Code | Meaning | User action |\n|---|---|---|\n| 401 | Not authenticated | Log in |\n| 403 | Not authorised | Contact admin / use a different account |\n\nShowing a 'sign in' prompt on 403 is confusing and breaks the UX for users who are already signed in.\n\n### Why error messages must match the user action\nA well-designed error message tells the user what went wrong and what to do about it:\n- **401**: 'Your session has expired. Please sign in again.' (and redirect to /login)\n- **403**: 'You don't have permission to view this page. Contact your administrator if you believe this is a mistake.'\n- **404**: 'This resource doesn't exist or has been removed.'\n- **500**: 'Something went wrong on our end. Please try again later.'\n\nShowing raw status codes (`HTTP 403`) or incorrect actions (`sign in` for 403) leads to support tickets and user frustration.\n\n### Implementation pattern\n```js\nif (r.status === 401) {\n  // Redirect to login or show 'session expired'\n  router.push('/login');\n  return;\n}\nif (r.status === 403) {\n  setError(\"You don't have permission to do this.\");\n  return;\n}\nif (!r.ok) {\n  setError(`Something went wrong (${r.status}). Please try again.`);\n  return;\n}\n// 2xx\nconst data = await r.json();\n```",
+  "recruiterReview": "Correct. 401 vs 403 is a classic trap — the names are counterintuitive ('Unauthorized' doesn't mean unauthorised, it means unauthenticated). The redirect-on-any-error distractor is dangerous in production: 403 → /login → 403 → /login creates an infinite redirect loop. The raw status code option marginalises the UX. The pattern of branching on specific status codes and translating to user-friendly messages is the professional approach. ✅",
+  "tutorial": {
+    "bodyMd": "## Understanding 401 vs 403: Authentication vs Authorisation\n\n### Two concepts, two codes\n**Authentication** answers 'Who are you?' — verifying identity. You authenticate with a username/password, a token, a session cookie.\n\n**Authorisation** answers 'Are you allowed to do this?' — checking permissions. Even after authenticating, a user may not be allowed to access certain resources.\n\nHTTP has one code for each failure:\n- **401 Unauthorized**: not authenticated. Despite the misleading name, it means 'I don't know who you are — please identify yourself.'\n- **403 Forbidden**: authenticated but not authorised. 'I know who you are, but you can't do this.'\n\n### Why the distinction matters\nIf you show a 'sign in' prompt on 403:\n- The user (already signed in) tries to sign in again\n- They're immediately bounced back to the same page\n- The page shows 403 again, possibly prompts again — infinite loop\n- They file a support ticket: 'The login is broken'\n\nCorrect behaviour:\n- **401** → redirect to `/login` or show 'session expired'\n- **403** → show permission denied; don't redirect to login\n\n### How servers signal which code to use\n**401** also requires a `WWW-Authenticate` response header (specifying the auth scheme) per the HTTP spec. In practice, many APIs skip this header but still use 401 for 'not logged in'. Look at the status code, not the header.\n\n**403** should not include `WWW-Authenticate`. If you see 403 and you're already logged in, logging in again won't help — you need a different account or elevated permissions.\n\n### The handling pattern in React\n```js\nasync function fetchProtected(url) {\n  const r = await fetch(url, { credentials: \"include\" });\n  if (r.status === 401) {\n    // User is not logged in — send to login page\n    window.location.href = `/login?return=${encodeURIComponent(window.location.pathname)}`;\n    return null;\n  }\n  if (r.status === 403) {\n    // User is logged in but doesn't have permission\n    throw new Error(\"You don't have permission to access this resource.\");\n  }\n  if (!r.ok) {\n    throw new Error(`Request failed (${r.status})`);\n  }\n  return r.json();\n}\n```\n\n### Related codes\n- **407 Proxy Authentication Required** — same concept as 401 but for proxy servers\n- **511 Network Authentication Required** — need to authenticate with a captive portal (hotel WiFi)\n\n### You just learned\n401 means 'not logged in' — redirect to login. 403 means 'logged in but no permission' — show a permission error. Never redirect to login on 403; it creates an infinite redirect loop.",
+    "videos": [
+      {
+        "title": "HTTP 401 vs 403 difference explained",
+        "searchQuery": "HTTP 401 unauthorized vs 403 forbidden difference explained tutorial"
+      },
+      {
+        "title": "Authentication vs authorisation explained",
+        "searchQuery": "authentication vs authorization difference explained web development"
+      }
+    ]
+  },
+  "estMinutes": 5,
+  "version": 1
+}
