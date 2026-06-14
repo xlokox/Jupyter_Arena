@@ -1,0 +1,62 @@
+{
+  "id": "dl-016-crossentropy-vs-bce",
+  "sector": "dl",
+  "difficulty": "easy",
+  "title": "16_crossentropy_vs_bce.py",
+  "language": "python",
+  "icon": "brain-circuit",
+  "conceptTags": ["loss-functions", "CrossEntropyLoss", "BCEWithLogitsLoss", "binary-classification"],
+  "descriptionMd": "## Mission: CrossEntropyLoss With Binary Float Labels Crashes\n\nA binary sentiment classifier uses `nn.CrossEntropyLoss` with float labels `[0.0, 1.0]` and outputs two logits per sample. The training loop raises a `RuntimeError` immediately.\n\n`CrossEntropyLoss` expects integer class indices (`torch.long`) and `C` output neurons for `C` classes. For **binary classification** the standard choice is `nn.BCEWithLogitsLoss` — one output neuron, float labels.\n\nFix the model and loss function for binary classification.",
+  "initialCode": "import torch\nimport torch.nn as nn\n\nmodel = nn.Linear(10, 2)     # 2 output neurons — one per class\nloss_fn = nn.CrossEntropyLoss()\n\nbatch_x = torch.randn(8, 10)\nbatch_y = torch.tensor([0.0, 1.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0])  # float labels\n\nlogits = model(batch_x)       # shape: (8, 2)\nloss = loss_fn(logits, batch_y)  # ← RuntimeError\nprint(loss.item())",
+  "buggyLineStart": 5,
+  "buggyLineEnd": 10,
+  "traceback": "RuntimeError: expected scalar type Long but found Float\n  File \"train.py\", line 11, in <module>\n    loss = loss_fn(logits, batch_y)\n\nCrossEntropyLoss expects:\n  - logits shape: (N, C) where C = number of classes\n  - targets: torch.long integer class indices, shape (N,)\n\nGot:\n  - logits shape: (8, 2)   ← OK\n  - targets dtype: float32 ← WRONG (needs int64 / Long)",
+  "correctOutput": "model   = nn.Linear(10, 1)         # 1 output neuron for binary\nloss_fn = nn.BCEWithLogitsLoss()   # sigmoid + BCE combined\n\nlogits = model(batch_x)            # shape: (8, 1)\nbatch_y_float = batch_y.unsqueeze(1)  # shape: (8, 1) to match logits\nloss = loss_fn(logits, batch_y_float) # no RuntimeError\nprint(loss.item())  # e.g. 0.7231",
+  "options": [
+    {
+      "key": "a",
+      "label": "Switch to 1 output neuron and `BCEWithLogitsLoss`",
+      "patchCode": "import torch\nimport torch.nn as nn\n\nmodel   = nn.Linear(10, 1)         # binary: 1 output neuron\nloss_fn = nn.BCEWithLogitsLoss()   # sigmoid + binary cross-entropy\n\nbatch_x = torch.randn(8, 10)\nbatch_y = torch.tensor([0.0, 1.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0])\n\nlogits = model(batch_x)              # shape: (8, 1)\nloss = loss_fn(logits, batch_y.unsqueeze(1))  # target shape: (8, 1)\nprint(loss.item())",
+      "isCorrect": true,
+      "resultLog": "model   = nn.Linear(10, 1)\nloss_fn = nn.BCEWithLogitsLoss()\n\nlogits.shape = torch.Size([8, 1])\nloss   = 0.7231  (example value — no RuntimeError)\n\nBCEWithLogitsLoss internally applies sigmoid to the logit,\nthen computes binary cross-entropy. Numerically stable.",
+      "rationale": "`BCEWithLogitsLoss` is the correct choice for binary classification. It combines the sigmoid activation and binary cross-entropy in a single numerically stable function — more stable than `sigmoid(logit)` then `BCELoss`. Use 1 output neuron and float targets in [0.0, 1.0]. At inference, apply `torch.sigmoid(logits) > 0.5` to get predictions."
+    },
+    {
+      "key": "b",
+      "label": "Cast `batch_y` to `torch.long` and keep `CrossEntropyLoss`",
+      "patchCode": "import torch\nimport torch.nn as nn\n\nmodel   = nn.Linear(10, 2)\nloss_fn = nn.CrossEntropyLoss()\n\nbatch_x = torch.randn(8, 10)\nbatch_y = torch.tensor([0, 1, 1, 0, 1, 0, 0, 1])  # int labels\n\nlogits = model(batch_x)           # shape: (8, 2)\nloss = loss_fn(logits, batch_y)   # no error\nprint(loss.item())",
+      "isCorrect": false,
+      "resultLog": "batch_y as torch.long (int64) + CrossEntropyLoss → no RuntimeError\n\nloss = 0.8112  (example value)\n\nThis works. But for binary classification it is unconventional:\n  - 2 output neurons instead of 1\n  - Cannot use float soft labels or label smoothing naturally\n  - BCEWithLogitsLoss is the standard for binary tasks\n\nBoth approaches produce correct gradients.",
+      "rationale": "Casting `batch_y` to `torch.long` fixes the `RuntimeError`. With integer class indices (0 or 1) and two output neurons, `CrossEntropyLoss` correctly computes the multiclass cross-entropy for the binary case. However, this is non-standard for binary classification. `BCEWithLogitsLoss` with 1 output neuron is the conventional, more efficient choice — it uses half the output parameters and aligns with standard binary classification practice."
+    },
+    {
+      "key": "c",
+      "label": "Apply `torch.sigmoid` to the logits before passing to `CrossEntropyLoss`",
+      "patchCode": "logits = model(batch_x)              # shape: (8, 2)\nprobs  = torch.sigmoid(logits)        # squash to (0, 1)\nloss   = loss_fn(probs, batch_y)      # still float targets",
+      "isCorrect": false,
+      "resultLog": "RuntimeError: expected scalar type Long but found Float\n\nsigmoid changes the VALUES of logits — it does not change the dtype.\nbatch_y is still float32. CrossEntropyLoss still expects torch.long targets.\n\nAlso: applying sigmoid before CrossEntropyLoss is incorrect — CrossEntropyLoss\nexpects raw logits and applies softmax internally. Sigmoid + CrossEntropyLoss\nis numerically incorrect for multiclass classification.",
+      "rationale": "`torch.sigmoid` changes the values of the tensor (squashes to 0–1) but not its dtype. The target `batch_y` is still `float32`, so the `RuntimeError` about dtype persists. Additionally, `CrossEntropyLoss` applies `log_softmax` internally and expects raw logits — passing sigmoid-activated values distorts the gradient computation."
+    }
+  ],
+  "hints": [
+    "`nn.CrossEntropyLoss` expects integer class indices (`torch.long`) as targets and `C` output neurons. For binary classification (0 or 1 label), use `nn.BCEWithLogitsLoss` instead — it takes float targets and 1 output neuron.",
+    "`BCEWithLogitsLoss` applies sigmoid internally, so do NOT apply `torch.sigmoid` to the logit before passing it in. At inference: `prob = torch.sigmoid(model(x)); pred = (prob > 0.5).float()`."
+  ],
+  "explanationMd": "### Two loss functions for classification\n\n| Task | Output neurons | Target dtype | Loss function |\n|---|---|---|---|\n| Binary (0/1) | 1 | float32 | `BCEWithLogitsLoss` |\n| Multiclass (C classes) | C | int64 (Long) | `CrossEntropyLoss` |\n\n### `BCEWithLogitsLoss` for binary\n```python\nmodel   = nn.Linear(in_features, 1)\nloss_fn = nn.BCEWithLogitsLoss()\n\nlogits = model(x)                    # shape: (N, 1)\nloss   = loss_fn(logits, y.float().unsqueeze(1))  # y shape: (N, 1)\n```\n\n`BCEWithLogitsLoss` is equivalent to `sigmoid(logit)` + `BCELoss`, but numerically more stable because it avoids the vanishing-gradient issue near 0 and 1.\n\n### `CrossEntropyLoss` for multiclass\n```python\nmodel   = nn.Linear(in_features, C)\nloss_fn = nn.CrossEntropyLoss()\n\nlogits = model(x)          # shape: (N, C)\nloss   = loss_fn(logits, y.long())  # y: integer indices, shape (N,)\n```\n\n### Inference\n```python\n# Binary:\nprob = torch.sigmoid(model(x))   # (N, 1) probabilities\npred = (prob > 0.5).long()       # class 0 or 1\n\n# Multiclass:\nprob = torch.softmax(model(x), dim=1)\npred = prob.argmax(dim=1)        # class index\n```",
+  "recruiterReview": "Correct. The CrossEntropyLoss vs BCEWithLogitsLoss confusion is a standard PyTorch gotcha for developers coming from frameworks where binary and multiclass losses are unified. The RuntimeError surfaces immediately and clearly (dtype mismatch), but the correct response — change the loss and output neurons together — requires understanding the binary vs multiclass convention. The sigmoid-before-CEL distractor catches the 'apply activation first' mistake. ✅",
+  "tutorial": {
+    "bodyMd": "## PyTorch Loss Functions: Binary vs Multiclass Classification\n\n### The two classification setups\nPyTorch draws a clean line between binary and multiclass classification at the loss-function level:\n\n| Setting | Output neurons | Target shape/dtype | Loss |\n|---|---|---|---|\n| Binary (2 classes) | 1 | (N,) or (N,1), float32 | `BCEWithLogitsLoss` |\n| Multiclass (C classes) | C | (N,), int64 (Long) | `CrossEntropyLoss` |\n\nMixing these up causes `RuntimeError: expected scalar type Long but found Float` (or vice versa).\n\n### Binary classification with `BCEWithLogitsLoss`\n```python\nimport torch\nimport torch.nn as nn\n\n# Model outputs ONE logit per sample\nmodel = nn.Sequential(\n    nn.Linear(20, 64),\n    nn.ReLU(),\n    nn.Linear(64, 1)   # ← 1 output neuron\n)\n\nloss_fn = nn.BCEWithLogitsLoss()\n\n# Training step:\nbatch_x = torch.randn(32, 20)\nbatch_y = torch.randint(0, 2, (32,)).float()  # 0.0 or 1.0, float32\n\nlogits = model(batch_x)                    # shape: (32, 1)\nloss = loss_fn(logits, batch_y.unsqueeze(1)) # targets must be (32, 1)\n```\n\n`BCEWithLogitsLoss` internally computes:\n```\nloss = -[y * log(σ(logit)) + (1-y) * log(1 - σ(logit))]\n```\nwhere `σ` is the sigmoid function. The combined sigmoid+BCE is numerically more stable than applying `torch.sigmoid` first, then `BCELoss`.\n\n### Multiclass classification with `CrossEntropyLoss`\n```python\nnum_classes = 10\nmodel = nn.Sequential(\n    nn.Linear(20, 64),\n    nn.ReLU(),\n    nn.Linear(64, num_classes)  # ← C output neurons\n)\n\nloss_fn = nn.CrossEntropyLoss()\n\nbatch_x = torch.randn(32, 20)\nbatch_y = torch.randint(0, num_classes, (32,))  # integer indices, int64\n\nlogits = model(batch_x)           # shape: (32, 10)\nloss = loss_fn(logits, batch_y)   # targets: (32,) of type Long\n```\n\n`CrossEntropyLoss` internally applies `log_softmax` to the logits before computing the negative log-likelihood. Do NOT apply `softmax` before passing to `CrossEntropyLoss`.\n\n### Inference\n```python\n# Binary:\nwith torch.no_grad():\n    logits = model(x)              # (N, 1)\n    probs  = torch.sigmoid(logits) # (N, 1) in [0, 1]\n    preds  = (probs > 0.5).long()  # 0 or 1\n\n# Multiclass:\nwith torch.no_grad():\n    logits = model(x)              # (N, C)\n    probs  = torch.softmax(logits, dim=1)  # (N, C) in [0, 1]\n    preds  = probs.argmax(dim=1)   # class index\n```\n\n### Handling class imbalance\n```python\n# Binary: pos_weight upweights the positive class\npos_weight = torch.tensor([9.0])  # for 1:9 class ratio\nloss_fn = nn.BCEWithLogitsLoss(pos_weight=pos_weight)\n\n# Multiclass: weight per class\nweights = torch.tensor([1.0, 9.0, 3.0])  # for 3-class imbalanced problem\nloss_fn = nn.CrossEntropyLoss(weight=weights)\n```\n\n### Common mismatches and errors\n```python\n# Error: float targets with CrossEntropyLoss\nloss_fn(logits, y.float())  # RuntimeError: expected Long\n\n# Error: softmax before CrossEntropyLoss (wrong output range)\nprobs = torch.softmax(logits, dim=1)\nloss_fn(probs, y)  # Gradients are wrong — CEL expects raw logits\n\n# Error: sigmoid before BCEWithLogitsLoss (double sigmoid)\nlogits_sigmoid = torch.sigmoid(logits)\nloss_fn(logits_sigmoid, y)  # Numerically wrong\n```\n\n### Can you use CrossEntropyLoss for binary classification?\nYes — use 2 output neurons and integer targets (0 or 1 as `torch.long`). Both approaches give correct gradients. `BCEWithLogitsLoss` with 1 output neuron is conventional because it uses fewer parameters and aligns with standard binary logistic regression.\n\n### You just learned\nFor binary classification use `BCEWithLogitsLoss` with 1 output neuron and float targets. For multiclass use `CrossEntropyLoss` with C output neurons and integer (Long) targets. Never apply sigmoid before `BCEWithLogitsLoss` or softmax before `CrossEntropyLoss` — both include the activation internally for numerical stability.",
+    "videos": [
+      {
+        "title": "PyTorch BCEWithLogitsLoss vs CrossEntropyLoss binary classification tutorial",
+        "searchQuery": "pytorch BCEWithLogitsLoss CrossEntropyLoss binary classification tutorial"
+      },
+      {
+        "title": "PyTorch loss functions classification tutorial explained",
+        "searchQuery": "pytorch loss functions binary multiclass classification BCELoss CrossEntropyLoss explained"
+      }
+    ]
+  },
+  "estMinutes": 6,
+  "version": 1
+}
