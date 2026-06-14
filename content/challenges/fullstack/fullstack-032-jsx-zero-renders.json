@@ -1,0 +1,63 @@
+{
+  "id": "fullstack-032-jsx-zero-renders",
+  "sector": "fullstack",
+  "difficulty": "easy",
+  "title": "32_jsx_zero_renders.jsx",
+  "language": "jsx",
+  "icon": "braces",
+  "conceptTags": ["react", "jsx", "conditional-render", "zero-falsy"],
+  "subSector": "state-and-ui",
+  "descriptionMd": "## Mission: The Inbox Shows '0' Instead of Nothing\n\nAn inbox badge should display `{count} unread` when there are unread messages, and show nothing when the count is zero. The developer writes `{unreadCount && <span>{unreadCount} unread</span>}` — a common pattern — but when `unreadCount` is `0` the UI renders the literal character `\"0\"` instead of nothing.\n\nFix the conditional so the badge renders only when the count is greater than zero.",
+  "initialCode": "import { useState } from \"react\";\n\nexport default function InboxBadge() {\n  const [unreadCount, setUnreadCount] = useState(0);\n\n  return (\n    <div>\n      <button onClick={() => setUnreadCount(c => c + 1)}>Add Message</button>\n      <button onClick={() => setUnreadCount(0)}>Clear</button>\n      {unreadCount && <span className=\"badge\">{unreadCount} unread</span>}\n    </div>\n  );\n}",
+  "buggyLineStart": 9,
+  "buggyLineEnd": 9,
+  "traceback": "Initial render (unreadCount = 0):\n  Expected: nothing rendered after the buttons\n  Got:      the text '0' appears in the DOM\n\nWhy: In JSX, `{0 && <Component/>}` evaluates to `{0}` — JavaScript\nshort-circuits and returns the falsy left operand (0).\nReact renders `0` as a text node because 0 is a valid render value.",
+  "correctOutput": "unreadCount = 0: nothing rendered — no badge, no '0'\nunreadCount = 3: badge shows '3 unread'\nunreadCount = 0 (cleared): nothing rendered again",
+  "options": [
+    {
+      "key": "a",
+      "label": "Change the condition to `unreadCount > 0 &&` to explicitly exclude zero",
+      "patchCode": "{unreadCount > 0 && <span className=\"badge\">{unreadCount} unread</span>}",
+      "isCorrect": true,
+      "resultLog": "unreadCount = 0: nothing renders — condition is false\nunreadCount = 3: badge shows '3 unread'\n\n`unreadCount > 0` is a boolean. `false && ...` short-circuits to false.\nReact renders nothing for false (unlike 0, which renders as text).",
+      "rationale": "`unreadCount > 0` produces a boolean `false` when unreadCount is 0. React renders nothing for `false`, `null`, and `undefined`. The original `unreadCount &&` produces the number `0` when unreadCount is 0 — and React renders `0` as a text node because 0 is a valid displayable value."
+    },
+    {
+      "key": "b",
+      "label": "Convert to boolean with `!!`: `{!!unreadCount && <span>...`",
+      "patchCode": "{!!unreadCount && <span className=\"badge\">{unreadCount} unread</span>}",
+      "isCorrect": false,
+      "resultLog": "unreadCount = 0: nothing renders — !!0 is false\nunreadCount = 3: badge shows '3 unread'\n\nCorrect output — but `!!value` is less readable than `value > 0`\nfor a count. `> 0` makes the intent explicit; `!!` is a double-negation\nthat forces a boolean conversion.",
+      "rationale": "`!!unreadCount` converts `0` to `false` and any positive number to `true`. It works and avoids the `0` rendering bug. However, `unreadCount > 0` is more readable and self-documenting — it shows that the intent is to check 'is there at least one unread message', not just 'is this value truthy'."
+    },
+    {
+      "key": "c",
+      "label": "Use a ternary: `{unreadCount ? <span>...</span> : null}`",
+      "patchCode": "{unreadCount ? <span className=\"badge\">{unreadCount} unread</span> : null}",
+      "isCorrect": false,
+      "resultLog": "unreadCount = 0: nothing renders — 0 is falsy, ternary returns null\nunreadCount = 3: badge shows '3 unread'\n\nCorrect output — the ternary avoids the `0` render bug.\nBut `> 0 &&` is more idiomatic for 'show when count is positive'\nthan a ternary that explicitly returns null.",
+      "rationale": "The ternary works — `0` is falsy, so the `null` branch is taken and React renders nothing. But a ternary with an explicit `null` branch is slightly more verbose than `unreadCount > 0 &&`. Both are correct; `> 0 &&` is idiomatic for 'render when positive count'."
+    }
+  ],
+  "hints": [
+    "In JavaScript, `0 && anything` short-circuits and returns `0` — not `false`. React renders `0` as the text character '0'. Try `typeof (0 && <span/>)` in the console — it's `'number'`, not `'boolean'`.",
+    "Make the left side of `&&` a boolean, not a number. `unreadCount > 0` is a boolean: `true` when there are messages, `false` when zero. `false && ...` short-circuits to `false` and React renders nothing."
+  ],
+  "explanationMd": "### How JSX renders falsy values\nReact renders some falsy values and silently skips others:\n\n```jsx\n{false}     // renders nothing\n{null}      // renders nothing\n{undefined} // renders nothing\n{0}         // renders the text \"0\" ← the trap\n{''}        // renders nothing\n```\n\n`0` is special: it is falsy in JavaScript (so `0 && x` short-circuits to `0`), but it is a valid number that React renders as the text character `\"0\"`.\n\n### The `&&` short-circuit pattern\n```jsx\n// Dangerous — left side is a number:\n{count && <Badge/>}          // renders '0' when count === 0\n{items.length && <List/>}    // renders '0' when items is empty\n\n// Safe — left side is a boolean:\n{count > 0 && <Badge/>}       // renders nothing when count === 0\n{items.length > 0 && <List/>} // renders nothing when items is empty\n```\n\n### The three safe patterns\n```jsx\n// Explicit boolean check:\n{count > 0 && <Badge count={count}/>}\n\n// Double-negation (less readable):\n{!!count && <Badge count={count}/>}\n\n// Ternary with null:\n{count ? <Badge count={count}/> : null}\n```",
+  "recruiterReview": "Correct. The `&&` short-circuit rendering `0` is one of the most frequently encountered React UI bugs in code review — it only manifests when the count reaches zero, which is easy to miss in testing. The `!!` distractor is correct but less readable. The ternary is also correct. The `> 0` explicit check is clearly the most self-documenting. ✅",
+  "tutorial": {
+    "bodyMd": "## JSX Conditional Rendering and the Zero Pitfall\n\n### How React renders values\nIn JSX, values between `{}` are rendered to the DOM. React treats different falsy values differently:\n\n```jsx\nfunction Demo() {\n  return (\n    <div>\n      {false}      {/* nothing */}\n      {null}       {/* nothing */}\n      {undefined}  {/* nothing */}\n      {0}          {/* renders \"0\" as text */}\n      {\"\"}         {/* nothing */}\n      {\"hello\"}    {/* renders \"hello\" */}\n      {42}         {/* renders \"42\" */}\n    </div>\n  );\n}\n```\n\nThe key insight: `false`, `null`, and `undefined` are skipped. But `0` and empty string `''` are valid values that React renders.\n\n### The `&&` pattern and its trap\nThe short-circuit `&&` is a common JSX pattern for conditional rendering:\n\n```jsx\n{isLoggedIn && <UserMenu/>}   // safe — boolean left side\n{count && <Badge count={count}/>}  // dangerous — number left side!\n```\n\nHow `&&` works in JavaScript:\n- If the left operand is falsy, return it (don't evaluate the right side)\n- If the left operand is truthy, return the right operand\n\n```js\ntrue && 'hello'    // 'hello'\nfalse && 'hello'   // false\n0 && 'hello'       // 0  ← returns the left operand, which is 0!\n3 && 'hello'       // 'hello'\n```\n\nSo `{count && <Badge/>}` renders the text `\"0\"` when `count` is 0 — not nothing.\n\n### Safe conditional rendering patterns\n**Pattern 1: Explicit comparison (most readable)**\n```jsx\n{count > 0 && <Badge count={count}/>}\n{items.length > 0 && <ItemList items={items}/>}\n{user !== null && <Avatar user={user}/>}\n```\n\n**Pattern 2: Ternary operator**\n```jsx\n{count > 0\n  ? <Badge count={count}/>\n  : null\n}\n\n// Or with an alternative:\n{isLoading\n  ? <Spinner/>\n  : <Content data={data}/>\n}\n```\n\n**Pattern 3: Boolean conversion with `!!`**\n```jsx\n{!!count && <Badge count={count}/>}   // !!0 === false\n```\n\n### When to use which pattern\n- **`condition && <Component/>`**: when `condition` is already a boolean (e.g. `isLoggedIn`, `hasError`, `isLoading`)\n- **`value > 0 && <Component/>`**: when `value` is a number that might be zero\n- **Ternary**: when you need to render one of two things (if/else)\n- **`!!value &&`**: acceptable but prefer the explicit `> 0` or ternary for readability\n\n### Another common trap: empty array length\n```jsx\n// Bug — renders '0' when items is empty:\n{items.length && <ul>{items.map(...)}</ul>}\n\n// Fix:\n{items.length > 0 && <ul>{items.map(...)}</ul>}\n```\n\n### Extracting conditional logic\nFor complex conditions, extract to a variable before the return:\n\n```jsx\nfunction InboxBadge({ unreadCount }) {\n  const showBadge = unreadCount > 0;   // boolean, safe\n  return (\n    <div>\n      {showBadge && <span>{unreadCount} unread</span>}\n    </div>\n  );\n}\n```\n\n### You just learned\nJSX renders `0` as text because `0` is a valid displayable value, unlike `false`, `null`, and `undefined` which render nothing. When using `&&` for conditional rendering, make sure the left side is a boolean (`count > 0`, `items.length > 0`) — not a number that might be zero.",
+    "videos": [
+      {
+        "title": "React JSX conditional rendering and && operator pitfalls",
+        "searchQuery": "react JSX conditional rendering zero renders nothing tutorial"
+      },
+      {
+        "title": "React conditional rendering patterns tutorial",
+        "searchQuery": "react conditional rendering ternary && null patterns tutorial"
+      }
+    ]
+  },
+  "estMinutes": 4,
+  "version": 1
+}

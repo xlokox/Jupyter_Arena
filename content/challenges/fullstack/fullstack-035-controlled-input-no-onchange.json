@@ -1,0 +1,63 @@
+{
+  "id": "fullstack-035-controlled-input-no-onchange",
+  "sector": "fullstack",
+  "difficulty": "medium",
+  "title": "35_controlled_input_no_onchange.jsx",
+  "language": "jsx",
+  "icon": "mouse-pointer-click",
+  "conceptTags": ["react", "controlled-input", "onChange", "state"],
+  "subSector": "state-and-ui",
+  "descriptionMd": "## Mission: The Search Box Refuses User Input\n\nA search component renders an `<input>` driven by `value={searchQuery}`. Users click into the box and try to type — but nothing appears. The input is frozen.\n\nReact warns in the console: *\"You provided a `value` prop to a form field without an `onChange` handler. This will render a read-only field.\"*\n\nFix the input so users can type and the state is updated on each keystroke.",
+  "initialCode": "import { useState } from \"react\";\n\nexport default function SearchBox() {\n  const [searchQuery, setSearchQuery] = useState(\"\");\n\n  return (\n    <div>\n      <input\n        value={searchQuery}         // ← controlled: React owns the value\n        placeholder=\"Search...\"\n      />\n      {/* ← no onChange: user cannot type */}\n      <button onClick={() => console.log(\"Searching:\", searchQuery)}>\n        Search\n      </button>\n    </div>\n  );\n}",
+  "buggyLineStart": 8,
+  "buggyLineEnd": 10,
+  "traceback": "User clicks the input and types 'react'.\nInput remains blank — no characters appear.\n\nBrowser console:\n  Warning: You provided a `value` prop to a form field without an\n  `onChange` handler. This will render a read-only field. If the\n  field should be mutable use `defaultValue`. Otherwise, set either\n  `onChange` or `readOnly`.\n\nReact controls the input value from state. Without onChange, state\nnever updates — React re-renders the input with the same empty string\non each keystroke, effectively blocking all user input.",
+  "correctOutput": "User types 'react':\n  Input shows: react\n  searchQuery state: 'react'\n\nEach keystroke calls setSearchQuery with the new input value,\nstate updates, React re-renders with the new value.",
+  "options": [
+    {
+      "key": "a",
+      "label": "Add `onChange={e => setSearchQuery(e.target.value)}` to the input",
+      "patchCode": "<input\n  value={searchQuery}\n  placeholder=\"Search...\"\n  onChange={e => setSearchQuery(e.target.value)}\n/>",
+      "isCorrect": true,
+      "resultLog": "User types 'react':\n  onChange fires on each keystroke\n  setSearchQuery updates state\n  React re-renders input with the new value\n  Input shows: react",
+      "rationale": "A controlled input in React owns the input's value through state. `value={x}` tells React 'always render this value'. Without `onChange`, the user's keystrokes are caught and then overwritten with the unchanged state — making the input read-only. `onChange` reads `e.target.value` (what the user typed) and calls `setSearchQuery` so state updates and the input re-renders with the new value."
+    },
+    {
+      "key": "b",
+      "label": "Replace `value` with `defaultValue` to make it uncontrolled",
+      "patchCode": "<input\n  defaultValue={searchQuery}\n  placeholder=\"Search...\"\n/>",
+      "isCorrect": false,
+      "resultLog": "User types 'react':\n  Input shows: react  — user can type\n\nBut: the Search button logs the initial empty string, not 'react'.\n`defaultValue` is set once on mount. The DOM owns the value — React\ndoes not track it. `searchQuery` state never updates.",
+      "rationale": "`defaultValue` makes the input uncontrolled: React sets the initial value and then the DOM manages it. The user can type, but `searchQuery` state remains `\"\"` — it never reflects what the user typed. When Search is clicked, it logs `''`. To use the typed value in React code, you need a controlled input with `onChange`."
+    },
+    {
+      "key": "c",
+      "label": "Add `readOnly` to acknowledge that the input is intentionally frozen",
+      "patchCode": "<input\n  value={searchQuery}\n  placeholder=\"Search...\"\n  readOnly\n/>",
+      "isCorrect": false,
+      "resultLog": "Input remains frozen — user still cannot type.\nConsole warning is silenced.\n\nBut the search box is now deliberately read-only — useless\nfor a search form where the user needs to type a query.",
+      "rationale": "`readOnly` silences React's warning about a missing `onChange`, but it genuinely makes the input read-only. Users cannot type, which defeats the purpose of a search box. Use `readOnly` only for display-only fields (e.g. a field that shows a generated value the user should not edit). For interactive inputs, add `onChange`."
+    }
+  ],
+  "hints": [
+    "React's `value` prop makes an input 'controlled' — React owns the value and re-renders it after every keystroke. Without `onChange`, state never updates, so React always renders the old value — blocking input. This is React's intentional design: if you control the value, you must also handle changes.",
+    "Add `onChange={e => setSearchQuery(e.target.value)}` to the input. `e.target.value` is what the user typed. Each keystroke calls `setSearchQuery`, which updates state, which causes a re-render with the new value."
+  ],
+  "explanationMd": "### Controlled vs uncontrolled inputs\n**Uncontrolled**: the DOM owns the value. You can read it with a ref but React doesn't manage it.\n```jsx\n<input defaultValue=\"initial\" />\n```\n\n**Controlled**: React owns the value via state. The value always matches a state variable.\n```jsx\n<input value={text} onChange={e => setText(e.target.value)} />\n```\n\n### Why `value` without `onChange` freezes input\nWhen React renders `<input value={x}/>`, it tells the DOM 'this input's value is `x`'. When the user types, the browser fires an event and the DOM character appears — but then React re-renders and sets the value back to `x`. The input appears frozen because React immediately overwrites any user change.\n\n### The controlled input contract\n```jsx\n// Every controlled input needs BOTH:\n<input\n  value={state}                            // React reads this\n  onChange={e => setState(e.target.value)} // React writes this\n/>\n```\n\n### When to use each\n- **Controlled**: you need to read, validate, or transform the value in real time (form validation, search-as-you-type, format masking)\n- **Uncontrolled**: simple forms where you only need the value on submit (`<form onSubmit={...}>` with `ref` to read)\n\n### Reading uncontrolled values\n```jsx\nconst inputRef = useRef(null);\n<input defaultValue=\"\" ref={inputRef} />\n<button onClick={() => console.log(inputRef.current.value)}>Submit</button>\n```",
+  "recruiterReview": "Correct. The controlled-without-onChange freeze is one of the first React gotchas every developer hits. The defaultValue distractor demonstrates understanding of uncontrolled inputs but misses that the state never updates. The readOnly distractor shows what happens when you suppress the warning without fixing the actual problem. Understanding the controlled-input contract (value + onChange together) is foundational React. ✅",
+  "tutorial": {
+    "bodyMd": "## React Controlled vs Uncontrolled Inputs\n\n### The two input models\nReact supports two ways to manage form inputs, and they work very differently.\n\n**Uncontrolled inputs** let the DOM manage the value. React sets the initial value with `defaultValue`, but after mount, the browser is in charge:\n\n```jsx\n<input defaultValue=\"initial\" />\n```\n\nUsers can type freely. To read the value, you use a `ref` to reach into the DOM.\n\n**Controlled inputs** let React manage the value through state. The `value` prop always matches a state variable:\n\n```jsx\nconst [text, setText] = useState(\"\");\n<input value={text} onChange={e => setText(e.target.value)} />\n```\n\nThe two props work together: `value` tells React what to render, `onChange` tells React what to do when the user types.\n\n### Why `value` without `onChange` freezes the input\nHere is what happens on each keystroke:\n\n1. User presses 'r' in the search box\n2. Browser DOM updates the input's value to 'r'\n3. React re-renders (triggered by... nothing, since state didn't change)\n4. React renders `<input value=\"\"/>` — back to empty string\n5. The browser DOM is updated to show '' again\n6. User sees no change\n\nThis happens so fast it looks instant. The input appears frozen because React constantly overwrites the user's input with the unchanged state.\n\n### The controlled input contract\nFor controlled inputs, you must provide **both** `value` and `onChange`:\n\n```jsx\nconst [query, setQuery] = useState(\"\");\n\n<input\n  value={query}                              // React renders this\n  onChange={e => setQuery(e.target.value)}   // Update state on type\n  placeholder=\"Search...\"\n/>\n```\n\n`e.target.value` is the input's current value from the browser's perspective — what the user just typed. Calling `setQuery` with it updates state, React re-renders with the new value, and the input shows the character.\n\n### Choosing controlled vs uncontrolled\n\n**Use controlled when you need to:**\n- Validate input as the user types (show error messages in real time)\n- Transform input (format phone numbers, enforce uppercase)\n- Derive UI from input value (live search results, character counter)\n- Reset input programmatically (`setValue('')` to clear after submit)\n\n**Use uncontrolled when:**\n- You only need the value at submit time, not during typing\n- You're integrating with a non-React library that manages the DOM itself\n\n### Uncontrolled with ref\n```jsx\nfunction UncontrolledForm() {\n  const nameRef = useRef(null);\n\n  function handleSubmit(e) {\n    e.preventDefault();\n    console.log(nameRef.current.value);   // read DOM value on submit\n  }\n\n  return (\n    <form onSubmit={handleSubmit}>\n      <input ref={nameRef} defaultValue=\"\" />\n      <button type=\"submit\">Submit</button>\n    </form>\n  );\n}\n```\n\n### Common controlled input pattern: text field\n```jsx\nfunction ControlledField({ label, onSave }) {\n  const [value, setValue] = useState(\"\");\n\n  return (\n    <div>\n      <label>{label}</label>\n      <input\n        value={value}\n        onChange={e => setValue(e.target.value)}\n        onKeyDown={e => e.key === 'Enter' && onSave(value)}\n      />\n    </div>\n  );\n}\n```\n\n### What about `readOnly`?\n`readOnly` is for genuinely read-only fields — like a field that shows a generated API key that users should copy but not edit. It silences the missing-onChange warning but makes the input permanently non-interactive. Don't use it to work around a missing `onChange`.\n\n### You just learned\nA React `value` prop makes an input controlled — React owns the value. Without `onChange`, the user's typing is immediately overwritten back to the unchanged state, freezing the input. Always pair `value={x}` with `onChange={e => setX(e.target.value)}`. Use `defaultValue` instead if you want the DOM to manage the value.",
+    "videos": [
+      {
+        "title": "React controlled vs uncontrolled inputs explained",
+        "searchQuery": "react controlled uncontrolled input value onChange tutorial"
+      },
+      {
+        "title": "React form handling controlled inputs tutorial",
+        "searchQuery": "react form input state onChange handler tutorial beginners"
+      }
+    ]
+  },
+  "estMinutes": 5,
+  "version": 1
+}

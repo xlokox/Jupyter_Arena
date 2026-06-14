@@ -1,0 +1,63 @@
+{
+  "id": "fullstack-034-index-as-key",
+  "sector": "fullstack",
+  "difficulty": "medium",
+  "title": "34_index_as_key.jsx",
+  "language": "jsx",
+  "icon": "list-todo",
+  "conceptTags": ["react", "keys", "lists", "reconciliation"],
+  "subSector": "state-and-ui",
+  "descriptionMd": "## Mission: Deleting a Todo Clears the Wrong Checkbox\n\nA todo list lets users mark items complete with a checkbox. When the user **deletes** a completed item, the checkbox from the deleted item appears to 'move down' to the next item — wrong items appear checked after deletion.\n\nThe bug is in the `key` prop: the list uses array index as the key. When an item is removed, every subsequent item shifts its index down by one — React matches them to the wrong component instances.\n\nFix the key to use the todo's stable `id` so React tracks each item correctly.",
+  "initialCode": "import { useState } from \"react\";\n\nconst initialTodos = [\n  { id: 1, text: \"Buy groceries\", done: false },\n  { id: 2, text: \"Walk the dog\", done: true },\n  { id: 3, text: \"Read a book\", done: false },\n];\n\nexport default function TodoList() {\n  const [todos, setTodos] = useState(initialTodos);\n\n  function deleteTodo(id) {\n    setTodos(todos.filter(t => t.id !== id));\n  }\n\n  return (\n    <ul>\n      {todos.map((todo, i) => (\n        <li key={i}>  {/* ← bug: index as key */}\n          <input type=\"checkbox\" defaultChecked={todo.done} />\n          {todo.text}\n          <button onClick={() => deleteTodo(todo.id)}>Delete</button>\n        </li>\n      ))}\n    </ul>\n  );\n}",
+  "buggyLineStart": 19,
+  "buggyLineEnd": 19,
+  "traceback": "Initial render:\n  key=0: Buy groceries  ☐\n  key=1: Walk the dog   ☑  (done=true)\n  key=2: Read a book    ☐\n\nUser deletes 'Walk the dog' (key=1):\n  key=0: Buy groceries  ☐\n  key=1: Read a book    ☑  ← WRONG: checkbox from old key=1 persists!\n\nReact sees key=1 still exists and reuses the component instance,\nkeeping the old checkbox state — but the underlying data is 'Read a book'.",
+  "correctOutput": "After deleting 'Walk the dog':\n  id=1: Buy groceries  ☐\n  id=3: Read a book    ☐  — correct, not checked\n\nReact sees id=2 is gone (no key=2 in new list), unmounts it.\nid=1 and id=3 keep their correct component instances.",
+  "options": [
+    {
+      "key": "a",
+      "label": "Change `key={i}` to `key={todo.id}` to use a stable, unique identifier",
+      "patchCode": "<li key={todo.id}>",
+      "isCorrect": true,
+      "resultLog": "After deleting 'Walk the dog' (id=2):\n  key=1: Buy groceries  ☐  — unchanged\n  key=3: Read a book    ☐  — unchanged\n\nReact sees key=2 is gone: unmounts that component instance.\nkeys 1 and 3 are unchanged: their instances survive with correct state.",
+      "rationale": "React uses the `key` prop as a stable identity for list items. When the key is an array index, removing an item renumbers the remaining keys — React reuses existing component instances for the 'same' keys, carrying over stale state (like checkbox state). Using a stable `id` field means each item's identity is consistent across re-renders: if `id=2` disappears, React unmounts that instance cleanly."
+    },
+    {
+      "key": "b",
+      "label": "Remove the `key` prop entirely and let React manage it",
+      "patchCode": "<li>",
+      "isCorrect": false,
+      "resultLog": "React warning: Each child in a list should have a unique 'key' prop.\n\nWithout a key, React issues a console warning and uses index-based\ntracking internally — the same bug as before, plus a warning.\n\nRemoves are still broken. Keys are required in lists.",
+      "rationale": "Removing `key` doesn't avoid index-based tracking — React falls back to using index order when no key is provided. The same stale-state bug persists and a console warning is added. Keys are required on list elements to help React identify which items changed, were added, or were removed."
+    },
+    {
+      "key": "c",
+      "label": "Add `key={todo.text}` to use the todo text as the key",
+      "patchCode": "<li key={todo.text}>",
+      "isCorrect": false,
+      "resultLog": "Works correctly if all todo texts are unique.\n\nBut using text as a key is fragile:\n- Two todos with the same text would share a key — React bug\n- Editing a todo's text would unmount and remount the component\n  losing any internal state (input cursor position, animations, etc.)\n\nAlways prefer a stable, unique database id as the key.",
+      "rationale": "Using text as a key works only if all texts are unique and never change. If two todos have the same text, they'd share a key — React cannot distinguish them. If a text is edited, React treats it as a different item, unmounting the old one and mounting a new one (losing internal state). A stable `id` from the data source is always the correct choice."
+    }
+  ],
+  "hints": [
+    "After you delete item at index 1, all following items shift down: what was at index 2 is now at index 1. React sees key=1 still exists and reuses that component instance — including its checkbox's `defaultChecked` state — for the new item at that position.",
+    "React uses `key` to track component identity across renders. Use `todo.id` as the key — it is stable and unique regardless of position. `key={todo.id}` tells React 'this is the same todo item even after reordering or deletion'."
+  ],
+  "explanationMd": "### How React reconciles lists\nWhen a list re-renders, React compares the old and new arrays. It uses the `key` prop to match components between renders:\n- Same key exists: **update** the existing component instance\n- Key is new: **mount** a new component\n- Key is gone: **unmount** the component\n\n### Why index keys break on deletion\n```\nBefore: [A(key=0), B(key=1), C(key=2)]\nDelete B:\nAfter:  [A(key=0), C(key=1)]\n\nReact sees:\n  key=0: A → A  (update, same)\n  key=1: B → C  (update, React thinks B became C — wrong!)\n  key=2: (gone) → unmount what was C\n```\n\nThe component instance for `key=1` is reused for C, carrying B's internal state.\n\n### The fix: stable unique keys\n```jsx\n// Wrong:\n{items.map((item, i) => <Item key={i} {...item}/>)}\n\n// Correct:\n{items.map(item => <Item key={item.id} {...item}/>)}\n```\n\n### When index keys ARE acceptable\nIndex keys are safe when the list never reorders or removes items:\n- Purely display lists that never change order\n- Lists where items are only added at the end\n\nFor any list where items can be deleted, reordered, or filtered: always use a stable `id`.",
+  "recruiterReview": "Correct. Index-as-key is a genuine and tricky React bug — it only manifests on deletion or reorder, making it easy to miss in testing. The 'no key' distractor shows what happens without keys. The text-as-key distractor catches developers who know they need something unique but pick an unstable value. The core concept — React using keys for component identity — is fundamental React knowledge. ✅",
+  "tutorial": {
+    "bodyMd": "## React List Keys and Reconciliation\n\n### Why keys are required\nWhen React renders a list of components, it needs a way to track which component corresponds to which data item across re-renders. Without keys, React must guess based on position — which breaks when the order changes.\n\nThe `key` prop provides a stable identity that React uses to match DOM elements between renders.\n\n### React's reconciliation algorithm\nWhen a list re-renders, React compares old and new arrays item by item using keys:\n\n```\nOld: [<A key='1'/>, <B key='2'/>, <C key='3'/>]\nNew: [<A key='1'/>, <C key='3'/>]  ← B was removed\n\nReact sees:\n  key='1' still exists → update A in place\n  key='2' is gone      → unmount B\n  key='3' still exists → update C in place\n```\n\nThis is efficient and correct — only B is removed, A and C keep their component instances.\n\n### Why index keys fail on deletion\n```\nOld: [<A key=0/>, <B key=1/>, <C key=2/>]\nDelete B:\nNew: [<A key=0/>, <C key=1/>]\n\nReact sees:\n  key=0: same → update A  ✓\n  key=1: still exists → update existing key=1 component with C's data  ✗\n  key=2: gone → unmount what was C\n```\n\nThe component instance that held B's state (checkbox checked, input values, scroll position) now receives C's data. The state is wrong.\n\n### The rule: use stable, unique data IDs\n```jsx\n// Wrong — unstable keys:\n{items.map((item, index) => (\n  <ListItem key={index} item={item}/>\n))}\n\n// Correct — stable keys from the data:\n{items.map(item => (\n  <ListItem key={item.id} item={item}/>\n))}\n```\n\nThe `id` should come from your data source (database primary key, UUID, etc.) — something that doesn't change when the array is sorted or filtered.\n\n### What counts as a good key?\n- **Database ID**: `key={post.id}` — stable, unique per record\n- **UUID**: `key={item.uuid}` — generated at creation, stable thereafter\n- **Slug**: `key={article.slug}` — stable if slugs never change\n\nWhat NOT to use:\n- **Array index**: breaks on delete/reorder\n- **Random value**: `key={Math.random()}` — triggers remount every render\n- **Derived from mutable content**: `key={item.text}` — breaks if text changes\n\n### Component state is tied to identity\nThe key insight: **component state lives in the component instance**. When React reuses an existing instance for a different key, the state stays with the instance — not the data.\n\nFor `<input defaultChecked={todo.done}/>`, `defaultChecked` only sets the initial value — after mount, the checkbox tracks its own DOM state. If React reuses the checkbox instance for a different todo, the checkbox's state reflects the old todo, not the new one.\n\nFor `<input checked={todo.done} onChange={...}/>` (controlled), this is less of a problem because the value is always driven by props. But keys are still important for performance and animation.\n\n### When index keys are safe\nIndex keys are safe only when:\n1. The list is never reordered\n2. Items are only appended at the end (never inserted in the middle)\n3. Items are never deleted from the middle\n\nStatic display lists with append-only data are the only safe use case.\n\n### You just learned\nReact uses the `key` prop to track component identity across re-renders. Index keys break when items are deleted or reordered — React matches the wrong component instance to the wrong data. Always use a stable, unique identifier from your data (database ID, UUID) as the list key.",
+    "videos": [
+      {
+        "title": "React list keys explained reconciliation algorithm",
+        "searchQuery": "react list key prop explained reconciliation tutorial"
+      },
+      {
+        "title": "React why you should not use array index as key",
+        "searchQuery": "react array index as key problem explained tutorial"
+      }
+    ]
+  },
+  "estMinutes": 6,
+  "version": 1
+}

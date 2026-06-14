@@ -1,0 +1,63 @@
+{
+  "id": "fullstack-033-stale-closure-timer",
+  "sector": "fullstack",
+  "difficulty": "medium",
+  "title": "33_stale_closure_timer.jsx",
+  "language": "jsx",
+  "icon": "clock",
+  "conceptTags": ["react", "useEffect", "closure", "stale-state"],
+  "subSector": "state-and-ui",
+  "descriptionMd": "## Mission: The Stopwatch Never Goes Past 1 Second\n\nA stopwatch component uses `setInterval` to increment a `seconds` counter every second. After running for several seconds, the display is stuck at `1` — it never goes higher.\n\nThe developer added `console.log` inside the interval callback and sees it prints `1` every second, even after many ticks. The state setter appears to be calling `setSeconds(0 + 1)` forever.\n\nFix the counter so it actually increments each second.",
+  "initialCode": "import { useState, useEffect } from \"react\";\n\nexport default function Stopwatch() {\n  const [seconds, setSeconds] = useState(0);\n\n  useEffect(() => {\n    const id = setInterval(() => {\n      setSeconds(seconds + 1);   // ← bug: stale closure — always reads 0\n    }, 1000);\n    return () => clearInterval(id);\n  }, []);   // ← empty deps: closure captures seconds=0 forever\n\n  return <p>Time: {seconds}s</p>;\n}",
+  "buggyLineStart": 8,
+  "buggyLineEnd": 8,
+  "traceback": "After 3 seconds, console shows:\n  setSeconds called with: 1  (0+1)\n  setSeconds called with: 1  (0+1)\n  setSeconds called with: 1  (0+1)\n  UI always shows: Time: 1s\n\nThe interval callback is a closure created when useEffect ran.\nAt that point seconds=0. The closure captured seconds=0 and never\nupdates — every tick computes 0+1=1 and sets seconds to 1.",
+  "correctOutput": "After 3 seconds:\n  UI shows: Time: 3s\n\nEach interval tick reads the current seconds value and adds 1,\nso the counter actually increments.",
+  "options": [
+    {
+      "key": "a",
+      "label": "Use the functional update form: `setSeconds(s => s + 1)`",
+      "patchCode": "useEffect(() => {\n  const id = setInterval(() => {\n    setSeconds(s => s + 1);   // functional update: reads current value\n  }, 1000);\n  return () => clearInterval(id);\n}, []);",
+      "isCorrect": true,
+      "resultLog": "After 3 seconds:\n  UI shows: Time: 3s\n\n`setSeconds(s => s + 1)` receives the CURRENT state value as `s`.\nNo closure over the stale `seconds` variable — the updater function\nalways reads the latest value.",
+      "rationale": "The functional update form `setSeconds(s => s + 1)` receives the current state value as its argument at the time React processes the update. It does not close over the `seconds` variable from the outer scope — it asks React for the latest value each tick. This avoids the stale-closure problem entirely."
+    },
+    {
+      "key": "b",
+      "label": "Add `seconds` to the `useEffect` dependency array",
+      "patchCode": "useEffect(() => {\n  const id = setInterval(() => {\n    setSeconds(seconds + 1);\n  }, 1000);\n  return () => clearInterval(id);\n}, [seconds]);   // re-runs when seconds changes",
+      "isCorrect": false,
+      "resultLog": "Counts correctly: 1, 2, 3...\n\nBut: the effect tears down and re-creates the interval every second.\nEach tick: clearInterval → setInterval → new closure.\nThis creates a new 1-second interval on every render — the counter\nruns but the interval is unnecessarily reconstructed each step.\n\nFor a simple counter, `setSeconds(s => s + 1)` is cleaner.",
+      "rationale": "Adding `seconds` to the deps array makes the effect re-run on every state change, which updates the closure. The counter works. However, the interval is destroyed and re-created every second, which is unnecessary overhead. The functional update `setSeconds(s => s + 1)` achieves the same result without touching the interval at all."
+    },
+    {
+      "key": "c",
+      "label": "Read `seconds` through a ref that stays current",
+      "patchCode": "const secondsRef = useRef(0);\n\nuseEffect(() => {\n  const id = setInterval(() => {\n    secondsRef.current += 1;\n    setSeconds(secondsRef.current);\n  }, 1000);\n  return () => clearInterval(id);\n}, []);\n\nreturn <p>Time: {seconds}s</p>;",
+      "isCorrect": false,
+      "resultLog": "Counts correctly: 1, 2, 3...\n\nCorrect output — refs always read the current value without staling.\nBut this adds a `useRef` that duplicates the `seconds` state.\nFor a counter, `setSeconds(s => s + 1)` does the same with less code.",
+      "rationale": "Using a `useRef` to track the current value is a valid workaround for stale closures in complex cases (e.g. when you need the latest value without triggering a re-render). But here it duplicates `seconds` into a ref and adds unnecessary complexity. The functional update `setSeconds(s => s + 1)` is the direct, idiomatic solution."
+    }
+  ],
+  "hints": [
+    "The `useEffect` callback runs once. The closure it creates captures `seconds = 0` at that moment and never re-captures the new value after state updates. Every tick computes `0 + 1 = 1`. Try logging `seconds` inside the interval to confirm.",
+    "React's state setters accept a **function** as an argument. `setSeconds(s => s + 1)` receives the current state as `s` — not the stale closure variable. This is the functional update form and the standard fix for stale closures in counters."
+  ],
+  "explanationMd": "### What is a stale closure?\nA closure 'captures' the variables in scope when it is created. When `useEffect` runs with `[]` deps, its callback is created once — it closes over `seconds = 0`. Even as React re-renders the component with new `seconds` values, the original callback still holds `seconds = 0`.\n\n```js\nconst seconds = 0;\nconst tick = () => setSeconds(seconds + 1);  // captures 0 forever\n```\n\nEvery tick calls `setSeconds(0 + 1) = setSeconds(1)`. React sees the same value (1), and on the next render `seconds` is 1 — but the interval callback still sees the old closure's `0`.\n\n### The fix: functional state updates\n```js\nsetSeconds(s => s + 1);  // s = current state, provided by React\n```\n\nThe arrow function `s => s + 1` receives the **current** state from React's queue, not from the closure. It works regardless of what `seconds` is in the outer scope.\n\n### When to use functional updates\n- Any time the new state depends on the previous state\n- Inside async callbacks, `setInterval`, `setTimeout`, or event listeners\n- Inside `useEffect` with an empty deps array\n\n```js\nsetCount(c => c + 1)           // increment\nsetItems(prev => [...prev, x]) // append to array\nsetUser(u => ({ ...u, role: 'admin' }))  // update object field\n```",
+  "recruiterReview": "Correct. Stale closures in `useEffect` are one of the most confusing React bugs — the code looks right and no error is thrown, but the counter silently resets every tick. The deps-array distractor is a working but suboptimal fix that recreates the interval unnecessarily. The ref distractor is a valid advanced pattern but overkill here. The functional update form is the canonical solution. ✅",
+  "tutorial": {
+    "bodyMd": "## React Stale Closures in useEffect\n\n### What closures are\nA **closure** is a function that remembers the variables in scope when it was created, even after those variables would normally go out of scope.\n\n```js\nfunction makeAdder(x) {\n  return (y) => x + y;  // closes over x\n}\nconst add5 = makeAdder(5);\nadd5(3);  // 8 — x is still 5, even though makeAdder returned\n```\n\nIn React, every `useEffect` callback is a closure — it captures the state and props values that existed when the effect ran.\n\n### The stale closure problem\nWhen `useEffect` has an empty dependency array (`[]`), the effect runs **once** after the first render. The callback captures the state at that moment.\n\n```jsx\nconst [seconds, setSeconds] = useState(0);\n\nuseEffect(() => {\n  // This callback is created ONCE. It captures seconds = 0.\n  const id = setInterval(() => {\n    console.log(seconds);       // always 0 — stale closure\n    setSeconds(seconds + 1);   // always sets to 0 + 1 = 1\n  }, 1000);\n  return () => clearInterval(id);\n}, []);  // empty deps: effect never re-runs\n```\n\nEven after React updates `seconds` to 1, 2, 3... the interval callback is still the original closure with `seconds = 0`.\n\n### Fix 1: Functional state update (best for counters)\nUse the function form of the state setter:\n\n```jsx\nsetSeconds(s => s + 1);\n// s is provided by React — always the current value\n// No stale closure issue\n```\n\nThe arrow function `s => s + 1` does not read `seconds` from the closure. Instead, React provides `s` as the current state value at the time of the update. This is the cleanest fix for simple derived-state updates.\n\n### Fix 2: Include the variable in deps (appropriate in some cases)\n```jsx\nuseEffect(() => {\n  const id = setInterval(() => {\n    setSeconds(seconds + 1);  // seconds is now fresh per effect run\n  }, 1000);\n  return () => clearInterval(id);\n}, [seconds]);  // effect re-runs every time seconds changes\n```\n\nThis works but re-creates the interval on every state change. For a timer that's an unnecessary overhead. Use functional update instead.\n\n### Fix 3: useRef to escape the closure (for complex cases)\nWhen you need the latest value but don't want to re-run the effect:\n\n```jsx\nconst countRef = useRef(0);\ncountRef.current = count;  // always fresh\n\nuseEffect(() => {\n  const id = setInterval(() => {\n    // Read from ref, not from closure\n    doSomethingWith(countRef.current);\n  }, 1000);\n  return () => clearInterval(id);\n}, []);  // safe — reads ref, not stale count\n```\n\nRefs are mutable and not reactive — updating a ref does not cause a re-render, but the ref always holds the current value.\n\n### The general rule\nWhenever a `useEffect` callback uses state or props, you have two choices:\n1. List those values in the deps array (re-run the effect when they change)\n2. Use functional update forms (`setState(prev => ...)`) so the callback doesn't need to read the values at all\n\nThe `eslint-plugin-react-hooks` `exhaustive-deps` rule enforces this — if you see a lint warning about deps, a stale closure is likely nearby.\n\n### You just learned\nClosures in `useEffect` capture state values at the time the effect runs. With `[]` deps, the callback can become stale — reading old state on every invocation. The fix: use the functional update form `setState(prev => ...)`, which receives the current value from React rather than reading the stale closure variable.",
+    "videos": [
+      {
+        "title": "React stale closure useEffect explained",
+        "searchQuery": "react stale closure useEffect explained tutorial"
+      },
+      {
+        "title": "React useState functional update form tutorial",
+        "searchQuery": "react useState functional update form previous state tutorial"
+      }
+    ]
+  },
+  "estMinutes": 6,
+  "version": 1
+}

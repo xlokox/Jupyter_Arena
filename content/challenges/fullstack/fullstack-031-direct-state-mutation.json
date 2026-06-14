@@ -1,0 +1,63 @@
+{
+  "id": "fullstack-031-direct-state-mutation",
+  "sector": "fullstack",
+  "difficulty": "easy",
+  "title": "31_direct_state_mutation.jsx",
+  "language": "jsx",
+  "icon": "refresh-cw",
+  "conceptTags": ["react", "state", "mutation", "re-render"],
+  "subSector": "state-and-ui",
+  "descriptionMd": "## Mission: The Role Badge Never Updates After Clicking Promote\n\nAn admin panel has a button that promotes a user from `viewer` to `admin`. Clicking 'Promote to Admin' runs `promoteToAdmin()` — but the role shown in the UI never changes.\n\nThe developer checks `console.log(user.role)` after clicking and sees `'admin'` — so the mutation happened. But the component never re-rendered.\n\nFix the state update so React detects the change and re-renders the badge.",
+  "initialCode": "import { useState } from \"react\";\n\nexport default function UserCard() {\n  const [user, setUser] = useState({ name: \"Alice\", role: \"viewer\" });\n\n  function promoteToAdmin() {\n    user.role = \"admin\";   // ← bug: mutates the object directly\n    setUser(user);         // same reference — React sees no change\n  }\n\n  return (\n    <div>\n      <p>Name: {user.name}</p>\n      <p>Role: {user.role}</p>\n      <button onClick={promoteToAdmin}>Promote to Admin</button>\n    </div>\n  );\n}",
+  "buggyLineStart": 7,
+  "buggyLineEnd": 8,
+  "traceback": "User clicks 'Promote to Admin'.\n  console.log(user.role) → 'admin'   (mutation ran)\n  UI still shows: Role: viewer       (no re-render)\n\nReact compares the previous state reference with the new one.\n`setUser(user)` passes the same object — React shallow-compares\nreferences, sees no change, and bails out of the re-render.",
+  "correctOutput": "Click 'Promote to Admin':\n  UI updates to show: Role: admin\n\nReact re-renders because setUser received a NEW object,\nnot the same reference with a mutated property.",
+  "options": [
+    {
+      "key": "a",
+      "label": "Spread the existing object into a new one with the updated role",
+      "patchCode": "function promoteToAdmin() {\n  setUser({ ...user, role: \"admin\" });\n}",
+      "isCorrect": true,
+      "resultLog": "Click 'Promote to Admin':\n  UI updates immediately → Role: admin\n\n`{ ...user, role: 'admin' }` creates a NEW object.\nReact receives a different reference and schedules a re-render.",
+      "rationale": "React performs a shallow reference comparison on state. If `setUser` receives the same object reference it had before, React treats the state as unchanged and skips the re-render. `{ ...user, role: 'admin' }` creates a brand-new object with the updated property — React sees a different reference and re-renders the component."
+    },
+    {
+      "key": "b",
+      "label": "Mutate first, then force a re-render by calling `setUser({})`",
+      "patchCode": "function promoteToAdmin() {\n  user.role = \"admin\";\n  setUser({});   // force update with an empty object\n}",
+      "isCorrect": false,
+      "resultLog": "Click 'Promote to Admin':\n  UI updates — but now `user` is `{}` (empty object).\n  Name: (blank)  Role: (blank)\n\nThe `user` state is now an empty object, not the updated user.\nThe mutation happened but the state was replaced with `{}`.",
+      "rationale": "Passing `{}` to `setUser` replaces the user state with an empty object. The UI re-renders, but now `user.name` and `user.role` are both `undefined`. You've clobbered the entire user state while trying to force a re-render. Always update state by creating a new object that includes all existing fields plus the changes."
+    },
+    {
+      "key": "c",
+      "label": "Use `Object.assign(user, { role: 'admin' })` then call `setUser(user)`",
+      "patchCode": "function promoteToAdmin() {\n  Object.assign(user, { role: \"admin\" });\n  setUser(user);\n}",
+      "isCorrect": false,
+      "resultLog": "Click 'Promote to Admin':\n  UI may or may not update depending on React version.\n  In React 18+ with batching: likely no re-render.\n\n`Object.assign(user, ...)` mutates `user` in place — same as writing\n`user.role = 'admin'` directly. `setUser(user)` still passes the\nsame object reference. React still sees no state change.",
+      "rationale": "`Object.assign(target, source)` copies properties onto the `target` object — it mutates `user` in place. The object reference is unchanged. `setUser(user)` passes the same reference as before, so React skips the re-render. This is the same mutation bug as the original, just expressed differently."
+    }
+  ],
+  "hints": [
+    "React compares the previous and next state with `Object.is()` (shallow reference equality). If you pass the same object reference, React concludes nothing changed and skips re-rendering. Log `user === prevUser` after `setUser(user)` to see this.",
+    "Create a new object instead of mutating: `setUser({ ...user, role: 'admin' })`. The spread operator copies all properties of `user` into a new object, then the `role` property is overwritten. React receives a different reference and re-renders."
+  ],
+  "explanationMd": "### How React detects state changes\nReact uses `Object.is()` to compare the previous and next state value. For objects, `Object.is(a, b)` is `true` only when `a` and `b` are the **same object in memory** (same reference).\n\n```js\nconst a = { role: 'viewer' };\na.role = 'admin';  // mutate\nObject.is(a, a)    // true — still the same object reference\n```\n\nWhen you call `setUser(user)` after mutating `user`, React sees the same reference and bails out.\n\n### The fix: always return new objects from state updates\n```js\n// Wrong — mutates, same reference:\nuser.role = 'admin';\nsetUser(user);\n\n// Correct — new object, different reference:\nsetUser({ ...user, role: 'admin' });\n```\n\n### Updating nested state\n```js\n// Nested mutation — bug:\nstate.user.address.city = 'London';\nsetState(state);\n\n// Correct — new objects at every level that changed:\nsetState({\n  ...state,\n  user: { ...state.user, address: { ...state.user.address, city: 'London' } }\n});\n```",
+  "recruiterReview": "Correct. Direct state mutation is the most common React beginner mistake. The `Object.assign` distractor is the same mutation bug in disguise — it catches candidates who know the name but not the semantics. The empty-object distractor shows what happens when you force a re-render carelessly. The spread operator creating a new object is the fundamental React immutability pattern. ✅",
+  "tutorial": {
+    "bodyMd": "## React State Immutability: Why You Must Create New Objects\n\n### How React decides to re-render\nWhen you call a state setter (like `setUser`), React compares the previous state with the new value using `Object.is()`. For primitive values, this is a value comparison:\n\n```js\nObject.is(1, 1)           // true  — same value\nObject.is('hello', 'hi') // false — different values\n```\n\nFor objects, `Object.is()` compares **references** — whether the two variables point to the exact same object in memory:\n\n```js\nconst a = { role: 'viewer' };\nconst b = { role: 'viewer' };\nObject.is(a, a)   // true  — same reference\nObject.is(a, b)   // false — different references (even though contents match)\n```\n\n### What happens when you mutate\nWhen you write `user.role = 'admin'` and then call `setUser(user)`, you are passing the **same object reference**. React compares it to the previous state, sees the same reference, and concludes nothing changed — skipping the re-render entirely.\n\nThe property was changed in memory, but React never knows.\n\n### The rule: treat state as read-only\nNever modify state values directly. Always create a new value:\n\n```js\n// Don't mutate:\nuser.role = 'admin';\n\n// Do create new:\nconst updatedUser = { ...user, role: 'admin' };\nsetUser(updatedUser);\n\n// Or inline:\nsetUser({ ...user, role: 'admin' });\n```\n\n### The spread operator for state updates\nThe object spread `{ ...existing, key: newValue }` copies all properties from `existing` into a new object, then overwrites `key`:\n\n```js\nconst user = { name: 'Alice', role: 'viewer', active: true };\n\n// Update only the role:\nconst updated = { ...user, role: 'admin' };\n// { name: 'Alice', role: 'admin', active: true }\n```\n\nThis pattern works for any depth of update to the root level.\n\n### Updating arrays in state\nThe same principle applies to arrays — never mutate, always create new:\n\n```js\nconst [items, setItems] = useState(['a', 'b', 'c']);\n\n// Wrong — mutation:\nitems.push('d');\nsetItems(items);   // same reference, no re-render\n\n// Correct — new array:\nsetItems([...items, 'd']);\n\n// Removing an item:\nsetItems(items.filter(item => item !== 'b'));\n\n// Updating one item:\nsetItems(items.map(item => item === 'b' ? 'B' : item));\n```\n\n### Functional updates for derived state\nWhen the new state depends on the previous state, use the functional form:\n\n```js\nsetCount(prevCount => prevCount + 1);           // safe\nsetUser(prevUser => ({ ...prevUser, role: 'admin' }));  // safe\n```\n\nThis matters in React 18+ where multiple `setState` calls can be batched — the functional form always receives the latest state.\n\n### Libraries that help: Immer\nFor deeply nested state, the spread syntax becomes verbose. **Immer** lets you write mutation-style code that secretly produces new objects:\n\n```js\nimport { produce } from 'immer';\n\nsetState(produce(draft => {\n  draft.user.address.city = 'London';  // looks like mutation\n  // Immer creates new objects at every changed level\n}));\n```\n\n### You just learned\nReact compares state by reference. Mutating a state object and calling `setState(sameObj)` does not trigger a re-render because the reference hasn't changed. Always create new objects: `setState({ ...prev, key: newValue })` for objects, and `[...arr, item]` / `arr.filter()` / `arr.map()` for arrays.",
+    "videos": [
+      {
+        "title": "React state immutability why you must not mutate state",
+        "searchQuery": "react state immutability do not mutate state objects tutorial"
+      },
+      {
+        "title": "React useState objects and arrays update correctly",
+        "searchQuery": "react useState update object array spread operator tutorial"
+      }
+    ]
+  },
+  "estMinutes": 5,
+  "version": 1
+}
