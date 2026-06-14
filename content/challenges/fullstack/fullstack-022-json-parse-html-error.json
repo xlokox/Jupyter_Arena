@@ -1,0 +1,63 @@
+{
+  "id": "fullstack-022-json-parse-html-error",
+  "sector": "fullstack",
+  "difficulty": "easy",
+  "title": "22_json_parse_html_error.jsx",
+  "language": "jsx",
+  "icon": "file-warning",
+  "conceptTags": ["fetch", "json", "response.ok", "error-pages", "data-flow"],
+  "subSector": "data-flow",
+  "descriptionMd": "## Mission: `SyntaxError: Unexpected token '<'` When Fetching Data\n\nThe search component works in development but breaks intermittently in staging. The console shows a cryptic error: `SyntaxError: Unexpected token '<', \"<!DOCTYPE ...\" is not valid JSON`.\n\nThis crash happens because when the server returns an **HTML error page** (a 500, a login redirect, a maintenance page), the component blindly calls `.json()` on it — and tries to parse HTML as JSON. The `<` at the start of `<!DOCTYPE html>` is the first character of the HTML and the last thing a JSON parser expects.\n\nThe fix is always the same: **check `response.ok` before calling `.json()`**.",
+  "initialCode": "import { useEffect, useState } from \"react\";\n\nexport default function SearchResults({ query }) {\n  const [results, setResults] = useState([]);\n  const [error, setError] = useState(null);\n\n  useEffect(() => {\n    if (!query) return;\n    fetch(`/api/search?q=${encodeURIComponent(query)}`)\n      .then(r => r.json())   // ← bug: no response.ok check before parsing\n      .then(setResults)\n      .catch(err => setError(err.message));\n  }, [query]);\n\n  if (error) return <p className=\"error\">{error}</p>;\n  return <ul>{results.map(r => <li key={r.id}>{r.title}</li>)}</ul>;\n}",
+  "buggyLineStart": 10,
+  "buggyLineEnd": 10,
+  "traceback": "Browser Network tab:\n  GET /api/search?q=widgets  500 Internal Server Error  142ms\n  Response headers: Content-Type: text/html\n  Response body: <!DOCTYPE html><html>...<h1>Internal Server Error</h1>...</html>\n\nBrowser console:\n  Uncaught (in promise) SyntaxError: Unexpected token '<',\n  \"<!DOCTYPE ...\" is not valid JSON\n\nUI shows: error state — \"Unexpected token '<', ...\" (the raw JSON parse error)",
+  "correctOutput": "Browser Network tab:\n  GET /api/search?q=widgets  500 Internal Server Error  142ms\n\nBrowser console: (no JSON parse error)\n\nUI shows: <p class=\"error\">Server error (500) — please try again later.</p>\n\n(When the server is healthy:)\n  GET /api/search?q=widgets  200 OK  38ms\n  UI renders matching results.",
+  "options": [
+    {
+      "key": "a",
+      "label": "Check `r.ok` before `.json()` and throw a readable error on failure",
+      "patchCode": "useEffect(() => {\n  if (!query) return;\n  fetch(`/api/search?q=${encodeURIComponent(query)}`)\n    .then(r => {\n      if (!r.ok) throw new Error(`Server error (${r.status}) — please try again later.`);\n      return r.json();\n    })\n    .then(setResults)\n    .catch(err => setError(err.message));\n}, [query]);",
+      "isCorrect": true,
+      "resultLog": "Browser Network tab:\n  GET /api/search?q=widgets  500 Internal Server Error  142ms\n\nNo SyntaxError in console.\nUI shows: \"Server error (500) — please try again later.\"\n\nWhen server returns 200:\n  .json() is called, results render normally.",
+      "rationale": "Checking `r.ok` before calling `.json()` is the universal fetch guard. When the server returns a 500 with an HTML body, `r.ok` is `false` (it's only `true` for 2xx). We throw an error with a readable message instead of calling `.json()` on HTML. The thrown error propagates to `.catch()`, which sets the error state with a message the user can understand — not a raw `SyntaxError` about `<` characters. This pattern must appear in every `fetch()` call."
+    },
+    {
+      "key": "b",
+      "label": "Wrap `.json()` in a try/catch to handle the SyntaxError",
+      "patchCode": "useEffect(() => {\n  if (!query) return;\n  fetch(`/api/search?q=${encodeURIComponent(query)}`)\n    .then(async r => {\n      try {\n        const data = await r.json();\n        setResults(data);\n      } catch {\n        setError(\"Response was not JSON.\");\n      }\n    });\n}, [query]);",
+      "isCorrect": false,
+      "resultLog": "Browser Network tab:\n  GET /api/search?q=widgets  500 Internal Server Error  142ms\n\nNo SyntaxError crash — the try/catch silences it.\nUI shows: \"Response was not JSON.\"\n\nBut the status code is lost. A 500 and a 404 and a JSON-parse bug all\nlook identical to this handler. You can't tell if the server crashed,\nthe URL is wrong, or if the response is an empty string.",
+      "rationale": "Wrapping `.json()` in try/catch does silence the `SyntaxError` — so no crash. But it loses all information about WHY parsing failed: was it a 500? A 404? A login redirect? A network timeout that returned an empty string? The `try/catch` treats all of these identically: 'response was not JSON'. The proper fix is to check `r.ok` first, which gives you the HTTP status code. You can then show 'Server error (500)', 'Not found (404)', or 'Please log in (401)' — actionable messages for both the developer and the user."
+    },
+    {
+      "key": "c",
+      "label": "Use `r.text()` first, then `JSON.parse()` manually to avoid the error",
+      "patchCode": "useEffect(() => {\n  if (!query) return;\n  fetch(`/api/search?q=${encodeURIComponent(query)}`)\n    .then(r => r.text())\n    .then(text => {\n      try {\n        setResults(JSON.parse(text));\n      } catch {\n        setError(\"Not JSON: \" + text.slice(0, 80));\n      }\n    })\n    .catch(err => setError(err.message));\n}, [query]);",
+      "isCorrect": false,
+      "resultLog": "Browser Network tab:\n  GET /api/search?q=widgets  500 Internal Server Error  142ms\n\nUI shows: \"Not JSON: <!DOCTYPE html><html lang=en><meta charset=utf-8>...\"\n\nNo crash. But the error message leaks the first 80 chars of the HTML error page\nto the UI. The HTTP status (500) is thrown away. The 200 case still works\nbut you've added unnecessary complexity.",
+      "rationale": "`r.text()` followed by manual `JSON.parse()` is a more verbose way to catch a JSON parse error. It has the same problem as option b: the HTTP status code is discarded. The error message shown to users now contains raw HTML fragments — a poor UX. The right layer to check is the HTTP status (`r.ok`), not the response body's parseability. Checking `r.ok` is 2 lines vs 8 lines, and gives you the status code that actually tells you what went wrong."
+    }
+  ],
+  "hints": [
+    "Before calling `.json()`, the response has a `.ok` property (true for 2xx status codes) and a `.status` property (200, 500, etc.). Check `.ok` first — if it's false, don't parse JSON.",
+    "The fix is on line 10. Add `if (!r.ok) throw new Error(...)` before `return r.json()`. The thrown error goes to your `.catch()` handler, which sets the error state with a readable message."
+  ],
+  "explanationMd": "### Why HTML error pages break JSON.parse()\nWhen a server hits an error, it often returns an HTML page — the default '500 Internal Server Error' page, a redirect to `/login`, a CloudFront error page. The `Content-Type` header says `text/html`, not `application/json`. But if your code calls `.json()` unconditionally, it tries to parse that HTML as JSON. The first character of HTML is `<` (from `<!DOCTYPE>`), which is immediately invalid in JSON. Hence: `SyntaxError: Unexpected token '<'`.\n\n### response.ok — the 2xx flag\n`fetch()` returns a `Response` object. Two properties you always want:\n- `response.ok` — `true` if status is 200–299, `false` otherwise\n- `response.status` — the numeric status code (200, 400, 404, 500, ...)\n\nThe pattern:\n```js\nfetch(url)\n  .then(r => {\n    if (!r.ok) throw new Error(`HTTP ${r.status}`);\n    return r.json();  // only runs on 2xx\n  })\n  .then(data => /* use data */)\n  .catch(err => /* handle error */);\n```\n\n### What the error tells you\n`SyntaxError: Unexpected token '<'` almost always means:\n- The server returned HTML (error page, redirect, maintenance)\n- You called `.json()` without checking `response.ok` first\n\nWhen you see this error:\n1. Open Network tab\n2. Find the request\n3. Check the status code and `Content-Type` header\n4. Look at the response body — is it HTML?\n\n### Giving users readable error messages\nRaw JSON parse errors make terrible user messages. With the `response.ok` check you can translate status codes:\n```js\nif (r.status === 401) throw new Error(\"Please log in to continue.\");\nif (r.status === 403) throw new Error(\"You don't have permission to view this.\");\nif (r.status === 404) throw new Error(\"No results found.\");\nif (r.status >= 500) throw new Error(\"Server error — please try again later.\");\n```",
+  "recruiterReview": "Good — you identified the root cause (calling .json() on an HTML response) and applied the `response.ok` guard as the fix. The try/catch distractor is the tempting 'handle the symptom' approach; the `r.text()` distractor adds even more complexity while still losing the status code. The pattern you applied — check ok, throw readable error, catch in .catch() — is the standard professional pattern for fetch error handling. ✅",
+  "tutorial": {
+    "bodyMd": "## Why fetch() Can Throw 'Unexpected token <'\n\n### The HTTP request-response cycle\nWhen your browser fetches data from a server:\n1. Browser sends an HTTP request (GET, POST, etc.) to a URL\n2. Server receives it, does some work, sends back a response\n3. The response has a **status code** (200, 404, 500...), **headers** (Content-Type, etc.), and a **body** (the data)\n\nThe status code tells you whether the request worked. The body is the actual content — JSON, HTML, an image, a file, etc.\n\n### response.ok and response.status\n`fetch()` gives you a Response object with:\n```js\nconst r = await fetch(\"/api/data\");\nr.ok      // true for 200-299, false for 400+ and 500+\nr.status  // exact status code: 200, 404, 500, etc.\n```\n\nIf `r.ok` is `false`, the server sent an error response. The body might be an HTML error page, a JSON error object, or plain text — you don't know until you check.\n\n### Why HTML breaks JSON.parse()\nEvery HTML document starts with `<!DOCTYPE html>` or just `<html`. The JSON format starts with `{`, `[`, `\"`, a number, or `null` — never `<`. When your code calls `r.json()` on an HTML body, the parser reads `<` and immediately fails: `SyntaxError: Unexpected token '<'`.\n\nYou'll see this whenever:\n- The server returns a 500 error page\n- The server redirects to `/login` (which returns HTML)\n- A CDN or load balancer intercepts the request (returns its own HTML error)\n- The URL is wrong and the server returns a 404 with an HTML 'not found' page\n\n### The universal fetch guard\nEvery `fetch()` call should check `response.ok` before parsing:\n```js\nasync function fetchData(url) {\n  const r = await fetch(url);\n  if (!r.ok) {\n    throw new Error(`HTTP ${r.status}: ${r.statusText}`);\n  }\n  return r.json(); // only called if status is 2xx\n}\n```\n\nIn React with useEffect:\n```js\nuseEffect(() => {\n  fetch(\"/api/data\")\n    .then(r => {\n      if (!r.ok) throw new Error(`HTTP ${r.status}`);\n      return r.json();\n    })\n    .then(setData)\n    .catch(err => setError(err.message));\n}, []);\n```\n\n### Diagnosing with the Network tab\n1. Open DevTools → Network tab\n2. Trigger the request (reload the page or click the button)\n3. Click the request in the list\n4. Look at: **Status** (the number), **Response Headers** (Content-Type), **Response** (the actual body)\n\nIf Status is not 200 and Content-Type is `text/html`, you've found the bug before reading any JavaScript.\n\n### You just learned\n`fetch()` does not throw on 4xx or 5xx responses. Always check `response.ok` before calling `.json()`. `SyntaxError: Unexpected token '<'` almost always means the server returned HTML (an error page) instead of JSON.",
+    "videos": [
+      {
+        "title": "JavaScript fetch response.ok check tutorial",
+        "searchQuery": "javascript fetch response ok status code error handling tutorial"
+      },
+      {
+        "title": "SyntaxError unexpected token fetch response explained",
+        "searchQuery": "javascript fetch unexpected token less than json parse error fix"
+      }
+    ]
+  },
+  "estMinutes": 5,
+  "version": 1
+}

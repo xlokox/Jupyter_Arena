@@ -15,7 +15,7 @@ export const SUB_SECTOR_MAP = {
   da: ["data-loading", "wrangling", "charts-literacy", "stats-reasoning", "numpy-foundations"],
   ml: ["data-prep", "evaluation", "models", "pipelines"],
   dl: ["tensors-and-shapes", "training-loop", "optimization", "data-pipeline"],
-  fullstack: ["data-flow", "state-and-ui", "auth-and-sessions", "async-and-network", "deploy-and-config"],
+  fullstack: ["data-flow", "error-handling", "state-and-ui", "auth-and-sessions", "async-and-network", "deploy-and-config"],
   db: ["querying", "performance", "transactions", "schema-and-migrations", "connections"],
 } as const satisfies Record<SectorId, readonly string[]>;
 

@@ -1,0 +1,63 @@
+{
+  "id": "fullstack-024-await-missing-in-handler",
+  "sector": "fullstack",
+  "difficulty": "medium",
+  "title": "24_await_missing_handler.jsx",
+  "language": "jsx",
+  "icon": "clock-alert",
+  "conceptTags": ["async", "await", "Promise", "undefined", "data-flow"],
+  "subSector": "data-flow",
+  "descriptionMd": "## Mission: The Dashboard Shows `[object Promise]` Instead of Data\n\nA dashboard helper function `loadDashboard()` is marked `async` and returns summary data. The click handler calls it and stores the result in state — but the dashboard renders `[object Promise]` and the real data never appears.\n\nThis is the **forgotten `await`** bug: calling an `async` function without `await` returns the Promise object itself, not the resolved value. The component then tries to render the Promise as a string.\n\nThis is different from fullstack-020 (which was about race conditions in fetch chains). Here the bug is simpler: a Promise stored where data was expected.",
+  "initialCode": "import { useState } from \"react\";\n\nasync function loadDashboard() {\n  const res = await fetch(\"/api/dashboard\");\n  if (!res.ok) throw new Error(`HTTP ${res.status}`);\n  return res.json();\n}\n\nexport default function Dashboard() {\n  const [data, setData] = useState(null);\n  const [error, setError] = useState(null);\n\n  async function handleRefresh() {\n    try {\n      const result = loadDashboard();   // ← bug: missing await\n      setData(result);\n    } catch (err) {\n      setError(err.message);\n    }\n  }\n\n  return (\n    <div>\n      <button onClick={handleRefresh}>Refresh</button>\n      {error && <p className=\"error\">{error}</p>}\n      {data && <p>Revenue: {data.revenue} | Users: {data.users}</p>}\n    </div>\n  );\n}",
+  "buggyLineStart": 15,
+  "buggyLineEnd": 15,
+  "traceback": "After clicking Refresh:\n  Browser Network tab: GET /api/dashboard 200 OK — response data arrived correctly.\n\n  UI renders: Revenue: [object Promise] | Users: undefined\n\n  No exception thrown. The catch block never runs.\n  result is a Promise object (not the resolved value).\n  setData(Promise{...}) stores the Promise in state.\n  React renders {data.revenue} → tries to access .revenue on a Promise → undefined.\n  The string template coerces the Promise to \"[object Promise]\".",
+  "correctOutput": "After clicking Refresh:\n  Browser Network tab: GET /api/dashboard 200 OK\n  Response: {\"revenue\": 14200, \"users\": 873}\n\n  UI renders: Revenue: 14200 | Users: 873",
+  "options": [
+    {
+      "key": "a",
+      "label": "Add `await` before `loadDashboard()` so the handler waits for the Promise to resolve",
+      "patchCode": "async function handleRefresh() {\n  try {\n    const result = await loadDashboard();   // await resolves the Promise\n    setData(result);\n  } catch (err) {\n    setError(err.message);\n  }\n}",
+      "isCorrect": true,
+      "resultLog": "After clicking Refresh:\n  handleRefresh pauses at await loadDashboard().\n  fetch resolves → res.json() resolves → loadDashboard() resolves to {revenue:14200, users:873}.\n  result = {revenue:14200, users:873}  (the actual data, not a Promise)\n  setData({revenue:14200, users:873})\n  UI renders: Revenue: 14200 | Users: 873",
+      "rationale": "`await` pauses the `async` function until the Promise resolves and gives you the resolved **value** — not the Promise object. Without `await`, `loadDashboard()` returns a Promise immediately, execution continues, and `result` is that Promise. `await` is mandatory whenever you call an `async` function and need its result. Since `handleRefresh` is already `async`, `await` is valid here — `async/await` can only be used inside an `async` function."
+    },
+    {
+      "key": "b",
+      "label": "Use `.then()` instead of async/await: `loadDashboard().then(setData)`",
+      "patchCode": "function handleRefresh() {\n  loadDashboard()\n    .then(setData)\n    .catch(err => setError(err.message));\n}",
+      "isCorrect": false,
+      "resultLog": "After clicking Refresh:\n  loadDashboard() returns a Promise.\n  .then(setData) schedules setData to run when the Promise resolves.\n  .catch(err => setError(err.message)) handles errors.\n  UI renders correctly: Revenue: 14200 | Users: 873\n\nThis also works! But the mission asks for the minimal fix to the async/await version.\n.then() is the Promise chain equivalent and is a valid pattern,\nbut switching from async/await to .then() is a style change, not the target fix.",
+      "rationale": "Using `.then()` instead of `await` does produce the correct result — the Promise resolves and `setData` is called with the actual data. However, the mission is about understanding why `await` is missing and adding it to the existing `async/await` code. Switching paradigms (async/await → .then()) works but doesn't teach the underlying concept. The minimal correct fix is `await loadDashboard()`. Note: `handleRefresh` must stay `async` for `await` to be valid inside it."
+    },
+    {
+      "key": "c",
+      "label": "Wrap `loadDashboard()` in `Promise.resolve()` to ensure it's awaitable",
+      "patchCode": "async function handleRefresh() {\n  try {\n    const result = await Promise.resolve(loadDashboard());\n    setData(result);\n  } catch (err) {\n    setError(err.message);\n  }\n}",
+      "isCorrect": false,
+      "resultLog": "After clicking Refresh:\n  loadDashboard() is already a Promise.\n  Promise.resolve(aPromise) returns the same Promise — no change.\n  await Promise.resolve(thePromise) resolves to the same value as await thePromise.\n  UI renders correctly: Revenue: 14200 | Users: 873\n\nThis technically works — but it's redundant.\nPromise.resolve() adds no value when the argument is already a Promise.\nThe correct and clean fix is simply: await loadDashboard().",
+      "rationale": "`Promise.resolve(value)` wraps a value in a resolved Promise. If `value` is already a Promise, it returns that same Promise unchanged (the spec assimilates it). So `await Promise.resolve(loadDashboard())` is equivalent to `await loadDashboard()` — it works, but the `Promise.resolve()` wrapper does nothing. This option reveals a misconception: that you need to 'ensure' something is awaitable before using `await`. Any Promise (including those returned by `async` functions) is awaitable directly."
+    }
+  ],
+  "hints": [
+    "What does `loadDashboard()` return immediately when called, before the fetch completes? Try `console.log(loadDashboard())` and look at what's logged.",
+    "The handler is already `async`, so `await` is available. Add `await` before `loadDashboard()` on line 15. This pauses the function until the Promise resolves and gives you the actual data value."
+  ],
+  "explanationMd": "### async functions always return Promises\nWhen you mark a function `async`, it **always returns a Promise**, even if the body returns a plain value:\n```js\nasync function getNumber() {\n  return 42;\n}\nconst result = getNumber();    // result is a Promise, not 42\nconsole.log(result);           // Promise { <fulfilled>: 42 }\nawait getNumber();              // 42 — the resolved value\n```\n\nThis is fundamental to how async/await works. The `async` keyword wraps the return value in a Promise. The `await` keyword unwraps it.\n\n### The bug: Promise stored as data\n```js\nconst result = loadDashboard();   // Promise{ pending } — not the data\nsetData(result);                  // stores a Promise in state\n```\nReact then renders `data.revenue` where `data` is a Promise object. Promise objects don't have a `.revenue` property, so you get `undefined`. When React converts `undefined` to a string for rendering it produces `\"\"`. For `{data.revenue}`, React renders nothing — but if rendered in a template literal, you'd see `[object Promise]`.\n\nThe try/catch never fires because the Promise itself is successfully created — the async operation hasn't failed, it just hasn't been waited for.\n\n### The fix: await the function\n```js\nconst result = await loadDashboard();  // pauses until resolved; result = {revenue, users}\nsetData(result);                       // stores actual data\n```\n\n`await` is only valid inside an `async` function. Since `handleRefresh` is already `async`, it's available.\n\n### When to use .then() vs await\nBoth patterns work:\n```js\n// async/await:\nasync function refresh() {\n  const data = await loadDashboard();\n  setData(data);\n}\n\n// .then() chain:\nfunction refresh() {\n  loadDashboard().then(setData).catch(setError);\n}\n```\nPrefer async/await in most cases — it's easier to read, especially with multiple sequential await calls. Use `.then()` for fire-and-forget or when you're not in an async function.",
+  "recruiterReview": "Good — you identified that the bug is a missing `await`, not a fetch issue or a Promise wrapping issue. The `.then()` distractor is technically valid but a style change, not the target fix. The `Promise.resolve()` distractor reveals a common misconception: you don't need to 'ensure' a Promise is awaitable. Any Promise is awaitable directly with `await`. The distinction 'async functions always return Promises' is foundational — once that clicks, the bug is immediately obvious. ✅",
+  "tutorial": {
+    "bodyMd": "## Async/Await: Promises and the Missing await\n\n### What is a Promise?\nA Promise is an object that represents a value that isn't available yet — it's 'promised' for later. Promises have three states:\n- **Pending**: the async work is still running\n- **Fulfilled**: the work completed successfully; the value is ready\n- **Rejected**: the work failed; an error is available\n\nYou get a Promise from any `async` function or from `fetch()`.\n\n### What `async` and `await` do\n`async` before a function declaration means:\n1. The function always returns a Promise\n2. Inside the function, you can use `await`\n\n`await` before a Promise:\n1. Pauses the function until the Promise settles\n2. Returns the resolved value (or throws if rejected)\n\n```js\nasync function fetchUser(id) {\n  const res = await fetch(`/api/users/${id}`);  // waits for response\n  const user = await res.json();                 // waits for parsing\n  return user;                                    // returns the value\n}\n\n// Calling the function:\nconst user = await fetchUser(1);    // pauses until resolved: user = {id:1, name:...}\nconst promise = fetchUser(1);       // returns a Promise immediately: promise = Promise{pending}\n```\n\n### The Promise object vs the resolved value\nThis is the most common async/await mistake:\n```js\nconst data = await loadData();  // data = { revenue: 14200, users: 873 }\nconst promise = loadData();     // promise = Promise { <pending> }\n```\n\nIf you store a Promise in state, React tries to render a Promise object. Properties like `.revenue` are `undefined` because Promise objects don't have those fields.\n\n### How the catch block interacts\nThe `try/catch` in an async handler catches thrown errors — rejections. But storing a Promise in state is not an error from JavaScript's perspective: the Promise was successfully created. The catch block never fires. This is why the bug is silent: no exception, just wrong data.\n\n### When to use .then() instead\nIf you're in a non-async context (an event listener, a class method without async), use `.then()` chains:\n```js\nfunction handleClick() {              // NOT async\n  loadData()\n    .then(setData)\n    .catch(err => setError(err.message));\n}\n```\n\nBoth patterns are equivalent. In an `async` function, `await` is almost always cleaner.\n\n### Common missing-await symptoms\n- `[object Promise]` rendered on screen (Promise coerced to string)\n- State contains `undefined` properties (accessing `.field` on a Promise object)\n- `.catch()` never fires even though the request failed (catching the Promise creation, not its rejection)\n- `typeof data === 'object' && data?.constructor?.name === 'Promise'` (checking in console)\n\n### You just learned\n`async` functions always return Promises. Calling them without `await` gives you the Promise object, not the resolved data. Add `await` whenever you call an `async` function and need its result.",
+    "videos": [
+      {
+        "title": "JavaScript async await tutorial for beginners",
+        "searchQuery": "javascript async await promises explained beginner tutorial"
+      },
+      {
+        "title": "Common async await mistakes JavaScript",
+        "searchQuery": "javascript async await common mistakes missing await tutorial"
+      }
+    ]
+  },
+  "estMinutes": 5,
+  "version": 1
+}

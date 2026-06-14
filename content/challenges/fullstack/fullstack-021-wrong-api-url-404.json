@@ -1,0 +1,63 @@
+{
+  "id": "fullstack-021-wrong-api-url-404",
+  "sector": "fullstack",
+  "difficulty": "easy",
+  "title": "21_wrong_api_url.jsx",
+  "language": "jsx",
+  "icon": "link-slash",
+  "conceptTags": ["fetch", "404", "network-tab", "error-handling", "data-flow"],
+  "subSector": "data-flow",
+  "descriptionMd": "## Mission: The List Is Always Empty — No Error, No Data\n\nA product listing page fetches `/api/product` on mount and renders the results. The component renders without crashing, but the list is always empty. No error message. No loading indicator stuck. Just... nothing.\n\nThis is one of the quietest bugs in frontend development: the fetch succeeds at the HTTP level (no network error thrown), but the response is a 404 — and the code never checks. The data is `null` or `[]`, and the component happily renders an empty list.\n\nOpen the **Network tab** first — that's the diagnostic tool for any data-loading problem. Look at the response status code. Then find the URL mismatch.",
+  "initialCode": "import { useEffect, useState } from \"react\";\n\nexport default function ProductList() {\n  const [products, setProducts] = useState([]);\n\n  useEffect(() => {\n    fetch(\"/api/product\")     // ← bug: wrong URL — endpoint is /api/products\n      .then(r => r.json())\n      .then(setProducts);\n  }, []);\n\n  return (\n    <ul>\n      {products.map(p => <li key={p.id}>{p.name}</li>)}\n    </ul>\n  );\n}",
+  "buggyLineStart": 7,
+  "buggyLineEnd": 7,
+  "traceback": "Browser Network tab:\n  GET /api/product  404 Not Found  32ms\n  Response body: {\"error\": \"Not Found\"}\n\nBrowser console: (nothing — no uncaught exception)\n\nUI: <ul></ul> — empty list\n\nThe 404 response is parsed as JSON: {\"error\": \"Not Found\"}.\nsetProducts([]) is NOT called — the response isn't an array.\nBut the component doesn't crash; it just renders an empty list\nbecause products starts as [] and is never updated.",
+  "correctOutput": "Browser Network tab:\n  GET /api/products  200 OK  28ms\n  Response body: [{\"id\":1,\"name\":\"Notebook\"},{\"id\":2,\"name\":\"Pen\"},...]\n\nUI renders:\n• Notebook\n• Pen\n• (3 more products)",
+  "options": [
+    {
+      "key": "a",
+      "label": "Fix the URL to `/api/products` and check `response.ok` before parsing",
+      "patchCode": "import { useEffect, useState } from \"react\";\n\nexport default function ProductList() {\n  const [products, setProducts] = useState([]);\n  const [error, setError] = useState(null);\n\n  useEffect(() => {\n    fetch(\"/api/products\")\n      .then(r => {\n        if (!r.ok) throw new Error(`HTTP ${r.status}`);\n        return r.json();\n      })\n      .then(setProducts)\n      .catch(err => setError(err.message));\n  }, []);\n\n  if (error) return <p>Failed to load: {error}</p>;\n  return (\n    <ul>\n      {products.map(p => <li key={p.id}>{p.name}</li>)}\n    </ul>\n  );\n}",
+      "isCorrect": true,
+      "resultLog": "Browser Network tab:\n  GET /api/products  200 OK  28ms\n\nUI: renders 5 product names correctly.\nIf /api/products ever returns a non-200, the error message appears\ninstead of a silent empty list.",
+      "rationale": "Two fixes together: (1) the URL typo (`/api/product` → `/api/products`), and (2) adding `response.ok` check so future HTTP errors surface as visible error messages instead of silent empty lists. The URL fix is the direct cause; the `response.ok` guard is the defensive pattern that prevents the same silent failure mode if the server has problems in the future. **Always check `response.ok` after any `fetch()` call** — it's the difference between 'empty' and 'we know something went wrong'."
+    },
+    {
+      "key": "b",
+      "label": "Add a `.catch()` to log the error — the fetch must be throwing",
+      "patchCode": "useEffect(() => {\n  fetch(\"/api/product\")\n    .then(r => r.json())\n    .then(setProducts)\n    .catch(err => console.error(\"Fetch error:\", err));\n}, []);",
+      "isCorrect": false,
+      "resultLog": "Browser Network tab:\n  GET /api/product  404 Not Found  32ms\n\nBrowser console: (nothing new — no error logged)\n\nUI: still empty list.\n\nThe .catch() doesn't fire because the fetch didn't throw.\nHTTP 404 is a valid HTTP response — fetch resolves, not rejects.\n.catch() only catches network-level failures (offline, DNS), not 4xx/5xx.",
+      "rationale": "`fetch()` only rejects (throws) on network-level failures: no internet connection, DNS failure, the server is completely unreachable. **HTTP 4xx and 5xx responses are not network failures** — the server responded, just with a bad status. So `fetch()` resolves successfully, `.then()` runs, `.catch()` never fires. The 404 response body `{\"error\": \"Not Found\"}` is parsed, `setProducts({error: ...})` is called but the component was mapping `products` as an array — so either nothing renders or you get a crash. Adding `.catch()` without fixing the URL does nothing here."
+    },
+    {
+      "key": "c",
+      "label": "Add a loading state — the data must be loading but not shown yet",
+      "patchCode": "const [products, setProducts] = useState([]);\nconst [loading, setLoading] = useState(true);\n\nuseEffect(() => {\n  fetch(\"/api/product\")\n    .then(r => r.json())\n    .then(data => {\n      setProducts(data);\n      setLoading(false);\n    });\n}, []);\n\nif (loading) return <p>Loading...</p>;",
+      "isCorrect": false,
+      "resultLog": "Browser Network tab:\n  GET /api/product  404 Not Found  32ms\n\nUI shows: \"Loading...\"\n... and stays on \"Loading...\" forever.\n\nThe 404 response is parsed as JSON ({\"error\": \"Not Found\"}).\nsetLoading(false) runs, but the 'Loading...' check is now gone.\nNow you see a list that tries to map over an object and renders nothing.\n(Or stays on Loading forever if setLoading was only called in the\n.then that receives the array — this depends on implementation.)",
+      "rationale": "The data isn't loading slowly — the URL is wrong, so the response is a 404. Adding a loading state doesn't change what the server returns. In the best case, `loading` eventually becomes `false` after the 404 response is parsed and `setLoading(false)` is called — and you're back to a silent empty list. A loading state is useful for showing a spinner while a valid request completes; it can't fix a request to the wrong endpoint. The root cause is the URL typo on line 7."
+    }
+  ],
+  "hints": [
+    "Open DevTools → Network tab, reload the page, and look at the request for the products data. What URL does it hit? What status code does the server return?",
+    "The bug is on line 7: the URL is `/api/product` (singular). The endpoint is `/api/products` (plural). Also add a `response.ok` check before `.json()` so errors don't silently produce an empty list."
+  ],
+  "explanationMd": "### The Network tab: your first diagnostic tool\nFor any data-loading problem in a React app, open DevTools → Network tab before looking at the code. The Network tab shows:\n- The exact URL that was requested\n- The HTTP status code (200, 404, 500, etc.)\n- The response body\n\nIf the status is anything other than 2xx, that's your bug. If the URL looks wrong, that's your bug. Looking at the UI and the console first is slower — the Network tab is the authoritative record of what actually happened on the wire.\n\n### Why fetch() doesn't throw on 404\n`fetch()` is a low-level API. It only throws (rejects the promise) if the network itself fails: no internet connection, DNS failure, the server refused the connection. HTTP 4xx (client errors) and 5xx (server errors) are valid HTTP responses — the server replied, it just replied with an error code. So `fetch()` resolves and `.then()` runs normally.\n\nThis means you must check `response.ok` yourself:\n```js\nfetch(\"/api/products\")\n  .then(r => {\n    if (!r.ok) throw new Error(`HTTP ${r.status}`);\n    return r.json();\n  })\n  .then(setProducts)\n  .catch(err => setError(err.message));\n```\n\n### URL typos: the silent empty list\nA 404 response body is often JSON like `{\"error\": \"Not Found\"}`. If your code calls `.json()` on it and passes the result to `setProducts`, you're now trying to render an object as an array — which usually produces an empty list (no `map` items match) or a crash. Either way, no visible error to the user.\n\n### Common URL bugs\n- Singular vs plural: `/api/product` vs `/api/products`\n- Missing base path: `/products` vs `/api/v1/products`\n- Wrong HTTP method served at that URL (GET vs POST endpoint)\n- Environment mismatch: dev URL hardcoded, doesn't work in staging\n- Query param typo: `?userId=` vs `?user_id=`",
+  "recruiterReview": "Correct — you identified both the URL typo AND added the `response.ok` guard, which is the complete fix. The `.catch()` distractor is instructive: many beginners assume fetch rejects on 404 because 'an error happened', but fetch only rejects on network failure. The loading state distractor is the 'I'm staring at the UI and guessing' approach — it doesn't touch the root cause. The Network tab diagnostic step is the real skill being tested here. ✅",
+  "tutorial": {
+    "bodyMd": "## fetch() and HTTP Status Codes\n\n### What is an HTTP status code?\nEvery HTTP response has a 3-digit status code that tells you whether the request succeeded:\n\n- **2xx (Success)**: The request worked. `200 OK` is the most common.\n- **3xx (Redirect)**: The resource has moved; follow the new location.\n- **4xx (Client error)**: The client did something wrong. `404 Not Found` means the URL doesn't exist; `400 Bad Request` means malformed data.\n- **5xx (Server error)**: The server failed. `500 Internal Server Error` means the backend crashed.\n\n### What fetch() does and doesn't throw\n`fetch()` rejects only on **network-level failures**:\n- No internet connection\n- DNS failure (domain doesn't exist)\n- Server refused the connection (port not open)\n\nHTTP 4xx and 5xx responses are **not** network failures — they're valid responses. `fetch()` resolves normally, and it's up to you to check the status code.\n\n```js\nconst response = await fetch(\"/api/products\");\nconsole.log(response.ok);     // true for 2xx, false for 4xx/5xx\nconsole.log(response.status); // 200, 404, 500, etc.\n```\n\n### The response.ok guard\nAlways check `response.ok` before parsing the body:\n```js\nfetch(\"/api/products\")\n  .then(r => {\n    if (!r.ok) throw new Error(`HTTP ${r.status}`);\n    return r.json();\n  })\n  .then(data => setProducts(data))\n  .catch(err => setError(err.message));\n```\n\nOr with async/await:\n```js\ntry {\n  const r = await fetch(\"/api/products\");\n  if (!r.ok) throw new Error(`HTTP ${r.status}`);\n  const data = await r.json();\n  setProducts(data);\n} catch (err) {\n  setError(err.message);\n}\n```\n\n### The Network tab as your first diagnostic\nBefore reading any code, open DevTools (F12 or right-click → Inspect) → Network tab → reload the page. Look at:\n1. The URL column: is it the right endpoint?\n2. The Status column: 200 (good), 404 (wrong URL), 500 (server crash)\n3. The Response tab: what did the server actually return?\n\nIf the status is wrong, you've found the bug before reading a line of JavaScript. If the URL looks wrong, you've found it even faster.\n\n### You just learned\n`fetch()` does not reject on 404 or 500 — it only rejects on network failure. Always check `response.ok` before parsing JSON. The Network tab shows you the real URL, status code, and response body — open it before reading code when data doesn't load.",
+    "videos": [
+      {
+        "title": "JavaScript fetch API tutorial for beginners",
+        "searchQuery": "javascript fetch API response ok status code tutorial beginner"
+      },
+      {
+        "title": "How to use browser DevTools Network tab",
+        "searchQuery": "chrome devtools network tab tutorial debugging requests"
+      }
+    ]
+  },
+  "estMinutes": 5,
+  "version": 1
+}
